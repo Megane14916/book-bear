@@ -1,0 +1,14 @@
+{
+  "name": "book-bear",
+  "private": true,
+  "packageManager": "pnpm@10.28.2",
+  "engines": { "node": ">=22.12.0" },
+  "scripts": {
+    "dev:web": "pnpm --filter web dev",
+    "dev:api": "pnpm --filter api dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "generate:openapi": "pnpm --filter api generate:openapi && pnpm --filter web generate:api",
+    "check:openapi": "pnpm --filter api check:openapi && pnpm --filter web check:api"
+  }
+}
