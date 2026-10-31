@@ -1,8 +1,28 @@
 # API設計書（OpenAPI契約の合意用）
 
 > v0.1 / 2026-10-31 / **APIベースパス** `/api/v1`。本書のエンドポイント表では先頭を省略。  
-> **初期ドラフト**：[`../contracts/openapi-draft.yaml`](../contracts/openapi-draft.yaml) は先行モック・型生成の出発点。Hono実装後は生成OpenAPI JSONへ置換する。
+> **初期ドラフト**：[`../contracts/openapi-draft.yaml`](../contracts/openapi-draft.yaml) は初期設計の履歴資料。現在の契約はHono/Zodから生成する `openapi.json` を参照する。
 > **正本の方針**：合意したレスポンス形状を `@hono/zod-openapi` のスキーマとルート定義へ反映し、生成した `openapi.json` をクライアント側で型生成する。本書は設計の意図とエンドポイント一覧を説明する。
+
+### 現在の契約と実装状況（Issue #7）
+
+`apps/api/src/modules/*/schemas.ts` と `src/contracts/routes.ts` を正本として、主要34操作の `contracts/openapi.json` とWebの `src/lib/api/generated.ts` を生成する。`GET /openapi.json` も同一仕様を返す。手書きの初期ドラフトは履歴資料とし、以降の変更はZod定義・生成物・本書に反映する。
+
+- 操作単位の `x-implementation-status: implemented` は稼働済み（現時点ではhealthのみ）。
+- `x-implementation-status: planned` は契約のみ。OpenAPIレジストリに登録するが、HonoのHTTPハンドラーには登録しないため、実APIは現在404となる。記載した成功・認証エラーは今後の実装の契約であり、認証や認可が稼働している意味ではない。
+- `x-auth` は `Public / OptionalAuth / AnyAuth / Owner / Registered`。`OptionalAuth` はJWTなしでも閲覧可、送信時は必ず検証して無効なら401。`Registered` は匿名ユーザーに403。公開化・followingフィードなどの条件付き制限は各操作の説明と403レスポンスに記載する。
+- `followedByMe`・`likedByMe` を返す公開GETと、本人の非公開情報を返し得るGETは任意認証。初期ドラフトの公開プロフィール・返信一覧・投稿検索の認証記載を補完した。
+- 入力はUUID、UTC日時、列挙値、本文長、整数範囲をZodで検証。JSONの数値・booleanは文字列から変換しない。クエリのlimitは数値化し、1〜30（既定15、書籍・ユーザー検索は20）とする。
+- 栞本文はtrim後1〜2,000文字、返信はtrim後1〜1,000文字。表示名はtrim後1〜50文字、bioはnullまたは500文字以内。handleはnullまたは空白のみでない文字列（文字種・長さの追加方針は後続のプロフィール実装で確定する）。
+- 栞作成の `visibility` は省略時 `private`、`isSpoiler` は栞・返信とも省略時false。初期ドラフトの必須指定から、要件書の既定値へ合わせた。PATCHには既定値を適用しない。
+- Webの型生成は `--default-non-nullable false` を指定し、既定値を持つ省略可能な入力をTypeScriptでも省略可能に保つ。
+- PATCHは対応フィールドを1つ以上必要とし、空オブジェクト・未知のフィールドを拒否。省略は変更なし、nullはnullable項目の解除。所有者・作成日時・栞の所属先は入力で変更できない。
+- ISBN-13は978/979の接頭辞、13桁、チェックディジットを検証。openBDのproviderIdもISBN-13。手動登録はISBN・作成者IDを受け付けない。DBにない検索候補はproviderとproviderIdを必ず持つ。こうした項目間条件やtrimの処理はOpenAPIだけでは完全に表せないためZod側でも検証する。
+- ユーザー検索は初期ドラフトの `UserPage` を維持し、カーソル入力がないため `nextCursor` はnullとする。
+
+契約の更新・確認：`pnpm generate:openapi` → `pnpm check:openapi` → `pnpm typecheck` → `pnpm test` → `pnpm build`。MSWはまだリポジトリに存在しないため、本Issueではモックを追加・更新しない。導入時には生成型を使い、認証シナリオ・403/404・空データ・カーソルを再現する。
+
+後続で操作を実装するときは対応する定義を `plannedRoutes` から取り出し、スキーマを再利用して `app.openapi()` に登録する。認証・認可と成功／異常系テストを追加してから、操作の状態を `implemented` に変更し、重複登録を避ける。DBスキーマ・マイグレーションの変更は本Issueには含まれない。
 
 ## 1. 共通ルール
 
