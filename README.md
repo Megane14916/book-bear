@@ -9,6 +9,7 @@ pnpm install
 pnpm dev:api # http://localhost:8787
 pnpm dev:web # http://localhost:5173
 pnpm typecheck
+pnpm test
 pnpm build
 ```
 
@@ -16,4 +17,13 @@ WebのAPI接続先は `apps/web/.env.example` を参考に `apps/web/.env.local`
 
 ## OpenAPI契約
 
-`pnpm generate:openapi` はAPIのHono/Zod定義から `contracts/openapi.json` を生成し、続けてWeb用の型を生成します。生成物はコミットし、変更後は `pnpm check:openapi` で差分がないことを確認します。現在の生成契約に含まれるのは稼働確認用の `/api/v1/health` のみです。`contracts/openapi-draft.yaml` は未実装の機能を含む設計用ドラフトで、実装済みAPIの契約ではありません。
+`pnpm generate:openapi` はAPIのHono/Zod定義から `contracts/openapi.json` を生成し、続けてWeb用の型を生成します。生成物はコミットし、変更後は `pnpm check:openapi` で差分がないことを確認します。APIは同じ仕様を `/openapi.json` でも公開します。
+
+生成契約にはプロフィール、書籍・本棚、栞、フィード、フォロー・いいね・返信、検索の34操作とhealthが含まれます。各操作の **`x-implementation-status`** を確認してください。
+
+- `implemented`：稼働済み。現在は `GET /api/v1/health` のみ。
+- `planned`：Zodで契約を定義済み、ハンドラーは未実装。実APIは現在404を返します。先行するUI開発では生成型とMSWを利用してください。
+
+スキーマは `apps/api/src/modules/*/schemas.ts`、共通項目は `src/shared/schemas.ts`、操作・認証要件は `src/contracts/routes.ts` にあります。JWT検証・DB操作・カーソルの署名や照合は後続実装です。`contracts/openapi-draft.yaml` は初期設計の履歴として残し、生成には利用しません。詳しくは [API設計書](docs/api.md) を参照してください。
+
+`pnpm test` でVitestによるスキーマ境界値・契約・実APIへの未登録の検証を実行します。GitHub Actionsでも型チェック・テスト・契約整合性・ビルドを確認します。現在lintスクリプトは未導入です。

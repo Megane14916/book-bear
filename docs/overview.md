@@ -64,4 +64,4 @@ P0：MVPに必須。P1：主要機能として実装を目指す。P2：余裕�
 - [開発・タスク管理書](docs/development.md)
 - [OpenAPI初期ドラフト](contracts/openapi-draft.yaml)
 
-OpenAPI初期ドラフトはフロントのモック開発用。実装後はHonoの定義から生成したOpenAPI仕様を正本とする。
+OpenAPI仕様の正本はHono/Zod定義から生成した `contracts/openapi.json`。初期ドラフトは履歴資料。生成仕様の `x-implementation-status` で稼働済み操作と未実装の契約を区別する。フロントの先行開発は生成型とMSWを利用する。
