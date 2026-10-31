@@ -1,76 +1,26 @@
-:root {
-  font-family: 'Hiragino Kaku Gothic ProN', 'Yu Gothic', system-ui, sans-serif;
-  color: #29362f;
-  background: #f8f8f5;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
+@import "tailwindcss";
+
+@theme {
+  --color-paper: #f8f8f5;
+  --color-ink: #29362f;
+  --color-mist: #e6f0e7;
+  --color-forest: #34684b;
+  --color-forest-dark: #285139;
 }
 
-* { box-sizing: border-box; }
+@layer base {
+  html {
+    font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", system-ui, sans-serif;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
 
-body { margin: 0; min-width: 320px; }
+  body {
+    min-width: 320px;
+  }
 
-button { font: inherit; cursor: pointer; }
-
-button:focus-visible { outline: 3px solid #5c9077; outline-offset: 3px; }
-
-.site-header {
-  height: 68px;
-  padding: 0 24px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: #ffffff;
-  border-bottom: 1px solid #e7e9e4;
-}
-
-.brand-mark {
-  color: #3c7656;
-  font-size: 22px;
-  transform: rotate(-12deg);
-}
-
-.brand-name { font-size: 18px; font-weight: 800; letter-spacing: .025em; }
-.header-note { color: #89938b; font-size: 11px; margin-left: auto; }
-
-.content { width: min(100%, 740px); margin: 0 auto; padding: 32px 20px 118px; }
-.welcome { padding: 36px 26px; background: #e6f0e7; border-radius: 24px; }
-.eyebrow { margin: 0 0 16px; color: #538063; font-size: 11px; font-weight: 800; letter-spacing: .16em; }
-h1 { margin: 0; font-size: clamp(28px, 7vw, 43px); line-height: 1.45; letter-spacing: .02em; }
-.intro { color: #526356; font-size: 14px; line-height: 2; margin: 16px 0 28px; }
-.primary-button { background: #34684b; color: white; border: none; border-radius: 999px; padding: 14px 22px; font-size: 14px; font-weight: 700; }
-.primary-button:hover { background: #285139; }
-.primary-button span { margin-left: 12px; }
-.section { margin-top: 38px; }
-.section-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
-h2 { font-size: 20px; margin: 0 0 16px; }
-.soft-label { font-size: 11px; color: #8b958d; }
-.empty-state { background: white; border: 1px solid #e7ebe5; border-radius: 20px; padding: 40px 24px; text-align: center; }
-.empty-icon { display: grid; place-items: center; width: 54px; height: 54px; border-radius: 16px; margin: 0 auto 15px; background: #eef4ec; color: #4c775a; font-size: 28px; }
-.empty-title { font-weight: 800; margin: 0 0 7px; }
-.empty-description { color: #78827a; font-size: 13px; line-height: 1.9; margin: 0; }
-.placeholder-page { margin-top: 18px; }
-.placeholder-description { color: #66776a; line-height: 1.9; margin: 12px 0 28px; }
-
-.bottom-nav {
-  position: fixed;
-  z-index: 10;
-  left: 0;
-  bottom: 0;
-  right: 0;
-  background: #fff;
-  border-top: 1px solid #e2e7e2;
-  padding-bottom: env(safe-area-inset-bottom);
-}
-.bottom-nav-inner { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); max-width: 740px; margin: auto; }
-.nav-item { min-height: 70px; padding: 10px 2px; border: 0; background: transparent; color: #929b93; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
-.nav-item-active { color: #34684b; font-weight: 800; }
-.nav-symbol { font-size: 25px; line-height: 1; }
-.nav-label { font-size: 10px; }
-.nav-item:hover { background: #f1f5f0; }
-
-@media (min-width: 720px) {
-  .content { padding-top: 48px; }
-  .welcome { padding: 48px; }
+  button {
+    cursor: pointer;
+  }
 }
