@@ -37,12 +37,13 @@ shiori-sns/
 │   ├── openapi-draft.yaml    # 実装前の仮契約
 │   └── openapi.json          # APIから生成する正本
 ├── docs/
+│   ├── overview.md
 │   ├── requirements.md
 │   ├── api.md
 │   ├── database.md
 │   ├── architecture.md
 │   └── development.md
-├── overview.md
+├── README.md
 ├── pnpm-workspace.yaml
 └── package.json
 ```
