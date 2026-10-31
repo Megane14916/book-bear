@@ -13,15 +13,17 @@ pnpm test
 pnpm build
 ```
 
+DBを使う場合は [Supabase・Hyperdrive初期設定](docs/database-setup.md) を参照してください。外部サービスの作成前でも `pnpm --filter api db:local` と `pnpm --filter api db:migrate` でローカル確認できます。
+
 WebのAPI接続先は `apps/web/.env.example` を参考に `apps/web/.env.local` の `VITE_API_BASE_URL` で変更できます。APIのCORS許可元は既定で `http://localhost:5173` です。環境ごとにWorkersの `CORS_ORIGIN` を設定してください。
 
 ## OpenAPI契約
 
 `pnpm generate:openapi` はAPIのHono/Zod定義から `contracts/openapi.json` を生成し、続けてWeb用の型を生成します。生成物はコミットし、変更後は `pnpm check:openapi` で差分がないことを確認します。APIは同じ仕様を `/openapi.json` でも公開します。
 
-生成契約にはプロフィール、書籍・本棚、栞、フィード、フォロー・いいね・返信、検索の34操作とhealthが含まれます。各操作の **`x-implementation-status`** を確認してください。
+生成契約にはプロフィール、書籍・本棚、栞、フィード、フォロー・いいね・返信、検索の34操作と2種類のhealthが含まれます。各操作の **`x-implementation-status`** を確認してください。
 
-- `implemented`：稼働済み。現在は `GET /api/v1/health` のみ。
+- `implemented`：実装済み。現在は `GET /api/v1/health` とDB接続確認の `GET /api/v1/health/db`。DB確認は設定とマイグレーションが必要です。
 - `planned`：Zodで契約を定義済み、ハンドラーは未実装。実APIは現在404を返します。先行するUI開発では生成型とMSWを利用してください。
 
 スキーマは `apps/api/src/modules/*/schemas.ts`、共通項目は `src/shared/schemas.ts`、操作・認証要件は `src/contracts/routes.ts` にあります。JWT検証・DB操作・カーソルの署名や照合は後続実装です。`contracts/openapi-draft.yaml` は初期設計の履歴として残し、生成には利用しません。詳しくは [API設計書](docs/api.md) を参照してください。

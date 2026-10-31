@@ -8,7 +8,7 @@
 
 `apps/api/src/modules/*/schemas.ts` と `src/contracts/routes.ts` を正本として、主要34操作の `contracts/openapi.json` とWebの `src/lib/api/generated.ts` を生成する。`GET /openapi.json` も同一仕様を返す。手書きの初期ドラフトは履歴資料とし、以降の変更はZod定義・生成物・本書に反映する。
 
-- 操作単位の `x-implementation-status: implemented` は稼働済み（現時点ではhealthのみ）。
+- 操作単位の `x-implementation-status: implemented` は実装済み（現時点ではhealthとDB接続確認）。
 - `x-implementation-status: planned` は契約のみ。OpenAPIレジストリに登録するが、HonoのHTTPハンドラーには登録しないため、実APIは現在404となる。記載した成功・認証エラーは今後の実装の契約であり、認証や認可が稼働している意味ではない。
 - `x-auth` は `Public / OptionalAuth / AnyAuth / Owner / Registered`。`OptionalAuth` はJWTなしでも閲覧可、送信時は必ず検証して無効なら401。`Registered` は匿名ユーザーに403。公開化・followingフィードなどの条件付き制限は各操作の説明と403レスポンスに記載する。
 - `followedByMe`・`likedByMe` を返す公開GETと、本人の非公開情報を返し得るGETは任意認証。初期ドラフトの公開プロフィール・返信一覧・投稿検索の認証記載を補完した。
@@ -23,6 +23,10 @@
 契約の更新・確認：`pnpm generate:openapi` → `pnpm check:openapi` → `pnpm typecheck` → `pnpm test` → `pnpm build`。MSWはまだリポジトリに存在しないため、本Issueではモックを追加・更新しない。導入時には生成型を使い、認証シナリオ・403/404・空データ・カーソルを再現する。
 
 後続で操作を実装するときは対応する定義を `plannedRoutes` から取り出し、スキーマを再利用して `app.openapi()` に登録する。認証・認可と成功／異常系テストを追加してから、操作の状態を `implemented` に変更し、重複登録を避ける。DBスキーマ・マイグレーションの変更は本Issueには含まれない。
+
+### DB接続確認（Issue #8）
+
+`GET /api/v1/health/db` は認証なしのreadiness確認。Hyperdrive binding経由で `profiles` を最大1件読み取り、200 `{ "status": "ok" }` を返す。データ・SQL・接続設定はレスポンスにもログにも出さない。binding未設定、接続失敗、未マイグレーション、権限不足は503の共通エラー形式（code=`INTERNAL_ERROR`）。成功・失敗とも `Cache-Control: no-store`。通常の `GET /api/v1/health` はDBに依存しない。設定手順は [DB初期設定](database-setup.md) を参照。
 
 ## 1. 共通ルール
 

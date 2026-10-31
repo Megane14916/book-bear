@@ -2,6 +2,17 @@
 
 > v0.1 / 2026-10-31。論理設計の正本は `apps/api/src/db/schema/` とDrizzle migrations。SQLは設計例で、環境に合わせてマイグレーション化する。
 
+Issue #8で8テーブルの定義を `apps/api/src/db/schema/index.ts`、初回SQLを `apps/api/drizzle/0000_initial_schema.sql` に実装した。適用・Supabase作成・Hyperdrive設定は [初期設定手順](database-setup.md) を参照。
+
+- `pnpm --filter api db:generate` で生成、`db:check` で履歴の整合性を確認、`db:migrate` で管理用接続に適用する。SQL・snapshotをコミットし、生成差分をCIで検出する。
+- `auth.users` はSupabase管理の既存テーブルへのFK参照だけを定義し、作成・変更の対象に含めない。ローカルテストだけはid列のみの代替テーブルを使用する。
+- UUIDを自動生成し、日時はtimestamptz・now()。`created_at` は更新時の自動変更対象にせず、`updated_at` はDrizzleの `$onUpdate` で更新する。生SQLでの更新は明示的に `updated_at=now()` を指定する。
+- 本棚の読書状態を省略した場合の既定値は `want_to_read`。栞は `private`・ネタバレfalse、表示設定は `tap`。
+- 本文長・列挙値・ページ整数範囲・ISBN形式をCHECKで保証する。ISBNチェックディジットや認可はAPIでも検証する。
+- 全8テーブルでRLSを有効化し、アプリ専用 `book_bear_api` ロールだけにDMLポリシー・権限を付与する。`anon`／`authenticated`／PUBLICからの直接アクセスは許可しない。利用者ごとの認可はHonoで行う。
+- `profiles.id` → `auth.users.id` と設定 → プロフィールはON DELETE CASCADE、書籍の作成者はON DELETE SET NULL。それ以外のFKは既定のNO ACTION。本棚の削除は栞のFKで保護し、Authユーザー削除前にも依存データの整理が必要。
+- `GET /api/v1/health/db` は実際のWorkers接続でprofilesを最大1件読み、内容を返さず接続・マイグレーション・権限を確認する。未設定・失敗時は503、`Cache-Control: no-store`。
+
 ## 1. 設計方針
 
 - ユーザー認証はSupabase Authの `auth.users`。アプリ側プロフィールは `public.profiles` と別管理し、IDを一致させる。
