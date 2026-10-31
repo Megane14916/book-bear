@@ -14,14 +14,14 @@ pnpm --filter api db:local
 別ターミナルで実行する。
 
 ```powershell
-Copy-Item apps/api/.env.example apps/api/.env.local
+Copy-Item apps/api/.env.example apps/api/.env.db.local
 pnpm --filter api db:migrate
 pnpm dev:api
 ```
 
-`.env.local` が既にある場合は上書きせず、内容を確認して編集する。既定のローカル接続先は `127.0.0.1:5433`。`GET http://localhost:8787/api/v1/health/db` が200と `{"status":"ok"}` を返せば、Workers → Hyperdrive ローカルbinding → pg → Drizzle → DB のクエリが成功している。設定不備・未マイグレーション・接続失敗時は内部情報を含まない503を返す。
+`.env.db.local` が既にある場合は上書きせず、内容を確認して編集する。管理用接続はWranglerが通常読み込む `.env`／`.env.local` とは別ファイルに保存し、マイグレーションCLIだけが読み込む。既定のローカル接続先は `127.0.0.1:5433`。`GET http://localhost:8787/api/v1/health/db` が200と `{"status":"ok"}` を返せば、Workers → Hyperdrive ローカルbinding → pg → Drizzle → DB のクエリが成功している。設定不備・未マイグレーション・接続失敗時は内部情報を含まない503を返す。
 
-ローカルDBはPGliteのPostgreSQLエンジンを利用し、`apps/api/.local-db/` に保存する。このディレクトリと `.env.local` はGit対象外。ローカルの `postgres:postgres` はテスト用の固定値で、TCP認証やTLSを提供しないため、サーバーはループバックにだけbindする。共有環境・本番には利用しない。
+ローカルDBはPGliteのPostgreSQLエンジンを利用し、`apps/api/.local-db/` に保存する。このディレクトリと `.env.db.local` はGit対象外。ローカルの `postgres:postgres` はテスト用の固定値で、TCP認証やTLSを提供しないため、サーバーはループバックにだけbindする。共有環境・本番には利用しない。
 
 このローカルDBの `auth.users` は外部キー検証のためのidだけの代替テーブルで、Supabase Authそのものは提供しない。Supabaseを作成後に本物の認証と結合する。クラウド向けマイグレーションは `auth.users` を作成・変更しない。
 
@@ -29,7 +29,7 @@ pnpm dev:api
 
 1. Supabaseにログインし、開発用の新規プロジェクトを作成する。プロジェクト名の例は `book-bear-dev`。DBパスワードはパスワード管理ツールに保存する。
 2. プロジェクトの **Connect** からPostgreSQLの接続情報を取得する。マイグレーションは管理用の `postgres` 接続を使い、Workers用接続とは分離する。
-3. `apps/api/.env.local` の `MIGRATION_DATABASE_URL` を管理用接続文字列に置き換える。パスワードの特殊文字はURLエンコードする。TLSの証明書検証を有効にし、必要ならSupabaseが提供するCA証明書を取得して `sslrootcert` を指定する。
+3. `apps/api/.env.db.local` の `MIGRATION_DATABASE_URL` を管理用接続文字列に置き換える。パスワードの特殊文字はURLエンコードする。TLSの証明書検証を有効にし、必要ならSupabaseが提供するCA証明書を取得して `sslrootcert` を指定する。
 4. ローカル回線からDirect connectionへIPv6接続できない場合、管理用CLIにはConnect画面の **Session pooler（5432）** を使用できる。Transaction pooler（6543）はマイグレーションに使用しない。
 5. 生成SQL `apps/api/drizzle/0000_initial_schema.sql` と `scripts/sql/` を確認してから、開発用接続先で次を実行する。
 
