@@ -6,8 +6,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
-    "generate:api": "openapi-typescript ../../contracts/openapi.json -o src/lib/api/generated.ts",
-    "check:api": "openapi-typescript ../../contracts/openapi.json -o src/lib/api/generated.ts --check"
+    "generate:api": "openapi-typescript ../../contracts/openapi.json -o src/lib/api/generated.ts --default-non-nullable false",
+    "check:api": "openapi-typescript ../../contracts/openapi.json -o src/lib/api/generated.ts --default-non-nullable false --check"
   },
   "dependencies": {
     "openapi-fetch": "^0.14.0",

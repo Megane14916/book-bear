@@ -697,9 +697,9 @@ export interface components {
              * @default private
              * @enum {string}
              */
-            visibility: "public" | "private";
+            visibility?: "public" | "private";
             /** @default false */
-            isSpoiler: boolean;
+            isSpoiler?: boolean;
         };
         PatchBookmarkRequest: {
             pageNumber?: number | null;
@@ -739,7 +739,7 @@ export interface components {
         CreateReplyRequest: {
             content: string;
             /** @default false */
-            isSpoiler: boolean;
+            isSpoiler?: boolean;
         };
         PatchReplyRequest: {
             content?: string;
