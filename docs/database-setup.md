@@ -6,8 +6,10 @@
 
 リポジトリのルートで実行する。
 
+既にWeb/APIの開発サーバーを起動している場合は、それぞれのターミナルで `Ctrl+C` を押して停止してから依存関係をインストールする。特にWindowsでは、Viteなどが使用中のネイティブモジュールを削除・置き換えできない。
+
 ```sh
-pnpm install
+pnpm install --frozen-lockfile
 pnpm --filter api db:local
 ```
 
@@ -24,6 +26,14 @@ pnpm dev:api
 ローカルDBはPGliteのPostgreSQLエンジンを利用し、`apps/api/.local-db/` に保存する。このディレクトリと `.env.db.local` はGit対象外。ローカルの `postgres:postgres` はテスト用の固定値で、TCP認証やTLSを提供しないため、サーバーはループバックにだけbindする。共有環境・本番には利用しない。
 
 このローカルDBの `auth.users` は外部キー検証のためのidだけの代替テーブルで、Supabase Authそのものは提供しない。Supabaseを作成後に本物の認証と結合する。クラウド向けマイグレーションは `auth.users` を作成・変更しない。
+
+### Windowsでインストールが失敗した場合
+
+`EPERM ... unlink ... lightningcss...node` は、起動中のViteなどがそのファイルを使用している可能性がある。Book Bearの開発サーバーを停止してから、ルートで `pnpm install --frozen-lockfile` を再実行する。他のプロジェクトを含むNode.jsプロセスをまとめて終了しない。
+
+失敗したインストールの後に `tsx` が見つからない場合は、依存関係の再インストールが途中で止まっている。インストールの成功を確認してから `pnpm --filter api exec tsx --version`、続けて `pnpm --filter api db:local` を実行する。`tsx` のグローバルインストールは不要。
+
+pnpmストアは `pnpm-workspace.yaml` の `storeDir` で `.pnpm-store` に統一している。依存関係のインストールはリポジトリのルートで実行する。通常は `--store-dir` の追加指定や、ユーザー全体のpnpm設定の変更は不要。
 
 ## 2. Supabase の開発用プロジェクトを作る
 

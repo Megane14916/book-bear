@@ -4,6 +4,8 @@
 
 Node.js 22.12以上とpnpm 10.28.2を使用します。
 
+依存関係をインストールし直す前に、起動中のWeb/API開発サーバーを `Ctrl+C` で停止してください。特にWindowsでは使用中のネイティブモジュールがインストールを妨げることがあります。pnpmストアはリポジトリ内の `.pnpm-store` を使用します。
+
 ```sh
 pnpm install
 pnpm dev:api # http://localhost:8787
