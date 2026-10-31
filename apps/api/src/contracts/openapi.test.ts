@@ -12,8 +12,8 @@ const operations = Object.values(document.paths).flatMap((path) => Object.values
 describe('OpenAPI契約と稼働APIの区別', () => {
   it('主要34操作・healthが一意のoperationIdを持ち、全未実装操作を明示する', () => {
     expect(plannedRoutes).toHaveLength(34)
-    expect(operations).toHaveLength(35)
-    expect(new Set(operations.map((operation) => operation.operationId)).size).toBe(35)
+    expect(operations).toHaveLength(36)
+    expect(new Set(operations.map((operation) => operation.operationId)).size).toBe(36)
     for (const route of plannedRoutes) {
       const operation = document.paths[route.path]?.[route.method]
       expect(operation?.['x-implementation-status']).toBe('planned')
@@ -23,6 +23,7 @@ describe('OpenAPI契約と稼働APIの区別', () => {
       expect(operation?.responses[500]).toBeDefined()
     }
     expect(document.paths['/api/v1/health']?.get?.['x-implementation-status']).toBe('implemented')
+    expect(document.paths['/api/v1/health/db']?.get?.['x-implementation-status']).toBe('implemented')
   })
 
   it('初期ドラフトの全操作をZod定義でカバーする', async () => {
@@ -78,6 +79,13 @@ describe('OpenAPI契約と稼働APIの区別', () => {
       const url = route.path.replace(/\{\w+\}/g, 'a0000000-0000-4000-8000-000000000001')
       expect((await app.request(url, { method: route.method.toUpperCase() })).status).toBe(404)
     }
+  })
+
+  it('DB未設定は接続情報を返さず503、キャッシュを禁止する', async () => {
+    const response = await app.request('/api/v1/health/db')
+    expect(response.status).toBe(503)
+    expect(response.headers.get('Cache-Control')).toBe('no-store')
+    expect(await response.json()).toEqual({ error: { code: 'INTERNAL_ERROR', message: 'データベースを利用できません' } })
   })
 
   it('Zodスキーマを実際のHonoバリデーションに再利用できる', async () => {

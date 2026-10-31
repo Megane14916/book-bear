@@ -20,6 +20,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/health/db": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * DB接続・マイグレーション・アプリロールの読み取り権限を確認
+         * @description HYPERDRIVE接続でprofilesを最大1件読み取る。データや接続情報は返さない。
+         */
+        get: operations["getDatabaseHealth"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me": {
         parameters: {
             query?: never;
@@ -528,6 +548,16 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        Error: {
+            error: {
+                /** @enum {string} */
+                code: "VALIDATION_ERROR" | "INVALID_CURSOR" | "UNAUTHORIZED" | "REGISTRATION_REQUIRED" | "FORBIDDEN" | "NOT_FOUND" | "ALREADY_EXISTS" | "HAS_BOOKMARKS" | "ACCOUNT_LINK_CONFLICT" | "RATE_LIMITED" | "INTERNAL_ERROR" | "BOOK_PROVIDER_UNAVAILABLE";
+                message: string;
+                details?: {
+                    [key: string]: unknown;
+                };
+            };
+        };
         Profile: {
             /** Format: uuid */
             id: string;
@@ -539,16 +569,6 @@ export interface components {
             followersCount: number;
             followingCount: number;
             isAnonymous: boolean;
-        };
-        Error: {
-            error: {
-                /** @enum {string} */
-                code: "VALIDATION_ERROR" | "INVALID_CURSOR" | "UNAUTHORIZED" | "REGISTRATION_REQUIRED" | "FORBIDDEN" | "NOT_FOUND" | "ALREADY_EXISTS" | "HAS_BOOKMARKS" | "ACCOUNT_LINK_CONFLICT" | "RATE_LIMITED" | "INTERNAL_ERROR" | "BOOK_PROVIDER_UNAVAILABLE";
-                message: string;
-                details?: {
-                    [key: string]: unknown;
-                };
-            };
         };
         PatchProfile: {
             displayName?: string;
@@ -773,6 +793,38 @@ export interface operations {
                         /** @enum {string} */
                         status: "ok";
                     };
+                };
+            };
+        };
+    };
+    getDatabaseHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description DBへの接続とクエリが成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        status: "ok";
+                    };
+                };
+            };
+            /** @description DB未設定・接続不可・未マイグレーション・権限不足 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };
