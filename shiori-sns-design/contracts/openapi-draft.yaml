@@ -1,0 +1,1592 @@
+# 初期契約ドラフト：バックエンド実装後、生成されたOpenAPI仕様を正本にする。
+openapi: 3.0.3
+info:
+  title: 栞SNS API（初期ドラフト）
+  version: 0.1.0
+  description: 設計段階の仮契約。Hono実装後は @hono/zod-openapi が生成するOpenAPI仕様を正本として、このファイルは置き換える。正式ユーザー限定の認可は bearerAuth
+    + is_anonymous=false をサーバーで判定する。
+servers:
+- url: http://localhost:8787
+  description: ローカル開発
+tags:
+- name: Profile
+- name: Books
+- name: Library
+- name: Bookmarks
+- name: Feed
+- name: Social
+- name: Replies
+- name: Search
+paths:
+  /api/v1/me:
+    get:
+      tags:
+      - Profile
+      summary: 自分のプロフィール
+      operationId: getMe
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '400': &id001
+          description: パラメータ不正
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401': &id002
+          description: 認証エラー
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403': &id003
+          description: 認可エラー
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404': &id004
+          description: 対象なし
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409': &id005
+          description: 競合
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - bearerAuth: []
+    put:
+      tags:
+      - Profile
+      summary: プロフィール初期化（冪等）
+      operationId: putMe
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '409': *id005
+      security:
+      - bearerAuth: []
+    patch:
+      tags:
+      - Profile
+      summary: プロフィール編集
+      operationId: patchMe
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '409': *id005
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchProfile'
+  /api/v1/me/preferences:
+    get:
+      tags:
+      - Profile
+      summary: 表示設定取得
+      operationId: getMePreferences
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Preferences'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '409': *id005
+      security:
+      - bearerAuth: []
+    patch:
+      tags:
+      - Profile
+      summary: 表示設定更新
+      operationId: patchMePreferences
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Preferences'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '409': *id005
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchPreferences'
+  /api/v1/users/{userId}:
+    get:
+      tags:
+      - Profile
+      summary: 公開プロフィール
+      operationId: getUsersUserid
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicProfile'
+        '400': *id001
+        '404': *id004
+      security: []
+  /api/v1/users/{userId}/followers:
+    get:
+      tags:
+      - Social
+      summary: followers一覧
+      operationId: getUsersUseridFollowers
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 15
+          minimum: 1
+          maximum: 30
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPage'
+        '400': *id001
+        '404': *id004
+      security: []
+  /api/v1/users/{userId}/following:
+    get:
+      tags:
+      - Social
+      summary: following一覧
+      operationId: getUsersUseridFollowing
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 15
+          minimum: 1
+          maximum: 30
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPage'
+        '400': *id001
+        '404': *id004
+      security: []
+  /api/v1/books/search:
+    get:
+      tags:
+      - Books
+      summary: 書名・ISBNから書籍候補を検索
+      operationId: getBooksSearch
+      parameters:
+      - name: q
+        in: query
+        required: true
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+          maximum: 30
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookSearchResult'
+        '400': *id001
+        '404': *id004
+      security: []
+  /api/v1/books/{bookId}:
+    get:
+      tags:
+      - Books
+      summary: 書籍詳細
+      operationId: getBooksBookid
+      parameters:
+      - name: bookId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Book'
+        '400': *id001
+        '404': *id004
+      security: []
+  /api/v1/books/import:
+    post:
+      tags:
+      - Books
+      summary: 外部APIから選択した書籍を取り込む
+      operationId: postBooksImport
+      responses:
+        '201':
+          description: 成功
+          content:
+            application/json:
+              schema: &id006
+                $ref: '#/components/schemas/Book'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '409': *id005
+        '200':
+          description: 既存データを再利用
+          content:
+            application/json:
+              schema: *id006
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImportBookRequest'
+  /api/v1/books/manual:
+    post:
+      tags:
+      - Books
+      summary: ISBNなしの書籍を手動登録
+      operationId: postBooksManual
+      responses:
+        '201':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Book'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '409': *id005
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManualBookRequest'
+  /api/v1/me/books:
+    get:
+      tags:
+      - Library
+      summary: 自分の本棚
+      operationId: getMeBooks
+      parameters:
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 15
+          minimum: 1
+          maximum: 30
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserBookPage'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '409': *id005
+      security:
+      - bearerAuth: []
+    post:
+      tags:
+      - Library
+      summary: 本棚へ登録
+      operationId: postMeBooks
+      responses:
+        '201':
+          description: 成功
+          content:
+            application/json:
+              schema: &id007
+                $ref: '#/components/schemas/UserBook'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '409': *id005
+        '200':
+          description: 既存データを再利用
+          content:
+            application/json:
+              schema: *id007
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserBookRequest'
+  /api/v1/me/books/{userBookId}:
+    patch:
+      tags:
+      - Library
+      summary: 本棚情報更新
+      operationId: patchMeBooksUserbookid
+      parameters:
+      - name: userBookId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserBook'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '409': *id005
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchUserBookRequest'
+    delete:
+      tags:
+      - Library
+      summary: 本棚から削除（栞があれば409）
+      operationId: deleteMeBooksUserbookid
+      parameters:
+      - name: userBookId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: No Content
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '409': *id005
+      security:
+      - bearerAuth: []
+  /api/v1/users/{userId}/books:
+    get:
+      tags:
+      - Library
+      summary: 公開栞のある本一覧
+      operationId: getUsersUseridBooks
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 15
+          minimum: 1
+          maximum: 30
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicBookPage'
+        '400': *id001
+        '404': *id004
+      security: []
+  /api/v1/bookmarks:
+    post:
+      tags:
+      - Bookmarks
+      summary: 栞を作成（publicは正式ユーザーのみ）
+      operationId: postBookmarks
+      responses:
+        '201':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookmarkCard'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '409': *id005
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBookmarkRequest'
+  /api/v1/bookmarks/{bookmarkId}:
+    get:
+      tags:
+      - Bookmarks
+      summary: 公開または本人の栞詳細
+      operationId: getBookmarksBookmarkid
+      parameters:
+      - name: bookmarkId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookmarkCard'
+        '400': *id001
+        '404': *id004
+      security:
+      - {}
+      - bearerAuth: []
+      description: JWTは任意。非公開栞は本人以外404
+    patch:
+      tags:
+      - Bookmarks
+      summary: 自分の栞を編集
+      operationId: patchBookmarksBookmarkid
+      parameters:
+      - name: bookmarkId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookmarkCard'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '409': *id005
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchBookmarkRequest'
+    delete:
+      tags:
+      - Bookmarks
+      summary: 自分の栞を論理削除
+      operationId: deleteBookmarksBookmarkid
+      parameters:
+      - name: bookmarkId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: No Content
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '409': *id005
+      security:
+      - bearerAuth: []
+  /api/v1/me/bookmarks:
+    get:
+      tags:
+      - Bookmarks
+      summary: 自分の公開・非公開栞を新しい順に取得
+      operationId: getMeBookmarks
+      parameters:
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 15
+          minimum: 1
+          maximum: 30
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedPage'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '409': *id005
+      security:
+      - bearerAuth: []
+  /api/v1/users/{userId}/books/{bookId}/bookmarks:
+    get:
+      tags:
+      - Bookmarks
+      summary: 栞の流れ（投稿日時ASC。本人のみ非公開を含む）
+      operationId: getUsersUseridBooksBookidBookmarks
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: bookId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 15
+          minimum: 1
+          maximum: 30
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookmarkFlowPage'
+        '400': *id001
+        '404': *id004
+      security:
+      - {}
+      - bearerAuth: []
+  /api/v1/feed:
+    get:
+      tags:
+      - Feed
+      summary: 公開タイムライン（投稿日時DESC）
+      operationId: getFeed
+      parameters:
+      - name: scope
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - all
+          - following
+          default: all
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 15
+          minimum: 1
+          maximum: 30
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedPage'
+        '400': *id001
+        '404': *id004
+      security:
+      - {}
+      - bearerAuth: []
+      description: scope=followingは正式ユーザーのみ。allはJWT任意
+  /api/v1/users/{userId}/follow:
+    put:
+      tags:
+      - Social
+      summary: フォロー追加
+      operationId: putUsersUseridFollow
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: No Content
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '409': *id005
+      security:
+      - bearerAuth: []
+    delete:
+      tags:
+      - Social
+      summary: フォロー解除
+      operationId: deleteUsersUseridFollow
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: No Content
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '409': *id005
+      security:
+      - bearerAuth: []
+  /api/v1/bookmarks/{bookmarkId}/like:
+    put:
+      tags:
+      - Social
+      summary: いいね追加
+      operationId: putBookmarksBookmarkidLike
+      parameters:
+      - name: bookmarkId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: No Content
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '409': *id005
+      security:
+      - bearerAuth: []
+    delete:
+      tags:
+      - Social
+      summary: いいね解除
+      operationId: deleteBookmarksBookmarkidLike
+      parameters:
+      - name: bookmarkId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: No Content
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '409': *id005
+      security:
+      - bearerAuth: []
+  /api/v1/bookmarks/{bookmarkId}/replies:
+    get:
+      tags:
+      - Replies
+      summary: 公開栞の返信一覧
+      operationId: getBookmarksBookmarkidReplies
+      parameters:
+      - name: bookmarkId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 15
+          minimum: 1
+          maximum: 30
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReplyPage'
+        '400': *id001
+        '404': *id004
+      security: []
+    post:
+      tags:
+      - Replies
+      summary: 公開栞に返信
+      operationId: postBookmarksBookmarkidReplies
+      parameters:
+      - name: bookmarkId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '201':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reply'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '409': *id005
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReplyRequest'
+  /api/v1/replies/{replyId}:
+    patch:
+      tags:
+      - Replies
+      summary: 自分の返信を編集
+      operationId: patchRepliesReplyid
+      parameters:
+      - name: replyId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reply'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '409': *id005
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchReplyRequest'
+    delete:
+      tags:
+      - Replies
+      summary: 自分の返信を論理削除
+      operationId: deleteRepliesReplyid
+      parameters:
+      - name: replyId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: No Content
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '409': *id005
+      security:
+      - bearerAuth: []
+  /api/v1/search/posts:
+    get:
+      tags:
+      - Search
+      summary: 公開栞のテキスト検索
+      operationId: getSearchPosts
+      parameters:
+      - name: q
+        in: query
+        required: true
+        schema:
+          type: string
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 15
+          minimum: 1
+          maximum: 30
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedPage'
+        '400': *id001
+        '404': *id004
+      security: []
+  /api/v1/search/users:
+    get:
+      tags:
+      - Search
+      summary: 表示名・handle検索
+      operationId: getSearchUsers
+      parameters:
+      - name: q
+        in: query
+        required: true
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+          maximum: 30
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPage'
+        '400': *id001
+        '404': *id004
+      security: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Supabase Auth access token。匿名の操作範囲はAPI側で制御。
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+              additionalProperties: true
+          required:
+          - code
+          - message
+      required:
+      - error
+    UserSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        avatarUrl:
+          type: string
+          nullable: true
+      required:
+      - id
+      - displayName
+      - avatarUrl
+    Profile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        handle:
+          type: string
+          nullable: true
+        displayName:
+          type: string
+        bio:
+          type: string
+          nullable: true
+        avatarUrl:
+          type: string
+          nullable: true
+        isAnonymous:
+          type: boolean
+        followersCount:
+          type: integer
+        followingCount:
+          type: integer
+      required:
+      - id
+      - handle
+      - displayName
+      - bio
+      - avatarUrl
+      - isAnonymous
+      - followersCount
+      - followingCount
+    PublicProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        handle:
+          type: string
+          nullable: true
+        displayName:
+          type: string
+        bio:
+          type: string
+          nullable: true
+        avatarUrl:
+          type: string
+          nullable: true
+        followersCount:
+          type: integer
+        followingCount:
+          type: integer
+        publicBookmarkCount:
+          type: integer
+        followedByMe:
+          type: boolean
+      required:
+      - id
+      - handle
+      - displayName
+      - bio
+      - avatarUrl
+      - followersCount
+      - followingCount
+      - publicBookmarkCount
+      - followedByMe
+    Preferences:
+      type: object
+      properties:
+        feedContentMode:
+          type: string
+          enum:
+          - all
+          - tap
+      required:
+      - feedContentMode
+    PatchPreferences:
+      type: object
+      properties:
+        feedContentMode:
+          type: string
+          enum:
+          - all
+          - tap
+      required:
+      - feedContentMode
+    PatchProfile:
+      type: object
+      properties:
+        displayName:
+          type: string
+        bio:
+          type: string
+          nullable: true
+        handle:
+          type: string
+          nullable: true
+    BookSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        isbn13:
+          type: string
+          nullable: true
+        title:
+          type: string
+        author:
+          type: string
+          nullable: true
+        coverUrl:
+          type: string
+          nullable: true
+      required:
+      - id
+      - isbn13
+      - title
+      - author
+      - coverUrl
+    Book:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        isbn13:
+          type: string
+          nullable: true
+        title:
+          type: string
+        author:
+          type: string
+          nullable: true
+        publisher:
+          type: string
+          nullable: true
+        totalPages:
+          type: integer
+          nullable: true
+        coverUrl:
+          type: string
+          nullable: true
+        source:
+          type: string
+          enum:
+          - google_books
+          - openbd
+          - manual
+      required:
+      - id
+      - isbn13
+      - title
+      - author
+      - publisher
+      - totalPages
+      - coverUrl
+      - source
+    BookSearchItem:
+      type: object
+      properties:
+        localBookId:
+          type: string
+          format: uuid
+          nullable: true
+        provider:
+          type: string
+          enum:
+          - google_books
+          - openbd
+          nullable: true
+        providerId:
+          type: string
+          nullable: true
+        isbn13:
+          type: string
+          nullable: true
+        title:
+          type: string
+        author:
+          type: string
+          nullable: true
+        totalPages:
+          type: integer
+          nullable: true
+        coverUrl:
+          type: string
+          nullable: true
+      required:
+      - localBookId
+      - provider
+      - providerId
+      - isbn13
+      - title
+      - author
+      - totalPages
+      - coverUrl
+    BookSearchResult:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/BookSearchItem'
+      required:
+      - items
+    ImportBookRequest:
+      type: object
+      properties:
+        provider:
+          type: string
+          enum:
+          - google_books
+          - openbd
+        providerId:
+          type: string
+      required:
+      - provider
+      - providerId
+    ManualBookRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        author:
+          type: string
+          nullable: true
+        totalPages:
+          type: integer
+          nullable: true
+      required:
+      - title
+    UserBook:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        book:
+          $ref: '#/components/schemas/BookSummary'
+        status:
+          type: string
+          enum:
+          - want_to_read
+          - reading
+          - completed
+        currentPage:
+          type: integer
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - id
+      - userId
+      - book
+      - status
+      - currentPage
+      - createdAt
+      - updatedAt
+    CreateUserBookRequest:
+      type: object
+      properties:
+        bookId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - want_to_read
+          - reading
+          - completed
+      required:
+      - bookId
+    PatchUserBookRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+          - want_to_read
+          - reading
+          - completed
+        currentPage:
+          type: integer
+          nullable: true
+    BookmarkCard:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        author:
+          $ref: '#/components/schemas/UserSummary'
+        book:
+          $ref: '#/components/schemas/BookSummary'
+        pageNumber:
+          type: integer
+          nullable: true
+        content:
+          type: string
+        visibility: &id008
+          type: string
+          enum:
+          - public
+          - private
+        isSpoiler:
+          type: boolean
+        likeCount:
+          type: integer
+        replyCount:
+          type: integer
+        likedByMe:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - id
+      - author
+      - book
+      - pageNumber
+      - content
+      - visibility
+      - isSpoiler
+      - likeCount
+      - replyCount
+      - likedByMe
+      - createdAt
+      - updatedAt
+    BookmarkFlowItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        pageNumber:
+          type: integer
+          nullable: true
+        content:
+          type: string
+        visibility: *id008
+        isSpoiler:
+          type: boolean
+        likeCount:
+          type: integer
+        replyCount:
+          type: integer
+        likedByMe:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - id
+      - pageNumber
+      - content
+      - visibility
+      - isSpoiler
+      - likeCount
+      - replyCount
+      - likedByMe
+      - createdAt
+      - updatedAt
+    FeedPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/BookmarkCard'
+        nextCursor:
+          type: string
+          nullable: true
+      required:
+      - items
+      - nextCursor
+    BookmarkFlowPage:
+      type: object
+      properties:
+        author:
+          $ref: '#/components/schemas/UserSummary'
+        book:
+          $ref: '#/components/schemas/BookSummary'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/BookmarkFlowItem'
+        nextCursor:
+          type: string
+          nullable: true
+      required:
+      - author
+      - book
+      - items
+      - nextCursor
+    CreateBookmarkRequest:
+      type: object
+      properties:
+        userBookId:
+          type: string
+          format: uuid
+        pageNumber:
+          type: integer
+          nullable: true
+        content:
+          type: string
+        visibility: *id008
+        isSpoiler:
+          type: boolean
+      required:
+      - userBookId
+      - content
+      - visibility
+      - isSpoiler
+    PatchBookmarkRequest:
+      type: object
+      properties:
+        pageNumber:
+          type: integer
+          nullable: true
+        content:
+          type: string
+        visibility: *id008
+        isSpoiler:
+          type: boolean
+    Reply:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        author:
+          $ref: '#/components/schemas/UserSummary'
+        content:
+          type: string
+        isSpoiler:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - id
+      - author
+      - content
+      - isSpoiler
+      - createdAt
+      - updatedAt
+    ReplyPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Reply'
+        nextCursor:
+          type: string
+          nullable: true
+      required:
+      - items
+      - nextCursor
+    CreateReplyRequest:
+      type: object
+      properties:
+        content:
+          type: string
+        isSpoiler:
+          type: boolean
+      required:
+      - content
+      - isSpoiler
+    PatchReplyRequest:
+      type: object
+      properties:
+        content:
+          type: string
+        isSpoiler:
+          type: boolean
+    UserPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserSummary'
+        nextCursor:
+          type: string
+          nullable: true
+      required:
+      - items
+      - nextCursor
+    UserBookPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserBook'
+        nextCursor:
+          type: string
+          nullable: true
+      required:
+      - items
+      - nextCursor
+    PublicBookPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/BookSummary'
+        nextCursor:
+          type: string
+          nullable: true
+      required:
+      - items
+      - nextCursor
