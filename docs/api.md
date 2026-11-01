@@ -41,6 +41,12 @@
 
 MSWは未導入のためモックの変更はない。Web用生成型を更新しており、フロントはSupabase SDKで取得したアクセストークンをBearerで送信する。
 
+### Google Custom OIDCへのバックエンド対応（Issue #18）
+
+Custom providerの識別子は `custom:google`、要求scopeは `openid email` のみ。Honoは既存のSupabase JWT検証・プロフィールAPIを再利用し、GoogleのID tokenやprovider access tokenを直接受け付けない。Google由来のmetadataから氏名・画像・emailをアプリへコピーせず、同UIDの既存値と設定を保持する。API契約とDBスキーマの変更はない。
+
+`pnpm --filter api auth:google` に設定表示・ローカル形式検査・利用者自身のブラウザによるログイン／匿名連携の確認を用意した。Googleログイン、scopeとSupabase Auth内部の保存内容の実サービス確認は手動で行う。手順と未検証範囲は [Google OIDC設定・手動確認](google-oidc-setup.md) を参照。フロントのSDK・UIは後続実装で、SDKはAuth専用、Data APIは使用しない。
+
 ## 1. 共通ルール
 
 - JSONフィールドは `camelCase`。DBは `snake_case`、変換はAPI側。
@@ -336,7 +342,7 @@ MVPでは日本語検索を `ILIKE` 等の簡易検索で開始。データ量�
 
 1. 初回に本を本棚へ登録しようとしたら、フロントがSupabase `signInAnonymously()` を呼ぶ。
 2. フロントは `PUT /me` でプロフィールを作成し、JWTを付けて本棚APIへアクセス。
-3. Google連携時、`supabase.auth.linkIdentity({ provider: 'google' })` を実行。
+3. Google連携時はCustom OIDC provider `custom:google` を指定してSDKのIdentity連携を実行する。組み込みGoogle providerを使う初期方針から変更し、scopeは `openid email` に限定する。フロント側のSDK呼び出しは後続実装。
 4. 同じUIDで正式ユーザーになれば記録はそのまま。連携失敗／既存Googleアカウントとの競合は明示的に表示し、自動マージはしない。
 5. サーバーはJWTの署名・issuer・audience・exp等を検証し、`sub` と `is_anonymous` を読んで認可する。
 6. ログアウトやユーザー切替時はフロントの個人用TanStack Queryキャッシュを消去する。
