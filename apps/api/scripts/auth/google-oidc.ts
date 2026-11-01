@@ -7,6 +7,9 @@ export const googleOidc = {
   provider_type: 'oidc', identifier: 'custom:google', name: 'Google (email only)',
   issuer: 'https://accounts.google.com', scopes: ['openid', 'email'],
   pkce_enabled: true, skip_nonce_check: false, email_optional: false,
+  // Custom providers accept a caller's scopes override. Their stored
+  // authorization params are applied last, so pin the outgoing scope too.
+  authorization_params: { scope: 'openid email', access_type: 'online', include_granted_scopes: 'false' },
 } as const
 
 export class AuthCheckError extends Error {}

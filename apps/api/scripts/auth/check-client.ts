@@ -35,7 +35,7 @@ export class GoogleCheckClient {
     return session
   }
 
-  async authorization(challenge: string, redirectTo: string, session?: Session) {
+  async authorization(challenge: string, redirectTo: string, session?: Session, probeScopeOverride = false) {
     const nonce = randomBytes(32).toString('base64url')
     const endpoint = session ? 'user/identities/authorize' : 'authorize'
     const url = new URL(`${this.config.supabaseUrl}/auth/v1/${endpoint}`)
@@ -43,6 +43,9 @@ export class GoogleCheckClient {
       code_challenge: challenge, code_challenge_method: 's256', nonce, ...(session ? { skip_http_redirect: 'true' } : {}),
     }).toString()
     // Do not pass scopes here: inspect the provider's actual configured scopes.
+    // The explicit probe asks Supabase for an override, but NEVER follows the
+    // resulting Google URL. It must still be pinned to openid email or fail.
+    if (probeScopeOverride) url.searchParams.set('scopes', 'openid email profile')
     let googleUrl: string
     if (session) {
       const data = await this.json(url, 'Identity link authorization', z.object({ url: z.string() }), { headers: this.authHeaders(session.access_token) })
@@ -89,6 +92,19 @@ export class GoogleCheckClient {
     return { profile, preferences: await this.preferences(session) }
   }
 
+  async prepareLink(session: Session) {
+    await this.initialize(session)
+    await this.json(`${this.config.apiUrl}/api/v1/me`, 'Prepare test profile', Profile, {
+      method: 'PATCH', headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ displayName: '連携確認用', bio: 'OIDC連携前の確認データ' }),
+    })
+    await this.json(`${this.config.apiUrl}/api/v1/me/preferences`, 'Prepare test preferences', Preferences, {
+      method: 'PATCH', headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ feedContentMode: 'all' }),
+    })
+    return { profile: await this.profile(session, 'GET'), preferences: await this.preferences(session) }
+  }
+
   async verify(session: Session, before?: Awaited<ReturnType<GoogleCheckClient['initialize']>>) {
     // Auth HTTPS validates the token; Hono also verifies its signature/claims.
     // Do not trust a decoded JWT as the identity or create a mismatched profile.
@@ -108,7 +124,10 @@ export class GoogleCheckClient {
       if (current.preferences.feedContentMode !== before.preferences.feedContentMode) throw new AuthCheckError('Google linking changed existing preferences.')
     }
     const initialized = await this.initialize(session)
-    if (JSON.stringify(initialized) !== JSON.stringify(current)) throw new AuthCheckError('Repeated PUT /me changed the application profile or preferences.')
+    if ((['id', 'isAnonymous', 'displayName', 'handle', 'bio', 'avatarUrl'] as const).some((key) => initialized.profile[key] !== current.profile[key])
+      || initialized.preferences.feedContentMode !== current.preferences.feedContentMode) {
+      throw new AuthCheckError('Repeated PUT /me changed the application profile or preferences.')
+    }
     const publicProfile = await this.json(`${this.config.apiUrl}/api/v1/users/${user.id}`, 'API public profile', z.record(z.unknown()))
     if (['email', 'email_verified', 'user_metadata', 'identity_data', 'isAnonymous', 'feedContentMode'].some((key) => key in publicProfile)) {
       throw new AuthCheckError('The public profile exposed private Auth or preference fields.')

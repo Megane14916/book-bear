@@ -20,7 +20,8 @@ function googleUrl(overrides: Record<string, string | undefined> = {}) {
 
 describe('Custom Google OIDC設定・最小scope', () => {
   it('provider設定はopenid email、PKCEとnonce検証を使う', () => {
-    expect(googleOidc).toMatchObject({ identifier: 'custom:google', issuer: 'https://accounts.google.com', scopes: ['openid', 'email'], pkce_enabled: true, skip_nonce_check: false })
+    expect(googleOidc).toMatchObject({ identifier: 'custom:google', issuer: 'https://accounts.google.com', scopes: ['openid', 'email'], pkce_enabled: true, skip_nonce_check: false,
+      authorization_params: { scope: 'openid email', access_type: 'online', include_granted_scopes: 'false' } })
     expect(readCheckConfig(env)).toMatchObject({ port: 8790, apiUrl: env.API_BASE_URL })
   })
   it.each([
@@ -113,6 +114,16 @@ describe('手動確認クライアント（外部通信なし）', () => {
       await expect(new GoogleCheckClient(config, fetcher).authorization(createPkce().challenge, redirectTo)).rejects.toThrow()
     }
   })
+  it('scope上書きprobeはSupabaseだけに要求し、Google向けURLのscopeが増えたら拒否する', async () => {
+    const pinned = transport()
+    await new GoogleCheckClient(config, pinned).authorization(createPkce().challenge, redirectTo, undefined, true)
+    expect(new URL(String(pinned.mock.calls[0][0])).searchParams.get('scopes')).toBe('openid email profile')
+    expect(new URL(String(pinned.mock.calls[0][0])).origin).toBe(supabaseUrl)
+    const unpinned: typeof fetch = async (input) => Response.redirect(googleUrl({
+      nonce: new URL(String(input)).searchParams.get('nonce')!, scope: 'openid email profile',
+    }), 302)
+    await expect(new GoogleCheckClient(config, unpinned).authorization(createPkce().challenge, redirectTo, undefined, true)).rejects.toThrow('scope')
+  })
   it('PKCE交換・更新と既存APIで同UIDを検証し、Data APIを呼ばない', async () => {
     const fetcher = transport(), client = new GoogleCheckClient(config, fetcher)
     const session = await client.exchange('one-time-code', 'verifier-secret')
@@ -125,6 +136,19 @@ describe('手動確認クライアント（外部通信なし）', () => {
       if (url.origin === config.apiUrl) expect(new Headers(init?.headers).has('apikey')).toBe(false)
       if (url.searchParams.get('grant_type') === 'pkce') expect(JSON.parse(String(init?.body))).toEqual({ auth_code: 'one-time-code', code_verifier: 'verifier-secret' })
       if (url.searchParams.get('grant_type') === 'refresh_token') expect(JSON.parse(String(init?.body))).toEqual({ refresh_token: 'refresh-secret' })
+    }
+  })
+  it('連携前の検証データは本人のHono APIだけで準備する', async () => {
+    const fetcher = transport(), client = new GoogleCheckClient(config, fetcher)
+    await client.prepareLink(makeSession())
+    const writes = fetcher.mock.calls.filter(([, init]) => init?.method === 'PATCH')
+    expect(writes).toHaveLength(2)
+    expect(writes.map(([input]) => new URL(String(input)).pathname)).toEqual(['/api/v1/me', '/api/v1/me/preferences'])
+    expect(JSON.parse(String(writes[0][1]?.body))).toEqual({ displayName: '連携確認用', bio: 'OIDC連携前の確認データ' })
+    expect(JSON.parse(String(writes[1][1]?.body))).toEqual({ feedContentMode: 'all' })
+    for (const [input, init] of writes) {
+      expect(new URL(String(input)).origin).toBe(config.apiUrl)
+      expect(new Headers(init?.headers).get('Authorization')).toBe(`Bearer ${accessToken}`)
     }
   })
   it('UID不一致ではアプリAPIへ書き込まず、Authの応答・ネットワークエラーを漏らさない', async () => {
