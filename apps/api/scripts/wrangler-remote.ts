@@ -18,7 +18,9 @@ if (!['dev', 'deploy'].includes(command) || (command === 'dev' && !args.includes
   const configPath = join(apiDirectory, `wrangler.remote.${randomUUID()}.json`)
   try {
     const source = await readFile(join(apiDirectory, 'wrangler.jsonc'), 'utf8')
-    const config = createRemoteConfig(source, process.env.HYPERDRIVE_ID)
+    const config = createRemoteConfig(source, process.env.HYPERDRIVE_ID, {
+      SUPABASE_URL: process.env.SUPABASE_URL, CORS_ORIGIN: process.env.CORS_ORIGIN,
+    })
     await writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`, { flag: 'wx' })
     const require = createRequire(import.meta.url)
     const cli = join(dirname(require.resolve('wrangler/package.json')), 'bin/wrangler.js')

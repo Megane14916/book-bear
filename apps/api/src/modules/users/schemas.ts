@@ -3,8 +3,7 @@ import { count, cursorPage, nonEmptyText, patchObject, uuid } from '../../shared
 
 const displayName = nonEmptyText().max(50)
 const bio = z.string().max(500).nullable()
-// Handle character/length policy is intentionally left to the profile implementation.
-const handle = nonEmptyText().nullable()
+const handle = z.string().trim().min(3).max(30).regex(/^[a-z0-9_]+$/).nullable()
 
 export const UserSummary = z.object({
   id: uuid, displayName, avatarUrl: z.string().url().nullable(),

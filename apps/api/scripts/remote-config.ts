@@ -3,7 +3,7 @@ import { parse, type ParseError } from 'jsonc-parser'
 type HyperdriveConfig = { binding: string; id: string; [key: string]: unknown }
 export type RemoteConfig = Record<string, unknown> & { hyperdrive: HyperdriveConfig[] }
 
-export function createRemoteConfig(source: string, hyperdriveId: string | undefined): RemoteConfig {
+export function createRemoteConfig(source: string, hyperdriveId: string | undefined, variables: { SUPABASE_URL?: string; CORS_ORIGIN?: string } = {}): RemoteConfig {
   const id = hyperdriveId?.trim()
   if (!id || !/^[a-f0-9]{32}$/i.test(id) || /^0{32}$/.test(id)) {
     throw new Error('Set HYPERDRIVE_ID to your 32-character Hyperdrive ID in apps/api/.env.deploy.local or the shell environment.')
@@ -21,6 +21,10 @@ export function createRemoteConfig(source: string, hyperdriveId: string | undefi
   }
   return {
     ...base,
+    vars: {
+      ...(base.vars as Record<string, unknown> | undefined),
+      ...Object.fromEntries(Object.entries(variables).filter(([key, value]) => ['SUPABASE_URL', 'CORS_ORIGIN'].includes(key) && value !== undefined)),
+    },
     hyperdrive: bindings.map((binding) => binding.binding === 'HYPERDRIVE' ? { ...binding, id } : binding),
   }
 }

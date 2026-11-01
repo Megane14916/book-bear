@@ -1,0 +1,4 @@
+# Copy to .dev.vars for local Wrangler only (ignored by Git).
+# dev:remote / deploy:worker use .env.deploy.local instead.
+SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+CORS_ORIGIN=http://localhost:5173

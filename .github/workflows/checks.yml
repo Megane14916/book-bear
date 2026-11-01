@@ -49,4 +49,6 @@ jobs:
         run: pnpm --filter api deploy:worker --dry-run
         env:
           HYPERDRIVE_ID: '1234567890abcdef1234567890abcdef'
+          SUPABASE_URL: 'https://ci-placeholder.supabase.co'
+          CORS_ORIGIN: 'https://web.example.com'
           WRANGLER_SEND_METRICS: 'false'
