@@ -160,6 +160,8 @@ VITE_USE_MOCK_AUTH=false
 
 Backendの主な設定：`HYPERDRIVE`（DB接続binding）、`SUPABASE_URL`、JWT検証用設定、CORS許可origin、必要に応じて書籍APIキー。秘密値はWorkers Secretsなどで管理する。
 
+Issue #9のJWT検証はSupabaseのES256/RS256公開鍵を使用し、JWT secretやservice_roleキーは不要。リモート起動／デプロイは `.env.deploy.local` の `HYPERDRIVE_ID`・`SUPABASE_URL`・`CORS_ORIGIN`、ローカルWranglerは `.dev.vars` を使用する。設定と結合確認は [認証設定手順](auth-setup.md) を参照。
+
 ローカル起動用のnpm scriptsを用意する。
 
 ```bash

@@ -8,12 +8,12 @@
 
 `apps/api/src/modules/*/schemas.ts` と `src/contracts/routes.ts` を正本として、主要34操作の `contracts/openapi.json` とWebの `src/lib/api/generated.ts` を生成する。`GET /openapi.json` も同一仕様を返す。手書きの初期ドラフトは履歴資料とし、以降の変更はZod定義・生成物・本書に反映する。
 
-- 操作単位の `x-implementation-status: implemented` は実装済み（現時点ではhealthとDB接続確認）。
+- 操作単位の `x-implementation-status: implemented` は実装済み（health・DB接続確認と、Issue #9のプロフィール／設定6操作）。
 - `x-implementation-status: planned` は契約のみ。OpenAPIレジストリに登録するが、HonoのHTTPハンドラーには登録しないため、実APIは現在404となる。記載した成功・認証エラーは今後の実装の契約であり、認証や認可が稼働している意味ではない。
 - `x-auth` は `Public / OptionalAuth / AnyAuth / Owner / Registered`。`OptionalAuth` はJWTなしでも閲覧可、送信時は必ず検証して無効なら401。`Registered` は匿名ユーザーに403。公開化・followingフィードなどの条件付き制限は各操作の説明と403レスポンスに記載する。
 - `followedByMe`・`likedByMe` を返す公開GETと、本人の非公開情報を返し得るGETは任意認証。初期ドラフトの公開プロフィール・返信一覧・投稿検索の認証記載を補完した。
 - 入力はUUID、UTC日時、列挙値、本文長、整数範囲をZodで検証。JSONの数値・booleanは文字列から変換しない。クエリのlimitは数値化し、1〜30（既定15、書籍・ユーザー検索は20）とする。
-- 栞本文はtrim後1〜2,000文字、返信はtrim後1〜1,000文字。表示名はtrim後1〜50文字、bioはnullまたは500文字以内。handleはnullまたは空白のみでない文字列（文字種・長さの追加方針は後続のプロフィール実装で確定する）。
+- 栞本文はtrim後1〜2,000文字、返信はtrim後1〜1,000文字。表示名はtrim後1〜50文字、bioはnullまたは500文字以内。handleはnullまたはtrim後の小文字英数字と `_` の3〜30文字。
 - 栞作成の `visibility` は省略時 `private`、`isSpoiler` は栞・返信とも省略時false。初期ドラフトの必須指定から、要件書の既定値へ合わせた。PATCHには既定値を適用しない。
 - Webの型生成は `--default-non-nullable false` を指定し、既定値を持つ省略可能な入力をTypeScriptでも省略可能に保つ。
 - PATCHは対応フィールドを1つ以上必要とし、空オブジェクト・未知のフィールドを拒否。省略は変更なし、nullはnullable項目の解除。所有者・作成日時・栞の所属先は入力で変更できない。
@@ -27,6 +27,19 @@
 ### DB接続確認（Issue #8）
 
 `GET /api/v1/health/db` は認証なしのreadiness確認。Hyperdrive binding経由で `profiles` を最大1件読み取り、200 `{ "status": "ok" }` を返す。データ・SQL・接続設定はレスポンスにもログにも出さない。binding未設定、接続失敗、未マイグレーション、権限不足は503の共通エラー形式（code=`INTERNAL_ERROR`）。成功・失敗とも `Cache-Control: no-store`。通常の `GET /api/v1/health` はDBに依存しない。設定手順は [DB初期設定](database-setup.md) を参照。
+
+### 認証・プロフィール（Issue #9）
+
+`GET/PUT/PATCH /me`、`GET/PATCH /me/preferences`、`GET /users/{userId}` の6操作を実装した。定義は `modules/users/routes.ts`、HTTP処理は `http.ts`、DB操作は `service.ts`。生成契約の34操作のうち28操作は引き続きplanned。
+
+- `middleware/auth.ts` で固定プロジェクトのJWKSからES256／RS256を検証する。issuerは `SUPABASE_URL + /auth/v1`、audienceは `authenticated`。exp／iat／sub／role／session_id／is_anonymousを必須とする。JWTなし・不正・期限切れは401、設定不備・JWKS取得障害は503。HS256は使わない。
+- 本人のID・匿名状態は検証済みclaimから取得し、本文やユーザーメタデータで上書きしない。公開プロフィールは任意認証で、提示したJWTが不正なら401。
+- `PUT /me` はプロフィールと表示設定を同一トランザクションで作成し、既存値・作成更新日時を変更しない。GET／PATCHは未初期化なら404。Authに存在しないIDの初期化はFKでも拒否する。
+- PATCHは本人だけを更新。handle重複は409 `ALREADY_EXISTS` で全更新を取り消す。表示名・handleはtrimし、bio／handleのnullは解除、省略は保持。
+- 公開プロフィールは公開・未削除の栞の件数とフォロー件数を実DBから集計。設定・匿名状態は公開しない。全6操作で成功・失敗とも `Cache-Control: no-store`。
+- JWTのローカル署名検証だけではサインアウト・ユーザー停止の即時反映を保証しない。鍵キャッシュ・失効の扱いとSupabase側設定は [認証設定手順](auth-setup.md) を参照。
+
+MSWは未導入のためモックの変更はない。Web用生成型を更新しており、フロントはSupabase SDKで取得したアクセストークンをBearerで送信する。
 
 ## 1. 共通ルール
 

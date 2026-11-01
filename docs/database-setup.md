@@ -71,6 +71,8 @@ postgresql://book_bear_api:ENCODED_PASSWORD@db.PROJECT_REF.supabase.co:5432/post
 
 アプリロールのポリシーはバックエンド全体のアクセスを許可するもので、利用者ごとの認可を代行しない。JWTの検証・所有者・公開範囲の判定は後続のHono実装で必ず行う。Supabase Data APIから本棚・非公開栞へ直接アクセスさせるポリシーは作らない。
 
+JWT検証とプロフィール・表示設定APIはIssue #9で実装済み。DB設定の完了後は [Supabase匿名認証の設定](auth-setup.md) へ進む。その他のリソースの所有者・公開範囲の認可は各APIの実装時に追加する。
+
 ## 3. Cloudflare Hyperdrive を作る
 
 1. Cloudflareアカウントを用意し、Hyperdriveで開発用設定（例 `book-bear-dev`）を作成する。
@@ -116,7 +118,7 @@ pnpm --filter api dev:remote
 
 同じ `/api/v1/health/db` の200を確認し、Dashboardでもクエリキャッシュ無効を再確認する。デプロイする場合は対象環境のIDを確認して `pnpm --filter api deploy:worker` を実行する。`pnpm --filter api deploy:worker --dry-run` ならアップロードせずに設定とビルドを検証できる。CORS許可元はWebの開発・公開originに合わせて `CORS_ORIGIN` を設定する。
 
-Supabase・Cloudflareのリソースがまだないため、今回の作業で検証するのはローカルWorkersとCIまで。実クラウド上の200確認は、この設定完了後に実施する。
+自動テストで検証するのはローカルWorkersと使い捨てDB・CIまで。実クラウド上の200確認は、この設定完了後に実施する。続く認証設定は [匿名認証・プロフィールAPI](auth-setup.md) を参照。
 
 ## 5. テストと変更時の作業
 
@@ -130,6 +132,8 @@ pnpm build
 ```
 
 通常のDBテストは毎回一時的なPGliteに生成SQLを適用し、実際のpg TCP接続でFK・UNIQUE・CHECK・RLS・権限とWorkers接続を検証する。CIではPostgreSQL 17の使い捨てサービスに同じテストを実行する。`TEST_DATABASE_URL` はローカルの `book_bear_test` DBにだけ許可し、Supabaseへテスト用Authテーブルを作らない。
+
+CIでDBテストのファイルが同じ使い捨てDBを共有するため、テストスクリプトはファイル間の並列実行を無効にする。プロフィール初期化の並行リクエストは専用テスト内でPostgreSQLに対して検証する。
 
 `src/db/schema/index.ts` を変更したらマイグレーションを生成し、SQLとsnapshotをコミットする。CIで再生成の差分も検出する。DB本文長・ISBN形式の制約に加え、API側でもtrim・ISBNチェックディジット・入力・認可を検証する。
 

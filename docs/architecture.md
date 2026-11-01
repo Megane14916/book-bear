@@ -230,6 +230,7 @@ sequenceDiagram
 ```
 
 - JWKSによる署名確認はSupabaseプロジェクトが非対称署名キーでJWTを発行している場合の手法。署名方式・`issuer`・`audience`・失効／ユーザー停止時の対応をプロジェクト設定に合わせて設計する。信頼できないJWTのpayloadを検証前に信用しない。
+- Issue #9で `jose` によるES256/RS256検証とプロフィール・表示設定APIを実装。`SUPABASE_URL` からissuer／JWKSを固定し、audience=`authenticated`、expと必須ユーザーclaimを検証する。HS256は非対応。アクセストークンの失効・ユーザー停止を即時反映するAuth照会は未実装。設定と検証範囲は [認証設定手順](auth-setup.md) を参照。
 - `auth.users` とアプリテーブルのユーザーIDを一致させる。
 - **Hyperdrive経由のDBセッションはSupabase AuthユーザーJWTのRLS文脈を自動的に持たない。** Honoで認可し、直接Supabase Data APIを公開しない設計にする。
 - DBロールは最小権限、マイグレーション用とAPI用を分ける。

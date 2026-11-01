@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { resolve } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { sql } from 'drizzle-orm'
 import { createApp } from '../src/index'
@@ -66,14 +67,21 @@ describe('プロフィール・表示設定API（実DB・最小権限・署名�
     expect((await request('/api/v1/me', 'PUT', undefined, otherToken)).status).toBe(200)
   })
   it('PATCHは本人のみ更新し、trim・null・省略を区別する', async () => {
+    await fixture.client.query("UPDATE profiles SET updated_at='2000-01-01T00:00:00Z' WHERE id=$1", [userId])
+    const before = (await fixture.client.query('SELECT created_at FROM profiles WHERE id=$1', [userId])).rows[0]
     const response = await request('/api/v1/me', 'PATCH', { displayName: '  読書好き  ', bio: '紹介', handle: 'reader_9' })
     expect(response.status).toBe(200)
     expect(await response.json()).toMatchObject({ id: userId, displayName: '読書好き', bio: '紹介', handle: 'reader_9', isAnonymous: true })
+    const after = (await fixture.client.query('SELECT created_at,updated_at FROM profiles WHERE id=$1', [userId])).rows[0]
+    expect(after.created_at).toEqual(before.created_at)
+    expect(after.updated_at.getTime()).toBeGreaterThan(Date.parse('2000-01-01T00:00:00Z'))
     expect(await (await request('/api/v1/me', 'GET', undefined, otherToken)).json()).toMatchObject({ id: otherId, displayName: 'ゲスト', bio: null, handle: null, isAnonymous: false })
     expect(await (await request('/api/v1/me', 'PATCH', { bio: null })).json()).toMatchObject({ bio: null, handle: 'reader_9', displayName: '読書好き' })
   })
   it('設定の更新も本人に限定する', async () => {
+    await fixture.client.query("UPDATE user_preferences SET updated_at='2000-01-01T00:00:00Z' WHERE user_id=$1", [userId])
     expect(await (await request('/api/v1/me/preferences', 'PATCH', { feedContentMode: 'all' })).json()).toEqual({ feedContentMode: 'all' })
+    expect((await fixture.client.query('SELECT updated_at FROM user_preferences WHERE user_id=$1', [userId])).rows[0].updated_at.getTime()).toBeGreaterThan(Date.parse('2000-01-01T00:00:00Z'))
     expect(await (await request('/api/v1/me/preferences', 'GET', undefined, otherToken)).json()).toEqual({ feedContentMode: 'tap' })
   })
   it('再PUTでプロフィール・設定・作成更新日時を上書きしない', async () => {
@@ -165,4 +173,34 @@ describe('プロフィール・表示設定API（実DB・最小権限・署名�
     expect((await fixture.client.query('SELECT count(*)::int AS count FROM profiles WHERE id=$1', [id])).rows[0].count).toBe(1)
     expect((await fixture.client.query('SELECT count(*)::int AS count FROM user_preferences WHERE user_id=$1', [id])).rows[0].count).toBe(1)
   })
+  it('実Workersで署名検証からHyperdrive binding経由の初期化・取得まで動作する', async () => {
+    const names = ['CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE', 'WRANGLER_LOG_PATH', 'WRANGLER_SEND_METRICS'] as const
+    const previous = names.map((name) => process.env[name])
+    process.env.CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE = fixture.apiConnectionString
+    process.env.WRANGLER_LOG_PATH = resolve('.wrangler/logs')
+    process.env.WRANGLER_SEND_METRICS = 'false'
+    const { unstable_dev } = await import('wrangler')
+    let worker: Awaited<ReturnType<typeof unstable_dev>> | undefined
+    try {
+      worker = await unstable_dev('tests/fixtures/auth-worker.ts', {
+        config: 'wrangler.jsonc', local: true, ip: '127.0.0.1', port: 0, inspectorPort: 0, persist: false, logLevel: 'error',
+        vars: { SUPABASE_URL: supabaseUrl, TEST_JWKS: JSON.stringify(signing.jwks) },
+        experimental: { disableExperimentalWarning: true, disableDevRegistry: true, watch: false },
+      })
+      const headers = { Authorization: `Bearer ${token}` }
+      const initialized = await worker.fetch('/api/v1/me', { method: 'PUT', headers })
+      expect(initialized.status).toBe(200)
+      expect(await initialized.json()).toMatchObject({ id: userId, isAnonymous: true, displayName: '読書好き' })
+      const profile = await worker.fetch('/api/v1/me', { headers })
+      expect(profile.status).toBe(200)
+      expect(profile.headers.get('Cache-Control')).toBe('no-store')
+      expect((await worker.fetch('/api/v1/me', { headers: { Authorization: `Bearer ${await signing.sign({ exp: 1 })}` } })).status).toBe(401)
+    } finally {
+      await worker?.stop()
+      names.forEach((name, index) => {
+        if (previous[index] === undefined) delete process.env[name]
+        else process.env[name] = previous[index]
+      })
+    }
+  }, 60000)
 })
