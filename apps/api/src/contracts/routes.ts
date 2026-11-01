@@ -3,8 +3,7 @@ import {
   BookmarkFlowParams, BookmarkIdParams, BookIdParams, ErrorSchema, PaginationQuery,
   ReplyIdParams, SearchQuery, UserBookIdParams, UserIdParams, nonEmptyText,
 } from '../shared/schemas'
-import { PatchProfile, Profile, PublicProfile, UserPage } from '../modules/users/schemas'
-import { PatchPreferences, Preferences } from '../modules/preferences/schemas'
+import { UserPage } from '../modules/users/schemas'
 import { Book, BookSearchResult, ImportBookRequest, ManualBookRequest, PublicBookPage } from '../modules/books/schemas'
 import { CreateUserBookRequest, PatchUserBookRequest, UserBook, UserBookPage } from '../modules/library/schemas'
 import { BookmarkCard, BookmarkFlowPage, CreateBookmarkRequest, FeedPage, PatchBookmarkRequest } from '../modules/bookmarks/schemas'
@@ -64,17 +63,6 @@ const registeredPublish = 'visibility=publicの作成・公開化は正式ユー
 // These definitions are registered only in the OpenAPI registry, never as HTTP handlers.
 // When implementing an operation, reuse its schema/route and move it to app.openapi().
 export const plannedRoutes: PlannedRoute[] = [
-  planned({ method: 'get', path: '/api/v1/me', operationId: 'getMe', tags: ['Profile'], summary: '自分のプロフィール', responses: { 200: json(Profile) } }, 'AnyAuth', [404]),
-  planned({ method: 'put', path: '/api/v1/me', operationId: 'putMe', tags: ['Profile'], summary: 'プロフィール初期化（冪等）',
-    description: 'profilesとuser_preferencesを既定値で作成。既存データは変更せず同じUIDのプロフィールを返す。表示設定の初期値はtap。',
-    responses: { 200: json(Profile) } }, 'AnyAuth'),
-  planned({ method: 'patch', path: '/api/v1/me', operationId: 'patchMe', tags: ['Profile'], summary: 'プロフィール編集',
-    request: { body: body(PatchProfile) }, responses: { 200: json(Profile) } }, 'Owner', [404, 409]),
-  planned({ method: 'get', path: '/api/v1/me/preferences', operationId: 'getMePreferences', tags: ['Profile'], summary: '表示設定取得', responses: { 200: json(Preferences) } }, 'AnyAuth', [404]),
-  planned({ method: 'patch', path: '/api/v1/me/preferences', operationId: 'patchMePreferences', tags: ['Profile'], summary: '表示設定更新',
-    request: { body: body(PatchPreferences) }, responses: { 200: json(Preferences) } }, 'AnyAuth', [404]),
-  planned({ method: 'get', path: '/api/v1/users/{userId}', operationId: 'getUsersUserid', tags: ['Profile'], summary: '公開プロフィール',
-    description: '未認証のfollowedByMeはfalse。', request: { params: UserIdParams }, responses: { 200: json(PublicProfile) } }, 'OptionalAuth', [404]),
   ...(['followers', 'following'] as const).map((kind) => planned({
     method: 'get', path: `/api/v1/users/{userId}/${kind}`,
     operationId: kind === 'followers' ? 'getUsersUseridFollowers' : 'getUsersUseridFollowing',

@@ -39,4 +39,10 @@ describe('environment-based remote config', () => {
     expect(source).toContain('00000000000000000000000000000000')
     expect(source).not.toContain(id)
   })
+  it('リモートWorkerへ公開設定だけを渡し、秘密値やIDをvarsへ含めない', () => {
+    const variables = { SUPABASE_URL: 'https://test.supabase.co', CORS_ORIGIN: 'https://web.example.com',
+      MIGRATION_DATABASE_URL: 'must-not-copy', SUPABASE_SERVICE_ROLE_KEY: 'must-not-copy', HYPERDRIVE_ID: id }
+    const config = createRemoteConfig(base, id, variables)
+    expect(config.vars).toEqual({ SUPABASE_URL: variables.SUPABASE_URL, CORS_ORIGIN: variables.CORS_ORIGIN })
+  })
 })

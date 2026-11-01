@@ -11,7 +11,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "Supabase Auth access token。署名・issuer・audience・expを検証し、subとis_anonymousで認可。契約定義のみでJWT検証実装は未提供。"
+        "description": "Supabase Auth access token。プロジェクトのJWKSによるES256/RS256署名・issuer・audience=authenticated・expを検証し、subとis_anonymousで認可。HS256は非対応。"
       }
     },
     "schemas": {
@@ -78,7 +78,9 @@
           "handle": {
             "type": "string",
             "nullable": true,
-            "minLength": 1
+            "minLength": 3,
+            "maxLength": 30,
+            "pattern": "^[a-z0-9_]+$"
           },
           "bio": {
             "type": "string",
@@ -124,7 +126,9 @@
           "handle": {
             "type": "string",
             "nullable": true,
-            "minLength": 1
+            "minLength": 3,
+            "maxLength": 30,
+            "pattern": "^[a-z0-9_]+$"
           }
         },
         "additionalProperties": false,
@@ -181,7 +185,9 @@
           "handle": {
             "type": "string",
             "nullable": true,
-            "minLength": 1
+            "minLength": 3,
+            "maxLength": 30,
+            "pattern": "^[a-z0-9_]+$"
           },
           "bio": {
             "type": "string",
@@ -943,19 +949,18 @@
     },
     "/api/v1/me": {
       "get": {
-        "operationId": "getMe",
         "tags": [
           "Profile"
         ],
-        "summary": "自分のプロフィール",
         "security": [
           {
             "bearerAuth": []
           }
         ],
-        "description": "【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。Supabase Bearer JWT必須。匿名・正式ユーザーともに利用可能。 ",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "x-auth": "AnyAuth",
+        "operationId": "getMe",
+        "summary": "自分のプロフィール",
         "responses": {
           "200": {
             "description": "成功",
@@ -968,7 +973,7 @@
             }
           },
           "400": {
-            "description": "VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル",
+            "description": "VALIDATION_ERROR: 入力不正",
             "content": {
               "application/json": {
                 "schema": {
@@ -978,7 +983,7 @@
             }
           },
           "401": {
-            "description": "UNAUTHORIZED: 必須JWTがない、または送信されたJWTが無効・期限切れ",
+            "description": "UNAUTHORIZED: JWTなし・無効・期限切れ",
             "content": {
               "application/json": {
                 "schema": {
@@ -988,17 +993,7 @@
             }
           },
           "404": {
-            "description": "NOT_FOUND: 対象なし。第三者の非公開栞・削除済み栞も存在を明かさず404",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "RATE_LIMITED: 操作回数制限",
+            "description": "NOT_FOUND: プロフィールまたは設定が未作成",
             "content": {
               "application/json": {
                 "schema": {
@@ -1008,7 +1003,17 @@
             }
           },
           "500": {
-            "description": "INTERNAL_ERROR: 内部情報を含めないサーバーエラー",
+            "description": "INTERNAL_ERROR: 内部情報を含めないエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "INTERNAL_ERROR: 認証設定不備・JWKS取得失敗",
             "content": {
               "application/json": {
                 "schema": {
@@ -1020,19 +1025,19 @@
         }
       },
       "put": {
-        "operationId": "putMe",
         "tags": [
           "Profile"
         ],
-        "summary": "プロフィール初期化（冪等）",
-        "description": "【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。Supabase Bearer JWT必須。匿名・正式ユーザーともに利用可能。 profilesとuser_preferencesを既定値で作成。既存データは変更せず同じUIDのプロフィールを返す。表示設定の初期値はtap。",
         "security": [
           {
             "bearerAuth": []
           }
         ],
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "x-auth": "AnyAuth",
+        "operationId": "putMe",
+        "summary": "プロフィール初期化（冪等）",
+        "description": "JWTのsubでprofilesとuser_preferencesを同一トランザクション内で既定値作成。既存データは変更しない。表示名ゲスト、設定tap。クライアントのIDやメタデータは使用しない。",
         "responses": {
           "200": {
             "description": "成功",
@@ -1045,7 +1050,7 @@
             }
           },
           "400": {
-            "description": "VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル",
+            "description": "VALIDATION_ERROR: 入力不正",
             "content": {
               "application/json": {
                 "schema": {
@@ -1055,7 +1060,7 @@
             }
           },
           "401": {
-            "description": "UNAUTHORIZED: 必須JWTがない、または送信されたJWTが無効・期限切れ",
+            "description": "UNAUTHORIZED: JWTなし・無効・期限切れ",
             "content": {
               "application/json": {
                 "schema": {
@@ -1064,8 +1069,8 @@
               }
             }
           },
-          "429": {
-            "description": "RATE_LIMITED: 操作回数制限",
+          "404": {
+            "description": "NOT_FOUND: プロフィールまたは設定が未作成",
             "content": {
               "application/json": {
                 "schema": {
@@ -1075,7 +1080,17 @@
             }
           },
           "500": {
-            "description": "INTERNAL_ERROR: 内部情報を含めないサーバーエラー",
+            "description": "INTERNAL_ERROR: 内部情報を含めないエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "INTERNAL_ERROR: 認証設定不備・JWKS取得失敗",
             "content": {
               "application/json": {
                 "schema": {
@@ -1087,19 +1102,19 @@
         }
       },
       "patch": {
-        "operationId": "patchMe",
         "tags": [
           "Profile"
         ],
-        "summary": "プロフィール編集",
         "security": [
           {
             "bearerAuth": []
           }
         ],
-        "description": "【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。Supabase Bearer JWT必須。匿名・正式ともに本人のみ。所有者は検証済みJWTのsubから判定。 ",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "x-auth": "Owner",
+        "operationId": "patchMe",
+        "summary": "本人のプロフィール編集",
+        "description": "JWTのsubに一致するプロフィールのみ更新。handleは小文字英数字と_の3〜30文字、nullで解除。",
         "requestBody": {
           "required": true,
           "content": {
@@ -1122,7 +1137,7 @@
             }
           },
           "400": {
-            "description": "VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル",
+            "description": "VALIDATION_ERROR: 入力不正",
             "content": {
               "application/json": {
                 "schema": {
@@ -1132,17 +1147,7 @@
             }
           },
           "401": {
-            "description": "UNAUTHORIZED: 必須JWTがない、または送信されたJWTが無効・期限切れ",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "REGISTRATION_REQUIRED: 正式登録が必要 / FORBIDDEN: 操作権限なし",
+            "description": "UNAUTHORIZED: JWTなし・無効・期限切れ",
             "content": {
               "application/json": {
                 "schema": {
@@ -1152,7 +1157,7 @@
             }
           },
           "404": {
-            "description": "NOT_FOUND: 対象なし。第三者の非公開栞・削除済み栞も存在を明かさず404",
+            "description": "NOT_FOUND: プロフィールまたは設定が未作成",
             "content": {
               "application/json": {
                 "schema": {
@@ -1162,17 +1167,7 @@
             }
           },
           "409": {
-            "description": "ALREADY_EXISTS / HAS_BOOKMARKS / ACCOUNT_LINK_CONFLICT: 重複・競合",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "RATE_LIMITED: 操作回数制限",
+            "description": "ALREADY_EXISTS: handleが使用済み",
             "content": {
               "application/json": {
                 "schema": {
@@ -1182,7 +1177,17 @@
             }
           },
           "500": {
-            "description": "INTERNAL_ERROR: 内部情報を含めないサーバーエラー",
+            "description": "INTERNAL_ERROR: 内部情報を含めないエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "INTERNAL_ERROR: 認証設定不備・JWKS取得失敗",
             "content": {
               "application/json": {
                 "schema": {
@@ -1196,19 +1201,18 @@
     },
     "/api/v1/me/preferences": {
       "get": {
-        "operationId": "getMePreferences",
         "tags": [
           "Profile"
         ],
-        "summary": "表示設定取得",
         "security": [
           {
             "bearerAuth": []
           }
         ],
-        "description": "【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。Supabase Bearer JWT必須。匿名・正式ユーザーともに利用可能。 ",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "x-auth": "AnyAuth",
+        "operationId": "getMePreferences",
+        "summary": "本人の表示設定取得",
         "responses": {
           "200": {
             "description": "成功",
@@ -1221,7 +1225,7 @@
             }
           },
           "400": {
-            "description": "VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル",
+            "description": "VALIDATION_ERROR: 入力不正",
             "content": {
               "application/json": {
                 "schema": {
@@ -1231,7 +1235,7 @@
             }
           },
           "401": {
-            "description": "UNAUTHORIZED: 必須JWTがない、または送信されたJWTが無効・期限切れ",
+            "description": "UNAUTHORIZED: JWTなし・無効・期限切れ",
             "content": {
               "application/json": {
                 "schema": {
@@ -1241,17 +1245,7 @@
             }
           },
           "404": {
-            "description": "NOT_FOUND: 対象なし。第三者の非公開栞・削除済み栞も存在を明かさず404",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "RATE_LIMITED: 操作回数制限",
+            "description": "NOT_FOUND: プロフィールまたは設定が未作成",
             "content": {
               "application/json": {
                 "schema": {
@@ -1261,7 +1255,17 @@
             }
           },
           "500": {
-            "description": "INTERNAL_ERROR: 内部情報を含めないサーバーエラー",
+            "description": "INTERNAL_ERROR: 内部情報を含めないエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "INTERNAL_ERROR: 認証設定不備・JWKS取得失敗",
             "content": {
               "application/json": {
                 "schema": {
@@ -1273,19 +1277,18 @@
         }
       },
       "patch": {
-        "operationId": "patchMePreferences",
         "tags": [
           "Profile"
         ],
-        "summary": "表示設定更新",
         "security": [
           {
             "bearerAuth": []
           }
         ],
-        "description": "【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。Supabase Bearer JWT必須。匿名・正式ユーザーともに利用可能。 ",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "x-auth": "AnyAuth",
+        "operationId": "patchMePreferences",
+        "summary": "本人の表示設定更新",
         "requestBody": {
           "required": true,
           "content": {
@@ -1308,7 +1311,7 @@
             }
           },
           "400": {
-            "description": "VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル",
+            "description": "VALIDATION_ERROR: 入力不正",
             "content": {
               "application/json": {
                 "schema": {
@@ -1318,7 +1321,7 @@
             }
           },
           "401": {
-            "description": "UNAUTHORIZED: 必須JWTがない、または送信されたJWTが無効・期限切れ",
+            "description": "UNAUTHORIZED: JWTなし・無効・期限切れ",
             "content": {
               "application/json": {
                 "schema": {
@@ -1328,17 +1331,7 @@
             }
           },
           "404": {
-            "description": "NOT_FOUND: 対象なし。第三者の非公開栞・削除済み栞も存在を明かさず404",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "RATE_LIMITED: 操作回数制限",
+            "description": "NOT_FOUND: プロフィールまたは設定が未作成",
             "content": {
               "application/json": {
                 "schema": {
@@ -1348,7 +1341,17 @@
             }
           },
           "500": {
-            "description": "INTERNAL_ERROR: 内部情報を含めないサーバーエラー",
+            "description": "INTERNAL_ERROR: 内部情報を含めないエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "INTERNAL_ERROR: 認証設定不備・JWKS取得失敗",
             "content": {
               "application/json": {
                 "schema": {
@@ -1362,20 +1365,20 @@
     },
     "/api/v1/users/{userId}": {
       "get": {
-        "operationId": "getUsersUserid",
         "tags": [
           "Profile"
         ],
-        "summary": "公開プロフィール",
-        "description": "【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。JWTは任意。送信されたJWTは検証し、無効なら401。 未認証のfollowedByMeはfalse。",
         "security": [
           {},
           {
             "bearerAuth": []
           }
         ],
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "x-auth": "OptionalAuth",
+        "operationId": "getUsersUserid",
+        "summary": "公開プロフィール",
+        "description": "JWTは任意。送信時は検証し無効なら401。非公開・削除済み栞は件数に含めず、匿名状態や設定を公開しない。未認証のfollowedByMeはfalse。",
         "parameters": [
           {
             "schema": {
@@ -1399,7 +1402,7 @@
             }
           },
           "400": {
-            "description": "VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル",
+            "description": "VALIDATION_ERROR: 入力不正",
             "content": {
               "application/json": {
                 "schema": {
@@ -1409,7 +1412,7 @@
             }
           },
           "401": {
-            "description": "UNAUTHORIZED: 必須JWTがない、または送信されたJWTが無効・期限切れ",
+            "description": "UNAUTHORIZED: JWTなし・無効・期限切れ",
             "content": {
               "application/json": {
                 "schema": {
@@ -1419,17 +1422,7 @@
             }
           },
           "404": {
-            "description": "NOT_FOUND: 対象なし。第三者の非公開栞・削除済み栞も存在を明かさず404",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "RATE_LIMITED: 操作回数制限",
+            "description": "NOT_FOUND: プロフィールまたは設定が未作成",
             "content": {
               "application/json": {
                 "schema": {
@@ -1439,7 +1432,17 @@
             }
           },
           "500": {
-            "description": "INTERNAL_ERROR: 内部情報を含めないサーバーエラー",
+            "description": "INTERNAL_ERROR: 内部情報を含めないエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "INTERNAL_ERROR: 認証設定不備・JWKS取得失敗",
             "content": {
               "application/json": {
                 "schema": {

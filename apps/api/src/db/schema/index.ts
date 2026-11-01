@@ -12,7 +12,7 @@ const apiAccess = () => pgPolicy('backend_access', {
 })
 const createdAt = () => timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow()
 const updatedAt = () => timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow()
-  .$onUpdate(() => sql`now()`)
+  .$onUpdate(() => new Date())
 
 export const profiles = pgTable('profiles', {
   id: uuid('id').primaryKey().references(() => authUsers.id, { onDelete: 'cascade' }),

@@ -6,12 +6,13 @@ Issue #8で8テーブルの定義を `apps/api/src/db/schema/index.ts`、初回S
 
 - `pnpm --filter api db:generate` で生成、`db:check` で履歴の整合性を確認、`db:migrate` で管理用接続に適用する。SQL・snapshotをコミットし、生成差分をCIで検出する。
 - `auth.users` はSupabase管理の既存テーブルへのFK参照だけを定義し、作成・変更の対象に含めない。ローカルテストだけはid列のみの代替テーブルを使用する。
-- UUIDを自動生成し、日時はtimestamptz・now()。`created_at` は更新時の自動変更対象にせず、`updated_at` はDrizzleの `$onUpdate` で更新する。生SQLでの更新は明示的に `updated_at=now()` を指定する。
+- UUIDを自動生成し、日時のDB既定値はtimestamptz・now()。`created_at` は更新時の自動変更対象にせず、`updated_at` はDrizzleの `$onUpdate(() => new Date())` で更新する。生SQLでの更新は明示的に `updated_at=now()` を指定する。
 - 本棚の読書状態を省略した場合の既定値は `want_to_read`。栞は `private`・ネタバレfalse、表示設定は `tap`。
 - 本文長・列挙値・ページ整数範囲・ISBN形式をCHECKで保証する。ISBNチェックディジットや認可はAPIでも検証する。
 - 全8テーブルでRLSを有効化し、アプリ専用 `book_bear_api` ロールだけにDMLポリシー・権限を付与する。`anon`／`authenticated`／PUBLICからの直接アクセスは許可しない。利用者ごとの認可はHonoで行う。
 - `profiles.id` → `auth.users.id` と設定 → プロフィールはON DELETE CASCADE、書籍の作成者はON DELETE SET NULL。それ以外のFKは既定のNO ACTION。本棚の削除は栞のFKで保護し、Authユーザー削除前にも依存データの整理が必要。
 - `GET /api/v1/health/db` は実際のWorkers接続でprofilesを最大1件読み、内容を返さず接続・マイグレーション・権限を確認する。未設定・失敗時は503、`Cache-Control: no-store`。
+- Issue #9のプロフィール／表示設定は既存テーブルを使う。`PUT /me` は同一トランザクションで各PKに `ON CONFLICT DO NOTHING` を使い、既存値を保持する。更新日時のDrizzle実行時処理の修正にSQL差分はなく、追加マイグレーションは不要。
 
 ## 1. 設計方針
 
