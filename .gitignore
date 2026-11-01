@@ -5,6 +5,8 @@ dist/
 .env
 .env.*
 !.env.example
+!.env.deploy.example
 .dev.vars*
 *.tsbuildinfo
 .local-db/
+/apps/api/wrangler.remote.*.json

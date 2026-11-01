@@ -45,3 +45,8 @@ jobs:
       - run: pnpm build
         env:
           WRANGLER_SEND_METRICS: 'false'
+      - name: Verify environment-based remote configuration without deployment
+        run: pnpm --filter api deploy:worker --dry-run
+        env:
+          HYPERDRIVE_ID: '1234567890abcdef1234567890abcdef'
+          WRANGLER_SEND_METRICS: 'false'

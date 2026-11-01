@@ -83,7 +83,22 @@ pnpm --filter api exec wrangler hyperdrive update YOUR_HYPERDRIVE_ID --caching-d
 ```
 
 4. Dashboardまたは `wrangler hyperdrive get YOUR_HYPERDRIVE_ID` で **`caching.disabled = true`** を確認する。これはHyperdrive側の設定であり、`wrangler.jsonc` だけでは無効化できない。キャッシュを残すと非公開化した投稿の古い公開データを返すおそれがある。
-5. `apps/api/wrangler.jsonc` の `hyperdrive[0].id` に実際のIDを設定する。現在のゼロのIDはローカル検証用のプレースホルダー。ID自体は秘密値ではない。binding名は `HYPERDRIVE` のままとする。
+5. `apps/api/.env.deploy.example` を `.env.deploy.local` にコピーし、`HYPERDRIVE_ID` に実際のIDを設定する。ファイルが既にあれば上書きせず編集する。
+
+```powershell
+if (!(Test-Path -LiteralPath apps/api/.env.deploy.local)) {
+    Copy-Item apps/api/.env.deploy.example apps/api/.env.deploy.local
+}
+notepad apps/api/.env.deploy.local
+```
+
+```dotenv
+HYPERDRIVE_ID=YOUR_32_CHARACTER_HYPERDRIVE_ID
+```
+
+ID自体はDBパスワードではないが、環境ごとの設定としてGit対象外のファイルで管理する。`wrangler.jsonc` のゼロのIDはローカル検証専用で、書き換えない。`HYPERDRIVE_ID` は実行時のWorkers変数ではなく、リモート起動／デプロイ用CLIが読み取る設定。シェルやCIの環境変数で同名の値を設定することもできる。
+
+`dev:remote`／`deploy:worker` は環境変数のIDを反映した一時設定をAPIディレクトリ内に生成し、Wranglerに `--config` で渡す。生成ファイル `wrangler.remote.*.json` はGit対象外で、通常のコマンド終了時に削除する。ベース設定や相対パスは維持し、IDが未設定・不正・ゼロの場合はリモート操作を開始しない。ローカルの `pnpm dev:api` とビルドはID未設定でも利用できる。
 
 DBパスワードはHyperdriveの接続設定で保持する。Workersはbindingの `connectionString` を利用し、管理用接続文字列は持たない。フロントの `VITE_` 変数にDB情報を入れない。`nodejs_compat` は設定済み。
 
@@ -93,13 +108,13 @@ DBパスワードはHyperdriveの接続設定で保持する。Workersはbinding
 
 `GET /api/v1/health/db` が200ならDB接続とprofilesの読み取り権限を確認できる。ただし `wrangler dev` はDirect connectionを使い、実際のHyperdriveプール／キャッシュは通らない。
 
-Hyperdrive経由の検証には、開発用Hyperdrive IDを設定したうえで次を実行する。
+Hyperdrive経由の検証には、前節の `.env.deploy.local` またはシェル環境変数に開発用Hyperdrive IDを設定したうえで次を実行する。
 
 ```sh
-pnpm --filter api exec wrangler dev --remote
+pnpm --filter api dev:remote
 ```
 
-同じ `/api/v1/health/db` の200を確認し、Dashboardでもクエリキャッシュ無効を再確認する。デプロイする場合は開発用の設定を確認して `pnpm --filter api exec wrangler deploy` を実行する。CORS許可元はWebの開発・公開originに合わせて `CORS_ORIGIN` を設定する。
+同じ `/api/v1/health/db` の200を確認し、Dashboardでもクエリキャッシュ無効を再確認する。デプロイする場合は対象環境のIDを確認して `pnpm --filter api deploy:worker` を実行する。`pnpm --filter api deploy:worker --dry-run` ならアップロードせずに設定とビルドを検証できる。CORS許可元はWebの開発・公開originに合わせて `CORS_ORIGIN` を設定する。
 
 Supabase・Cloudflareのリソースがまだないため、今回の作業で検証するのはローカルWorkersとCIまで。実クラウド上の200確認は、この設定完了後に実施する。
 

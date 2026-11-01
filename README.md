@@ -17,6 +17,8 @@ pnpm build
 
 DBを使う場合は [Supabase・Hyperdrive初期設定](docs/database-setup.md) を参照してください。外部サービスの作成前でも `pnpm --filter api db:local` と `pnpm --filter api db:migrate` でローカル確認できます。
 
+実際のHyperdrive IDは `apps/api/.env.deploy.local` の `HYPERDRIVE_ID` で管理し、`wrangler.jsonc` には書き込みません。リモートでの接続確認は `pnpm --filter api dev:remote`、デプロイは `pnpm --filter api deploy:worker` を使用します。設定例は `apps/api/.env.deploy.example` にあります。
+
 WebのAPI接続先は `apps/web/.env.example` を参考に `apps/web/.env.local` の `VITE_API_BASE_URL` で変更できます。APIのCORS許可元は既定で `http://localhost:5173` です。環境ごとにWorkersの `CORS_ORIGIN` を設定してください。
 
 ## OpenAPI契約
