@@ -3,8 +3,14 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "db:local": "tsx scripts/dev-db.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:check": "drizzle-kit check",
+    "db:migrate": "tsx --env-file-if-exists=.env.db.local scripts/migrate.ts",
     "test": "vitest run",
     "dev": "wrangler dev",
+    "dev:remote": "tsx --env-file-if-exists=.env.deploy.local scripts/wrangler-remote.ts dev --remote",
+    "deploy:worker": "tsx --env-file-if-exists=.env.deploy.local scripts/wrangler-remote.ts deploy",
     "build": "wrangler deploy --dry-run --outdir dist",
     "typecheck": "tsc --noEmit",
     "generate:openapi": "tsx scripts/generate-openapi.ts",
@@ -12,11 +18,18 @@
   },
   "dependencies": {
     "@hono/zod-openapi": "0.19.10",
+    "drizzle-orm": "~0.44.7",
     "hono": "4.7.11",
+    "pg": "^8.23.1",
     "zod": "3.25.67"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.14",
+    "@electric-sql/pglite-socket": "^0.2.17",
     "@types/node": "^22.15.32",
+    "@types/pg": "^8.23.1",
+    "drizzle-kit": "^0.31.11",
+    "jsonc-parser": "^3.3.1",
     "tsx": "^4.20.3",
     "typescript": "~5.8.3",
     "vitest": "^3.2.7",

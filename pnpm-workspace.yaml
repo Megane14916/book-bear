@@ -1,2 +1,5 @@
 packages:
   - apps/*
+
+# Keep root-level installs and CI on the same repository-local store.
+storeDir: .pnpm-store

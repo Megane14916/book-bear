@@ -15,6 +15,49 @@
       }
     },
     "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "VALIDATION_ERROR",
+                  "INVALID_CURSOR",
+                  "UNAUTHORIZED",
+                  "REGISTRATION_REQUIRED",
+                  "FORBIDDEN",
+                  "NOT_FOUND",
+                  "ALREADY_EXISTS",
+                  "HAS_BOOKMARKS",
+                  "ACCOUNT_LINK_CONFLICT",
+                  "RATE_LIMITED",
+                  "INTERNAL_ERROR",
+                  "BOOK_PROVIDER_UNAVAILABLE"
+                ]
+              },
+              "message": {
+                "type": "string"
+              },
+              "details": {
+                "type": "object",
+                "additionalProperties": {
+                  "nullable": true
+                }
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ]
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
       "Profile": {
         "type": "object",
         "properties": {
@@ -63,49 +106,6 @@
           "followersCount",
           "followingCount",
           "isAnonymous"
-        ]
-      },
-      "Error": {
-        "type": "object",
-        "properties": {
-          "error": {
-            "type": "object",
-            "properties": {
-              "code": {
-                "type": "string",
-                "enum": [
-                  "VALIDATION_ERROR",
-                  "INVALID_CURSOR",
-                  "UNAUTHORIZED",
-                  "REGISTRATION_REQUIRED",
-                  "FORBIDDEN",
-                  "NOT_FOUND",
-                  "ALREADY_EXISTS",
-                  "HAS_BOOKMARKS",
-                  "ACCOUNT_LINK_CONFLICT",
-                  "RATE_LIMITED",
-                  "INTERNAL_ERROR",
-                  "BOOK_PROVIDER_UNAVAILABLE"
-                ]
-              },
-              "message": {
-                "type": "string"
-              },
-              "details": {
-                "type": "object",
-                "additionalProperties": {
-                  "nullable": true
-                }
-              }
-            },
-            "required": [
-              "code",
-              "message"
-            ]
-          }
-        },
-        "required": [
-          "error"
         ]
       },
       "PatchProfile": {
@@ -892,6 +892,48 @@
                   "required": [
                     "status"
                   ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/health/db": {
+      "get": {
+        "operationId": "getDatabaseHealth",
+        "summary": "DB接続・マイグレーション・アプリロールの読み取り権限を確認",
+        "description": "HYPERDRIVE接続でprofilesを最大1件読み取る。データや接続情報は返さない。",
+        "x-implementation-status": "implemented",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "DBへの接続とクエリが成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ok"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "DB未設定・接続不可・未マイグレーション・権限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }

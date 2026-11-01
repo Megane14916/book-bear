@@ -2,5 +2,17 @@
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "book-bear-api",
   "main": "src/index.ts",
-  "compatibility_date": "2025-06-18"
+  "compatibility_date": "2025-06-18",
+  "compatibility_flags": ["nodejs_compat"],
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      // Local-only placeholder. dev:remote/deploy:worker inject HYPERDRIVE_ID from
+      // .env.deploy.local into an ignored temporary config; do not edit here.
+      "id": "00000000000000000000000000000000",
+      // Local-only PGlite uses placeholder credentials. Override via
+      // CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE for Supabase.
+      "localConnectionString": "postgres://postgres:postgres@127.0.0.1:5433/postgres"
+    }
+  ]
 }
