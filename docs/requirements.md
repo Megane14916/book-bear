@@ -107,7 +107,7 @@ P0＝デモ成立の最低条件、P1＝主要SNS機能として時間内に目�
 | 表示モードの変更 | 端末内 | ○ | ○ |
 
 - 初回の**本棚登録・栞保存**時にセッションがなければ `signInAnonymously()` を呼ぶ。匿名での閲覧では不要。
-- 匿名→Google連携は `linkIdentity` により同一UIDを維持することが基本フロー。既存Googleアカウントとの衝突時は**自動統合しない**で案内する（MVP）。
+- 匿名→Google連携はCustom OIDC provider `custom:google` のIdentity連携により同一UIDを維持することが基本フロー。要求scopeは `openid email` のみで、Googleの氏名・画像をアプリのプロフィールへ取り込まない。既存Googleアカウントとの衝突時は**自動統合しない**で案内する（MVP）。設定・実サービス確認の範囲は [認証設計](auth-design.md) と [Google OIDC手順](google-oidc-setup.md) を参照。
 - 匿名ユーザーはブラウザデータ消去・別端末で記録を失う可能性があるため、適切なタイミングで正式登録を促す。
 - 公開行動の制御はUIだけでなくAPIで必須。
 

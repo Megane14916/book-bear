@@ -1,10 +1,12 @@
 # 認証機能 Design Doc — Supabase Auth / Google Custom OIDC
 
-状態: 設計案。Issue #18の実装・実サービス検証は未着手。
+状態: Issue #18のバックエンド確認用CLI・自動テスト・設定手順を実装。実GoogleログインとAuth内部の情報取得・保存は利用者による手動確認待ち。
 
 関連Issue: [#9](https://github.com/Megane14916/book-bear/issues/9)、[#18](https://github.com/Megane14916/book-bear/issues/18)
 
 基準: main `45f0325` / 2026-11-01
+
+更新: 2026-11-02。エージェントは実Googleログインやコンピュータユーズを実施せず、実サービスの認証操作は利用者が行う。
 
 ## 1. 目的と決定事項
 
@@ -28,12 +30,12 @@ Issue #18はバックエンド担当の作業とする。この文書にはフ�
 |---|---|---|
 | Supabase JWTの検証 | Issue #9で実装済み | Custom OIDC由来のセッションでも成立することを検証 |
 | プロフィール・表示設定API | 実装済み | UID維持、既定値、既存値の保持、非公開情報の非露出を保証 |
-| Google Custom OIDC | 設定・実動作は未確認 | 設定手順、必要なバックエンド修正、検証手段を整備 |
+| Google Custom OIDC | 設定手順・手動確認CLIを実装、設定・実動作は手動確認待ち | [手順書](google-oidc-setup.md) で利用者が設定・ログインを確認 |
 | Google側のscopeと取得データ | 実サービスでは未検証 | 認可URL、応答、Auth内部の保存内容を確認 |
 | フロントのSupabase SDK・UI | 未実装 | 後続のFrontendタスクで実装 |
 | その他のリソースAPIの認可 | 各APIの実装に依存 | 書籍・本棚・栞・SNSの後続Issueで実装 |
 
-今回の文書作成ではアプリコード、依存ライブラリ、DBスキーマ、外部サービス設定を変更しない。独自のログインAPI、OAuthのトークン交換サーバー、Googleトークンを直接受け付けるAPIも新設しない。
+通常のHono APIは既存の認証・プロフィール処理を維持し、Custom OIDC由来のJWT、UID・既存値の保持、Google情報の非取り込みをテストで保証する。依存ライブラリ・DBスキーマ・外部サービス設定の変更は行っていない。独自のログインAPI、OAuthのトークン交換サーバー、Googleトークンを直接受け付けるAPIも新設しない。
 
 ## 3. 構成と責務
 
@@ -99,6 +101,7 @@ Supabase Authの **Custom OAuth/OIDC Providers** にOIDCとして登録する。
 | identifier | `custom:google` を設計値とする。実設定と後続フロントの値を一致させる |
 | issuer | `https://accounts.google.com` |
 | scopes | `openid`、`email` のみ |
+| authorization_params | scopeを `openid email`、access_typeを `online`、include_granted_scopesを文字列 `false` に固定 |
 | Client ID / Secret | 開発用Google OAuthクライアントの値をSupabaseへ登録 |
 | Google側のredirect URI | SupabaseがCustom provider作成時に表示するCallback URLを正確に登録 |
 | アプリへ戻るURL | Supabase側の許可リダイレクト先に登録。開発用・本番用を明示して分離 |
@@ -107,7 +110,11 @@ Supabase Authの **Custom OAuth/OIDC Providers** にOIDCとして登録する。
 
 OIDCのdiscovery・公開鍵検証はSupabaseへ委ねる。実際のscopeは新規同意・再ログイン・匿名連携の認可URLで確認する。SDKの追加scope指定だけでprovider既定値を制限できるとは仮定しない。[Custom OAuth/OIDC Providers](https://supabase.com/docs/guides/auth/custom-oauth-providers)
 
+公開実装では呼び出し側のscopesがproviderの既定scopeを上書きできるため、providerのAuthorization paramsでもscopeを固定する。これらはCustom providerが認可URLを作る最後に適用する設定で、値は文字列とする。実プロジェクトでこの設定が反映されることも手動確認する。[scopeの選択処理](https://github.com/supabase/auth/blob/master/internal/api/external.go)、[認可URLへの最終適用](https://github.com/supabase/auth/blob/master/internal/api/provider/custom_oauth.go)
+
 Custom providerを指定したIdentity連携の利用可否と採用SDKの型対応は、実装時に検証する。検証前のSDKバージョンや呼び出しコードを確定仕様として扱わず、組み込み `google` providerへ切り替えてscopeを増やす回避は行わない。
+
+バックエンドの手動確認CLIはSupabase Authの認可・Identity連携・PKCE交換APIをHTTPで呼び出す。SDKは導入していない。認可URLへscopeを上書き指定せず、providerに実際に設定されたscope、Googleのorigin、Client ID、nonce、PKCE、Supabase callbackを検査してから利用者へURLを提示する。
 
 ## 6. 認証フロー
 
@@ -201,6 +208,7 @@ JWKSの既存キャッシュは最大10分、未知kidの再取得cooldownは30�
 | VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY | 後続のWeb実装でSDKの認証用クライアントへ渡す公開設定 |
 | VITE_API_BASE_URL | 後続のWeb実装でHonoのHTTPクライアントへ渡す公開設定 |
 | DB資格情報 | Hyperdriveで保持。マイグレーション用資格情報は別管理 |
+| .env.auth.local | 手動確認CLI専用。Supabase URL・Publishable key・Google Client ID・API URL・loopback portを保持。Workerへ転送しない |
 
 本設計で通常のAPI実行にservice_roleキーやJWT secretは不要。Supabase Authのrefresh tokenはSDK側の認証処理で扱い、Honoへ転送しない。トークン本文・秘密値・個人情報を検証ログへ出さない。
 
@@ -212,22 +220,27 @@ JWKSの既存キャッシュは最大10分、未知kidの再取得cooldownは30�
 
 | 項目 | 状態と必要な確認 |
 |---|---|
-| openid emailだけの認可要求 | 設計で固定。実際のprovider設定と各認可URLは未検証 |
-| Googleのprofile情報をアプリへ同期しない | 既存APIの既定値・冪等処理を再利用し、metadataを含むJWTでも保持をテスト |
-| Auth内部の追加claim取得・保存 | GoogleのID token、UserInfoの利用、Supabaseのuser_metadata／identity_dataを実サービスで調査 |
-| Custom providerでの匿名Identity連携 | Supabase設定と対応するSDK／Auth機能を検証。一般的なGoogle連携の資料だけで成立と判断しない |
-| 既存Google Identityとの競合 | 自動Identity連携も含め、別UIDの記録が付け替わらないことを確認 |
-| Data API無効での認証経路 | AuthとHono経由のDB操作を結合検証 |
+| openid emailだけの認可要求 | CLIが余分なscopeを拒否する自動テストは実装済み。実際のprovider設定と認可URLは利用者が確認 |
+| Googleのprofile情報をアプリへ同期しない | metadata付きJWTで既定値・既存値・更新日時と行数を保持し、公開APIへemailを返さないDBテストを実装済み |
+| Auth内部の追加claim取得・保存 | CLIは取得できたメタデータの追加項目を値の出力なしで検出。ID token・UserInfo・Auth内部の全体監査は手動確認待ち |
+| Custom providerでの匿名Identity連携 | AuthのIdentity連携APIを使うCLIを実装。実Googleとの連携・後続SDKの型対応は利用者／フロント担当が確認 |
+| 既存Google Identityとの競合 | アプリ側でemailによる統合をしないDBテストは実装済み。Authの実サービス競合は手動確認待ち |
+| Data API無効での認証経路 | CLIがAuthとHonoだけを呼ぶ自動テストは実装済み。実プロジェクトでData API無効のまま動くことは手動確認待ち |
 
 「profileを要求しない」というscope制限だけで「追加プロフィール情報を一切取得・保存しない」ことまで達成済みと扱わない。Supabase内部の挙動を抑制できない場合は制約と対応案を報告し、要件を満たしたと宣言しない。取得後の削除だけで「取得しない」という要件を満たす扱いにもしない。
 
-## 11. 実装再開後の作業と検証計画
+Supabase Authの公開実装では、Custom OIDCの `GetUserData` がID tokenの解析を行い、Google issuerに対応する処理にはname／picture等をMetadataへ取り込むコードがある。scopeを絞っても「返された追加claimをAuthが必ず破棄する」とは保証できない。実プロジェクトに適用されたバージョン・Google応答・Auth側の保存を、[手順書](google-oidc-setup.md) に従い確認する。[Custom OIDC処理](https://github.com/supabase/auth/blob/master/internal/api/provider/custom_oauth.go)、[GoogleのID token解析](https://github.com/supabase/auth/blob/master/internal/api/provider/oidc.go)
 
-1. Google / Supabaseの設定項目と、Custom provider・scope・匿名連携の検証方法を準備する。
-2. 既存JWT・プロフィールAPIに必要な変更があるかを確認し、必要な差分とテストだけを追加する。
-3. フロントSDKやUIをアプリへ導入せず、検証用CLI・手順と必要に応じた一時コールバックで実サービスのOAuthを確認する。コールバックは開発用ループバックと許可リダイレクト先に限定する。
-4. 実際の認可scopeと、Auth内部を含む情報取得・保存を調査し、実施結果と未検証事項を分けて記録する。
-5. 設定手順・認証設計に沿って既存ドキュメントを更新し、PRへ変更・検証・外部設定を記載する。
+CLIは追加情報を検出した場合に成功扱いせず終了する。監査対象はAuthユーザー・Identity・Honoが受け付けたSupabase JWTで、Googleの生のID tokenやUserInfo応答まで網羅した証明ではない。
+
+## 11. 実装・検証と残る手動確認
+
+1. `auth:google config` は公開設定値、`check` はCLI環境変数の形式検査を行う。どちらもネットワークへ接続しない。
+   `auth:google scopes` はSupabaseへの通常要求とscope上書きprobeから生成されたGoogle向けURLを検査する。Googleへは接続せず、ログイン・ユーザー作成は行わない。
+2. `auth:google link` は検証専用の匿名ユーザーを作成し、Honoで既定値以外のプロフィール・設定を準備する。検査済みURLを利用者が開き、連携前後のUID・値を比較する。
+3. `auth:google login` は利用者がGoogleでサインインし、API・JWT更新後の同UID・既存値を確認する。
+4. 一時コールバックはloopbackの固定pathだけで認可コードを一度受け取り、メモリ内のPKCE verifierで交換する。ブラウザのURLからコードを除き、トークンや個人情報を表示・ファイル保存しない。CLIは外部ブラウザを開かない。
+5. 利用者は実際の認可scopeとAuth内部を含む情報取得・保存を確認し、項目名・有無だけで結果と未検証事項を記録する。
 
 | 検証 | 方法・期待値 |
 |---|---|
@@ -245,9 +258,10 @@ JWKSの既存キャッシュは最大10分、未知kidの再取得cooldownは30�
 ## 12. 関連ドキュメント
 
 - [認証設定手順（現在はIssue #9の匿名認証まで）](auth-setup.md)
+- [Google Custom OIDCの設定・手動確認](google-oidc-setup.md)
 - [アーキテクチャ設計](architecture.md)
 - [API設計](api.md)
 - [DB設計](database.md)
 - [DB・Hyperdrive設定](database-setup.md)
 
-既存文書の組み込み `provider: 'google'` を使う例は初期設計の記述であり、Issue #18の採用方針は本書のCustom OIDCとする。実装再開後に関連する手順・例をそろえる。
+既存文書のGoogle連携方針もCustom OIDCへそろえる。フロントの採用SDKに対する呼び出しコードと型対応は、後続の導入時に確定する。

@@ -162,6 +162,8 @@ Backendの主な設定：`HYPERDRIVE`（DB接続binding）、`SUPABASE_URL`、JW
 
 Issue #9のJWT検証はSupabaseのES256/RS256公開鍵を使用し、JWT secretやservice_roleキーは不要。リモート起動／デプロイは `.env.deploy.local` の `HYPERDRIVE_ID`・`SUPABASE_URL`・`CORS_ORIGIN`、ローカルWranglerは `.dev.vars` を使用する。設定と結合確認は [認証設定手順](auth-setup.md) を参照。
 
+Issue #18のGoogle Custom OIDCはバックエンドのテスト・設定手順・手動確認CLIを先行する。`auth:google config`／`check` はネットワークなしで実行でき、`link`／`login` は利用者がブラウザで確認するためのコマンド。CLI用の `.env.auth.local` はWorkerへ渡さず、実GoogleログインはCIに含めない。[設定・手動確認手順](google-oidc-setup.md) を参照。
+
 ローカル起動用のnpm scriptsを用意する。
 
 ```bash
