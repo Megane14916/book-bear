@@ -14,6 +14,7 @@ let signing: Awaited<ReturnType<typeof createSigningFixture>>
 let app: ReturnType<typeof createApp>
 let anonymous: { id: string; token: string }, registered: { id: string; token: string }
 let searchItems: unknown[] = []
+let activeConnections = 0
 const volumes = new Map<string, unknown>()
 const isbn13 = '9784780802047'
 const volume = (id: string, isbn: string | null = null) => ({ id, volumeInfo: { title: `外部書籍 ${id}`, ...(isbn ? { industryIdentifiers: [{ type: 'ISBN_13', identifier: isbn }] } : {}) } })
@@ -52,10 +53,15 @@ async function shelf(bookId: string, token = anonymous.token) {
 beforeAll(async () => {
   fixture = await createTestDatabase()
   signing = await createSigningFixture()
-  app = createApp({ bookFetch: fetcher, verifyToken: createTokenVerifier(signing.fetcher), database: (env, query) => withDatabase(env, async (db) => {
-    await db.execute(sql`SET ROLE book_bear_api`)
-    try { return await query(db) } finally { await db.execute(sql`RESET ROLE`) }
-  }) })
+  app = createApp({ bookFetch: fetcher, verifyToken: createTokenVerifier(signing.fetcher), database: async (env, query) => {
+    activeConnections++
+    try {
+      return await withDatabase(env, async (db) => {
+        await db.execute(sql`SET ROLE book_bear_api`)
+        try { return await query(db) } finally { await db.execute(sql`RESET ROLE`) }
+      })
+    } finally { activeConnections-- } // withDatabase has finished client.end().
+  } })
   anonymous = await actor()
   registered = await actor(false)
 }, 30000)
@@ -153,6 +159,59 @@ describe('書籍API（実DB・JWT・最小権限）', () => {
     expect((await request(`/books/search?q=${encodeURIComponent(q)}&limit=1`, 'GET', undefined, null)).status).toBe(200)
     const isbnResponse = await request('/books/search?q=978-4-7808-0204-7', 'GET', undefined, null)
     expect((await isbnResponse.json()).items).toHaveLength(1)
+  })
+  it.each([1, 20, 30])('DB候補がlimit=%i件に達していれば外部APIを呼ばず返す', async (limit) => {
+    const title = `DBだけの検索 ${randomUUID()}`
+    const expected = []
+    for (let i = 0; i < limit; i++) expected.push(await manual(`${title} ${String(i).padStart(2, '0')}`))
+    // limit=20 also exercises the default, with a configured provider available.
+    const response = await request(`/books/search?q=${encodeURIComponent(title)}${limit === 20 ? '' : `&limit=${limit}`}`, 'GET', undefined, null)
+    expect(response.status).toBe(200)
+    const result = BookSearchResult.parse(await response.json())
+    expect(result.items.map((book) => book.localBookId)).toEqual(expected.map((book) => book.id))
+    expect(fetcher).not.toHaveBeenCalled()
+  })
+  it.each(['search', 'import'] as const)('外部HTTPの応答本文を待つ間はDB接続を保持しない: %s', async (operation) => {
+    const title = `接続解放 ${randomUUID()}`
+    const local = await manual(title)
+    let release!: () => void, started!: () => void
+    const waiting = new Promise<void>((resolve) => { release = resolve })
+    const entered = new Promise<void>((resolve) => { started = resolve })
+    const id = `slow-${randomUUID()}`
+    const responseBody = operation === 'search'
+      ? { totalItems: 1, items: [volume(id, isbn13)] }
+      : volume(id)
+    // Return the headers immediately but hold the JSON body until the test
+    // observes the connection count. This covers the entire HTTP response wait.
+    fetcher.mockImplementationOnce(async () => new Response(new ReadableStream({
+      async start(controller) {
+        started()
+        await waiting
+        controller.enqueue(new TextEncoder().encode(JSON.stringify(responseBody)))
+        controller.close()
+      },
+    })))
+    const pending = operation === 'search'
+      ? request(`/books/search?q=${encodeURIComponent(title)}`, 'GET', undefined, null)
+      : request('/books/import', 'POST', { provider: 'google_books', providerId: id })
+    let connectionsWhileWaiting: number
+    try { await entered; connectionsWhileWaiting = activeConnections } finally { release() }
+    const response = await pending
+    expect(connectionsWhileWaiting).toBe(0)
+    expect(activeConnections).toBe(0)
+    expect(fetcher).toHaveBeenCalledTimes(1)
+    if (operation === 'search') {
+      expect(response.status).toBe(200)
+      const result = BookSearchResult.parse(await response.json())
+      expect(result.items[0].localBookId).toBe(local.id)
+      // The post-HTTP database lookup still reuses a registered ISBN.
+      expect(result.items[1]).toMatchObject({ isbn13, localBookId: expect.any(String), title: '外部書籍 isbn-first' })
+    } else {
+      expect(response.status).toBe(201)
+      const book = Book.parse(await response.json())
+      expect(book.title).toBe(`外部書籍 ${id}`)
+      expect((await fixture.client.query('SELECT id FROM books WHERE id=$1', [book.id])).rowCount).toBe(1)
+    }
   })
   it.each(['status', 'network', 'json', 'missing-key'])('外部障害でもDB候補があれば200、なければ502: %s', async (kind) => {
     const title = `障害時の本 ${randomUUID()}`
