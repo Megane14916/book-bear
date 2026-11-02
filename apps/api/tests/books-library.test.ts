@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { randomInt, randomUUID } from 'node:crypto'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { sql } from 'drizzle-orm'
 import { createApp } from '../src/index'
@@ -326,12 +326,17 @@ describe('本棚・公開本一覧のページ境界と非公開情報', () => {
   })
   it.runIf(Boolean(process.env.TEST_DATABASE_URL))('並行import・本棚登録がUNIQUE制約で1件になる（PostgreSQL）', async () => {
     const owner = await actor()
-    volumes.set('concurrent', volume('concurrent', '9784101010014'))
-    // Other test files may already have registered this ISBN; reuse remains valid.
+    // CI files share one database and may run in any order. Do not reuse an
+    // ISBN belonging to another fixture (including database.test.ts).
+    const prefix = `979${String(randomInt(1_000_000_000)).padStart(9, '0')}`
+    const checksum = (10 - [...prefix].reduce((sum, digit, i) => sum + Number(digit) * (i % 2 ? 3 : 1), 0) % 10) % 10
+    const concurrentIsbn = `${prefix}${checksum}`
+    volumes.set('concurrent', volume('concurrent', concurrentIsbn))
     const imports = await Promise.all(Array.from({ length: 4 }, () => request('/books/import', 'POST', { provider: 'google_books', providerId: 'concurrent' }, owner.token)))
-    expect(imports.every((response) => [200, 201].includes(response.status))).toBe(true)
+    expect(imports.map((response) => response.status).sort()).toEqual([200, 200, 200, 201])
     const ids = await Promise.all(imports.map(async (response) => Book.parse(await response.json()).id))
     expect(new Set(ids).size).toBe(1)
+    expect((await fixture.client.query('SELECT id FROM books WHERE isbn13=$1', [concurrentIsbn])).rowCount).toBe(1)
     const added = await Promise.all(Array.from({ length: 4 }, () => request('/me/books', 'POST', { bookId: ids[0] }, owner.token)))
     expect(added.map((response) => response.status).sort()).toEqual([200, 200, 200, 201])
     expect((await fixture.client.query('SELECT id FROM user_books WHERE user_id=$1 AND book_id=$2', [owner.id, ids[0]])).rowCount).toBe(1)
