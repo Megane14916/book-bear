@@ -21,6 +21,10 @@ DBを使う場合は [Supabase・Hyperdrive初期設定](docs/database-setup.md)
 
 認証・プロフィールAPIの利用には [Supabase匿名認証の設定](docs/auth-setup.md) を参照してください。Supabaseの匿名サインインとES256/RS256署名キーを確認し、APIに `SUPABASE_URL` を設定します。リモートコマンドは `.env.deploy.local`、ローカルWranglerは `.dev.vars` を使います。
 
+Google Custom OIDCと認証・データアクセスの責務は [認証機能 Design Doc](docs/auth-design.md) に記載しています。[Google OIDC設定・手動確認](docs/google-oidc-setup.md) に沿って、`pnpm --filter api auth:google link`／`login` でご自身のブラウザから確認できます。CLIは実際の認可scopeを検査し、UID・既存プロフィール・設定の保持を確認します。2026-11-02に利用者による実Googleログイン・匿名連携・再ログイン・追加メタデータ等の確認が完了しました。[検証結果](docs/google-oidc-setup.md#11-実サービスの検証記録) を参照してください。
+
+フロントは後続タスクでSupabase SDKを認証専用に導入し、Data APIは使用せず、アプリデータはHono API経由で扱います。今回のバックエンド対応ではフロントのSDK・UIを追加していません。
+
 WebのAPI接続先は `apps/web/.env.example` を参考に `apps/web/.env.local` の `VITE_API_BASE_URL` で変更できます。APIのCORS許可元は既定で `http://localhost:5173` です。環境ごとにWorkersの `CORS_ORIGIN` を設定してください。
 
 ## OpenAPI契約

@@ -124,6 +124,45 @@ describe('プロフィール・表示設定API（実DB・最小権限・署名�
     const registeredToken = await signing.sign({ sub: userId, is_anonymous: false })
     expect(await (await request('/api/v1/me', 'GET', undefined, registeredToken)).json()).toMatchObject({ id: userId, displayName: '読書好き', isAnonymous: false })
   })
+  it('Custom OIDCへの昇格・JWT更新後も同UIDと既存プロフィール・設定を保持し、Google情報を保存しない', async () => {
+    const id = randomUUID(), sessionId = randomUUID()
+    await fixture.client.query('INSERT INTO auth.users (id) VALUES ($1)', [id])
+    const anonymous = await signing.sign({ sub: id, session_id: sessionId })
+    expect((await request('/api/v1/me', 'PUT', undefined, anonymous)).status).toBe(200)
+    await request('/api/v1/me', 'PATCH', { displayName: '自分で設定した名前', bio: '既存の紹介' }, anonymous)
+    await request('/api/v1/me/preferences', 'PATCH', { feedContentMode: 'all' }, anonymous)
+    const before = (await fixture.client.query('SELECT p.*, u.feed_content_mode, u.updated_at AS preference_updated_at FROM profiles p JOIN user_preferences u ON u.user_id=p.id WHERE p.id=$1', [id])).rows[0]
+    const metadata = { email: 'private@example.invalid', name: 'Google name', full_name: 'Google full name',
+      picture: 'https://example.invalid/google.png', avatar_url: 'https://example.invalid/avatar.png',
+      sub: otherId, is_anonymous: true }
+    for (const phase of ['linked', 'refreshed']) {
+      const linked = await signing.sign({ sub: id, session_id: sessionId, is_anonymous: false, jti: phase,
+        app_metadata: { provider: 'custom:google', providers: ['anonymous', 'custom:google'] }, user_metadata: metadata })
+      const response = await request('/api/v1/me', 'PUT', undefined, linked)
+      expect(response.status).toBe(200)
+      const profile = await response.json()
+      expect(profile).toMatchObject({ id, isAnonymous: false, displayName: '自分で設定した名前', bio: '既存の紹介', avatarUrl: null, handle: null })
+      expect(JSON.stringify(profile)).not.toContain('private@example.invalid')
+      expect(await (await request('/api/v1/me/preferences', 'GET', undefined, linked)).json()).toEqual({ feedContentMode: 'all' })
+      expect((await fixture.client.query('SELECT p.*, u.feed_content_mode, u.updated_at AS preference_updated_at FROM profiles p JOIN user_preferences u ON u.user_id=p.id WHERE p.id=$1', [id])).rows[0]).toEqual(before)
+    }
+    const publicProfile = await (await request(`/api/v1/users/${id}`, 'GET', undefined, null)).json()
+    expect(Object.keys(publicProfile).sort()).toEqual(['id', 'displayName', 'handle', 'bio', 'avatarUrl', 'followersCount', 'followingCount', 'publicBookmarkCount', 'followedByMe'].sort())
+    expect(JSON.stringify(publicProfile)).not.toContain('private@example.invalid')
+  })
+  it('Google情報付きの新規ユーザーも既定値で初期化し、同じemailを持つ別UIDとアプリ側で統合しない', async () => {
+    const ids = [randomUUID(), randomUUID()]
+    await fixture.client.query('INSERT INTO auth.users (id) VALUES ($1), ($2)', ids)
+    for (const id of ids) {
+      const token = await signing.sign({ sub: id, is_anonymous: false,
+        app_metadata: { provider: 'custom:google', providers: ['custom:google'] },
+        email: 'same@example.invalid', user_metadata: { email: 'same@example.invalid', name: 'Google name', picture: 'https://example.invalid/a.png' } })
+      expect(await (await request('/api/v1/me', 'PUT', undefined, token)).json()).toEqual({ id, isAnonymous: false,
+        displayName: 'ゲスト', bio: null, handle: null, avatarUrl: null, followersCount: 0, followingCount: 0 })
+    }
+    expect((await fixture.client.query('SELECT count(*)::int AS count FROM profiles WHERE id IN ($1,$2)', ids)).rows[0].count).toBe(2)
+    expect((await fixture.client.query('SELECT count(*)::int AS count FROM user_preferences WHERE user_id IN ($1,$2)', ids)).rows[0].count).toBe(2)
+  })
   it('公開プロフィールは公開中・未削除の栞だけを集計し、設定・匿名状態を返さない', async () => {
     const bookId = randomUUID(), shelfId = randomUUID()
     await fixture.client.query("INSERT INTO books (id,title,source) VALUES ($1,'公開集計テスト','manual')", [bookId])

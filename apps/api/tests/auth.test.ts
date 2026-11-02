@@ -11,6 +11,32 @@ beforeAll(async () => { signing = await createSigningFixture() })
 const env = { SUPABASE_URL: supabaseUrl }
 
 describe('Supabase JWT検証', () => {
+  it('Custom OIDC由来のSupabase JWTはprovider名やGoogle情報を認可へ持ち込まない', async () => {
+    const id = randomUUID()
+    const token = await signing.sign({ sub: id, is_anonymous: false,
+      app_metadata: { provider: 'custom:google', providers: ['custom:google'] },
+      user_metadata: { email: 'private@example.invalid', name: 'Google name', picture: 'https://example.invalid/private.png',
+        sub: randomUUID(), is_anonymous: true },
+    })
+    expect(await createTokenVerifier(signing.fetcher)(token, env)).toEqual({ id, isAnonymous: false })
+  })
+  it('GoogleのID tokenとprovider access tokenをアプリのJWTとして受け付けない', async () => {
+    const google = await createSigningFixture('RS256')
+    const database = vi.fn()
+    const app = createApp({ database, verifyToken: createTokenVerifier(signing.fetcher) })
+    const tokens = [
+      await google.sign({ iss: 'https://accounts.google.com', aud: 'client.apps.googleusercontent.com', sub: 'google-user-id' }),
+      await signing.sign({ iss: 'https://accounts.google.com' }),
+      await signing.sign({ aud: 'client.apps.googleusercontent.com' }),
+      'opaque-provider-access-token',
+    ]
+    for (const token of tokens) {
+      const response = await app.request('/api/v1/me', { headers: { Authorization: `Bearer ${token}` } }, env)
+      expect(response.status).toBe(401)
+      expect(response.headers.get('Cache-Control')).toBe('no-store')
+    }
+    expect(database).not.toHaveBeenCalled()
+  })
   it.each([true, false])('ES256署名・issuer・audience・期限の検証後にsubと匿名状態を取得する (%s)', async (isAnonymous) => {
     const id = randomUUID()
     const verify = createTokenVerifier(signing.fetcher)

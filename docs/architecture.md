@@ -123,6 +123,7 @@ DBのテーブル構成・制約・インデックスは [DB設計書](database.
 重要：
 
 - フロントのSupabase SDKがログイン・Google連携を実施する。通常APIはJWTを受け取りHonoが検証する。
+- SDKは後続フロントで認証専用に導入し、Data APIの `.from()`／`.rpc()` は使用しない。GoogleはCustom OIDC provider `custom:google` で `openid email` のみを要求する。設定と利用者自身によるログイン確認は [Google OIDC手順](google-oidc-setup.md)、責務と未検証事項は [認証設計](auth-design.md) を参照。
 - 匿名ユーザーは閲覧と非公開記録が可能。公開栞・フォロー・いいね・返信は不可。
 - Supabase Authには匿名ユーザー用の `is_anonymous` claimがある。
 - `linkIdentity()` はManual Linkingの有効化が必要。既存Googleアカウントとの競合はMVPで自動マージしない。
@@ -221,7 +222,7 @@ sequenceDiagram
   H->>H: UID所有権とvisibilityを確認
   H->>D: Insert bookmark
   H-->>W: 201 Bookmark
-  W->>A: linkIdentity(google)
+  W->>A: Identity連携(custom:google / openid email)
   A-->>W: 同UID・正式ユーザーのセッション
   W->>H: POST /bookmarks (public)
   H->>H: is_anonymous=falseを検証

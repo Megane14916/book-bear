@@ -54,7 +54,7 @@ const response = await fetch(`${apiBaseUrl}/api/v1/me`, {
 if (!response.ok) throw new Error('プロフィールを初期化できませんでした')
 ```
 
-APIへ送るのはユーザーのアクセストークン。Publishable keyやlegacy anon keyをBearerトークンの代わりに使わない。Google連携とManual Linkingは後続の連携機能で設定する。
+APIへ送るのはユーザーのアクセストークン。Publishable keyやlegacy anon keyをBearerトークンの代わりに使わない。Google Custom OIDCとManual Linkingの設定、利用者自身によるログイン確認は [Google OIDC手順](google-oidc-setup.md) を参照。フロントへのSDK・UI導入は後続タスクとし、SDKは認証専用、アプリデータはHono経由で扱う。Data APIは使用しない。
 
 ## 3. PowerShellで実サービスを確認する
 

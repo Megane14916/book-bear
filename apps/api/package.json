@@ -7,6 +7,7 @@
     "db:generate": "drizzle-kit generate",
     "db:check": "drizzle-kit check",
     "db:migrate": "tsx --env-file-if-exists=.env.db.local scripts/migrate.ts",
+    "auth:google": "tsx --env-file-if-exists=.env.auth.local scripts/check-google-auth.ts",
     "test": "vitest run --no-file-parallelism",
     "dev": "wrangler dev",
     "dev:remote": "tsx --env-file-if-exists=.env.deploy.local scripts/wrangler-remote.ts dev --remote",

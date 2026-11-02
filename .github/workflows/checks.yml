@@ -34,6 +34,15 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
+      - name: Verify manual OIDC CLI configuration without external requests
+        run: |
+          pnpm --filter api auth:google config
+          pnpm --filter api auth:google check
+        env:
+          SUPABASE_URL: 'https://ci-placeholder.supabase.co'
+          SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_ci_placeholder'
+          GOOGLE_OIDC_CLIENT_ID: '123-ci-placeholder.apps.googleusercontent.com'
+          API_BASE_URL: 'http://127.0.0.1:8787'
       - run: pnpm --filter api db:check
       - run: pnpm --filter api db:generate
       - name: Verify migration generation is up to date
