@@ -2,7 +2,7 @@
 
 本手順は開発用Google／Supabaseプロジェクトを対象とする。**要求するscopeは `openid email` のみ**。認証設計は [Design Doc](auth-design.md) を参照。
 
-バックエンドと検証CLIの自動テストは用意している。実際のログイン・Googleの同意画面・Supabase内部の保存内容は、利用者がこの手順で確認する。実ログイン済みとする自動テストではない。
+バックエンドと検証CLIの自動テストに加え、2026-11-02に利用者から実Googleログイン・Supabase Auth登録および追加の受け入れ確認の完了報告を受けた。結果と確認範囲は [検証記録](#11-実サービスの検証記録) を参照。実サービスの操作は利用者が実施しており、自動テストによる実ログインではない。
 
 ## 1. 前提と今回の範囲
 
@@ -334,3 +334,23 @@ pnpm build
 後続フロント担当へは、provider識別子 `custom:google`、認証用のSupabase URLとPublishable key、HonoのAPI URL、許可コールバックURL、認証／連携の区別と手動確認結果を渡す。SDKはAuth専用に使い、Data APIの `.from()`／`.rpc()` は使用しない。SDKのCustom provider対応・Identity連携の型と画面上のセッション管理は、導入時に採用バージョンで検証する。
 
 参考: [Custom OAuth/OIDC Providers](https://supabase.com/docs/guides/auth/custom-oauth-providers)、[Identity Linking](https://supabase.com/docs/guides/auth/auth-identity-linking)、[Google OIDC](https://developers.google.com/identity/openid-connect/openid-connect)、[Supabase Authの実装](https://github.com/supabase/auth/blob/master/internal/api/provider/custom_oauth.go)。
+
+## 11. 実サービスの検証記録
+
+確認日: **2026-11-02（日本時間）**。確認者: 利用者。情報源: 本チャットでの本人報告。エージェントは実Googleログイン・コンピュータユーズを実施していない。
+
+利用者からGoogleログイン・Supabase Authへの登録成功の報告を受け、続けて以下の受け入れ項目を確認したところ「全て確認済み」との回答を得た。
+
+| 確認項目 | 結果（利用者報告） |
+|---|---|
+| Googleログイン・Supabase Authへのユーザー登録 | 成功 |
+| `auth:google scopes` | 成功。要求scopeは `openid email`、scope上書き防止の検査も成功 |
+| `auth:google link` と `auth:google login` | 両方成功 |
+| 匿名連携後およびJWT更新後のUID・プロフィール・表示設定 | 同じUIDと既存値を維持 |
+| CLIの追加メタデータ検出 | `additionalMetadataDetected=false` |
+| Supabaseのuser_metadata／identity_data | 氏名・画像等の追加情報なし |
+| 既存アカウントとの連携競合・同意キャンセル | データの付け替えなし |
+
+これらとバックエンドの自動テストを合わせ、Issue #18のバックエンド実装・受け入れ確認は完了とする。フロントのSDK・UI・セッション管理、本棚・栞の実装後の保持確認は後続タスク。
+
+この記録はCLI結果と利用者によるAuth内部の確認に基づく。Googleの生のID token／UserInfo、トークン、秘密値、個人情報は添付していない。確認したフローで追加情報がなかった結果を、将来の全応答や仕様変更後も追加claimが返らない保証には広げない。設定や依存サービスの挙動を変更した際は、本手順で再確認する。

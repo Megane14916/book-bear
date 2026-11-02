@@ -45,7 +45,7 @@ MSWは未導入のためモックの変更はない。Web用生成型を更新�
 
 Custom providerの識別子は `custom:google`、要求scopeは `openid email` のみ。Honoは既存のSupabase JWT検証・プロフィールAPIを再利用し、GoogleのID tokenやprovider access tokenを直接受け付けない。Google由来のmetadataから氏名・画像・emailをアプリへコピーせず、同UIDの既存値と設定を保持する。API契約とDBスキーマの変更はない。
 
-`pnpm --filter api auth:google` に設定表示・ローカル形式検査・利用者自身のブラウザによるログイン／匿名連携の確認を用意した。Googleログイン、scopeとSupabase Auth内部の保存内容の実サービス確認は手動で行う。手順と未検証範囲は [Google OIDC設定・手動確認](google-oidc-setup.md) を参照。フロントのSDK・UIは後続実装で、SDKはAuth専用、Data APIは使用しない。
+`pnpm --filter api auth:google` に設定表示・ローカル形式検査・利用者自身のブラウザによるログイン／匿名連携の確認を用意した。2026-11-02に利用者がGoogleログイン・Supabase Auth登録、scope、link／login、JWT更新後のUID・既存値保持、Auth追加メタデータ、競合・キャンセル時の挙動を確認済み。結果の根拠と確認範囲は [Google OIDC検証記録](google-oidc-setup.md#11-実サービスの検証記録) を参照。フロントのSDK・UIは後続実装で、SDKはAuth専用、Data APIは使用しない。
 
 ## 1. 共通ルール
 

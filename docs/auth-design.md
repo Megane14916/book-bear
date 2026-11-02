@@ -1,12 +1,12 @@
 # 認証機能 Design Doc — Supabase Auth / Google Custom OIDC
 
-状態: Issue #18のバックエンド確認用CLI・自動テスト・設定手順を実装。実GoogleログインとAuth内部の情報取得・保存は利用者による手動確認待ち。
+状態: Issue #18のバックエンド実装・自動テスト・利用者による実サービスの受け入れ確認が完了。確認結果は [検証記録](google-oidc-setup.md#11-実サービスの検証記録) を参照。フロントのSDK・UIは後続タスク。
 
 関連Issue: [#9](https://github.com/Megane14916/book-bear/issues/9)、[#18](https://github.com/Megane14916/book-bear/issues/18)
 
 基準: main `45f0325` / 2026-11-01
 
-更新: 2026-11-02。エージェントは実Googleログインやコンピュータユーズを実施せず、実サービスの認証操作は利用者が行う。
+更新: 2026-11-02。実Googleログインと追加確認は利用者が実施し、成功を本チャットで報告した。エージェントは実Googleログインやコンピュータユーズを実施していない。
 
 ## 1. 目的と決定事項
 
@@ -30,12 +30,12 @@ Issue #18はバックエンド担当の作業とする。この文書にはフ�
 |---|---|---|
 | Supabase JWTの検証 | Issue #9で実装済み | Custom OIDC由来のセッションでも成立することを検証 |
 | プロフィール・表示設定API | 実装済み | UID維持、既定値、既存値の保持、非公開情報の非露出を保証 |
-| Google Custom OIDC | 設定手順・手動確認CLIを実装、設定・実動作は手動確認待ち | [手順書](google-oidc-setup.md) で利用者が設定・ログインを確認 |
-| Google側のscopeと取得データ | 実サービスでは未検証 | 認可URL、応答、Auth内部の保存内容を確認 |
+| Google Custom OIDC | 利用者がGoogleログイン・Supabase Auth登録・匿名連携・再ログインを確認済み | 実装と受け入れ確認が完了 |
+| Google側のscopeと取得データ | 利用者がscope検査成功、CLIとAuthメタデータに追加の氏名・画像等がないことを確認済み | 検証結果と確認範囲を記録し、設定変更時に再確認 |
 | フロントのSupabase SDK・UI | 未実装 | 後続のFrontendタスクで実装 |
 | その他のリソースAPIの認可 | 各APIの実装に依存 | 書籍・本棚・栞・SNSの後続Issueで実装 |
 
-通常のHono APIは既存の認証・プロフィール処理を維持し、Custom OIDC由来のJWT、UID・既存値の保持、Google情報の非取り込みをテストで保証する。依存ライブラリ・DBスキーマ・外部サービス設定の変更は行っていない。独自のログインAPI、OAuthのトークン交換サーバー、Googleトークンを直接受け付けるAPIも新設しない。
+通常のHono APIは既存の認証・プロフィール処理を維持し、Custom OIDC由来のJWT、UID・既存値の保持、Google情報の非取り込みをテストで保証する。依存ライブラリ・DBスキーマの変更はない。外部サービスの設定と認証操作は利用者が実施した。独自のログインAPI、OAuthのトークン交換サーバー、Googleトークンを直接受け付けるAPIも新設しない。
 
 ## 3. 構成と責務
 
@@ -89,7 +89,7 @@ Googleのemailは変更され得るため、それをユーザーの不変IDと�
 
 アプリの `profiles` にはGoogleの氏名・画像・emailを同期しない。新規作成時は表示名 `ゲスト`、avatarUrl / bio / handleはnull、表示設定は `tap` を使う。連携時は既存値を保持する。
 
-**scopeを絞ること、アプリへコピーしないこと、Supabase内部にも保存されないことは、それぞれ別に検証する。** Googleはprofileスコープを要求していなくてもトークン更新時などに追加claimを返す可能性がある。providerが返す情報とSupabaseのuser_metadata／identity_dataの自動保存挙動は、現時点では未確認である。[Googleのname・picture等の仕様](https://developers.google.com/identity/openid-connect/openid-connect#an-id-tokens-payload)
+**scopeを絞ること、アプリへコピーしないこと、Supabase内部にも保存されないことは、それぞれ別に検証する。** Googleはprofileスコープを要求していなくてもトークン更新時などに追加claimを返す可能性がある。今回の利用者確認では、CLIの追加メタデータ検出はfalseで、Authのuser_metadata／identity_dataにも氏名・画像等がないとの報告を受けた。この結果を将来のすべてのGoogle応答の保証には広げない。[Googleのname・picture等の仕様](https://developers.google.com/identity/openid-connect/openid-connect#an-id-tokens-payload)
 
 ## 5. Custom OIDCの設定設計
 
@@ -112,7 +112,7 @@ OIDCのdiscovery・公開鍵検証はSupabaseへ委ねる。実際のscopeは新
 
 公開実装では呼び出し側のscopesがproviderの既定scopeを上書きできるため、providerのAuthorization paramsでもscopeを固定する。これらはCustom providerが認可URLを作る最後に適用する設定で、値は文字列とする。実プロジェクトでこの設定が反映されることも手動確認する。[scopeの選択処理](https://github.com/supabase/auth/blob/master/internal/api/external.go)、[認可URLへの最終適用](https://github.com/supabase/auth/blob/master/internal/api/provider/custom_oauth.go)
 
-Custom providerを指定したIdentity連携の利用可否と採用SDKの型対応は、実装時に検証する。検証前のSDKバージョンや呼び出しコードを確定仕様として扱わず、組み込み `google` providerへ切り替えてscopeを増やす回避は行わない。
+Custom providerを指定したIdentity連携は、利用者が手動確認CLIで検証済み。採用SDKの型対応は後続フロントの導入時に検証する。検証前のSDKバージョンや呼び出しコードを確定仕様として扱わず、組み込み `google` providerへ切り替えてscopeを増やす回避は行わない。
 
 バックエンドの手動確認CLIはSupabase Authの認可・Identity連携・PKCE交換APIをHTTPで呼び出す。SDKは導入していない。認可URLへscopeを上書き指定せず、providerに実際に設定されたscope、Googleのorigin、Client ID、nonce、PKCE、Supabase callbackを検査してから利用者へURLを提示する。
 
@@ -220,20 +220,20 @@ JWKSの既存キャッシュは最大10分、未知kidの再取得cooldownは30�
 
 | 項目 | 状態と必要な確認 |
 |---|---|
-| openid emailだけの認可要求 | CLIが余分なscopeを拒否する自動テストは実装済み。実際のprovider設定と認可URLは利用者が確認 |
+| openid emailだけの認可要求 | 自動テストに加え、利用者が `auth:google scopes` の成功を確認済み |
 | Googleのprofile情報をアプリへ同期しない | metadata付きJWTで既定値・既存値・更新日時と行数を保持し、公開APIへemailを返さないDBテストを実装済み |
-| Auth内部の追加claim取得・保存 | CLIは取得できたメタデータの追加項目を値の出力なしで検出。ID token・UserInfo・Auth内部の全体監査は手動確認待ち |
-| Custom providerでの匿名Identity連携 | AuthのIdentity連携APIを使うCLIを実装。実Googleとの連携・後続SDKの型対応は利用者／フロント担当が確認 |
-| 既存Google Identityとの競合 | アプリ側でemailによる統合をしないDBテストは実装済み。Authの実サービス競合は手動確認待ち |
-| Data API無効での認証経路 | CLIがAuthとHonoだけを呼ぶ自動テストは実装済み。実プロジェクトでData API無効のまま動くことは手動確認待ち |
+| Auth内部の追加claim取得・保存 | 利用者が `additionalMetadataDetected=false`、user_metadata／identity_dataに氏名・画像等がないことを確認済み。生のGoogle応答全般への保証とは区別する |
+| Custom providerでの匿名Identity連携 | 利用者がlinkとloginの成功、JWT更新後も同UID・プロフィール・設定を保持することを確認済み。後続SDKの型対応はフロント担当が検証 |
+| 既存Google Identityとの競合・同意キャンセル | 自動統合をしないDBテストに加え、利用者が実サービスでもデータの付け替えがないことを確認済み |
+| AuthとHonoの認証経路 | CLIがData APIを呼ばない自動テストは実装済み。利用者がlink／loginからのAPI・JWT更新確認を完了。Data APIを使わない設計を維持 |
 
 「profileを要求しない」というscope制限だけで「追加プロフィール情報を一切取得・保存しない」ことまで達成済みと扱わない。Supabase内部の挙動を抑制できない場合は制約と対応案を報告し、要件を満たしたと宣言しない。取得後の削除だけで「取得しない」という要件を満たす扱いにもしない。
 
-Supabase Authの公開実装では、Custom OIDCの `GetUserData` がID tokenの解析を行い、Google issuerに対応する処理にはname／picture等をMetadataへ取り込むコードがある。scopeを絞っても「返された追加claimをAuthが必ず破棄する」とは保証できない。実プロジェクトに適用されたバージョン・Google応答・Auth側の保存を、[手順書](google-oidc-setup.md) に従い確認する。[Custom OIDC処理](https://github.com/supabase/auth/blob/master/internal/api/provider/custom_oauth.go)、[GoogleのID token解析](https://github.com/supabase/auth/blob/master/internal/api/provider/oidc.go)
+Supabase Authの公開実装では、Custom OIDCの `GetUserData` がID tokenの解析を行い、Google issuerに対応する処理にはname／picture等をMetadataへ取り込むコードがある。scopeを絞っても「返された追加claimをAuthが必ず破棄する」とは保証できない。今回の受け入れ確認では追加情報がないとの利用者報告を記録した。Google／Supabaseの仕様やprovider設定を変更した場合は、[手順書](google-oidc-setup.md) に従い再確認する。[Custom OIDC処理](https://github.com/supabase/auth/blob/master/internal/api/provider/custom_oauth.go)、[GoogleのID token解析](https://github.com/supabase/auth/blob/master/internal/api/provider/oidc.go)
 
 CLIは追加情報を検出した場合に成功扱いせず終了する。監査対象はAuthユーザー・Identity・Honoが受け付けたSupabase JWTで、Googleの生のID tokenやUserInfo応答まで網羅した証明ではない。
 
-## 11. 実装・検証と残る手動確認
+## 11. 実装・検証と再確認手順
 
 1. `auth:google config` は公開設定値、`check` はCLI環境変数の形式検査を行う。どちらもネットワークへ接続しない。
    `auth:google scopes` はSupabaseへの通常要求とscope上書きprobeから生成されたGoogle向けURLを検査する。Googleへは接続せず、ログイン・ユーザー作成は行わない。
