@@ -11,6 +11,6 @@ export const CreateUserBookRequest = z.object({
   bookId: uuid, status: ReadingStatus.optional(),
 }).strict().openapi('CreateUserBookRequest')
 export const PatchUserBookRequest = patchObject({
-  status: ReadingStatus, currentPage: count.nullable(),
+  status: ReadingStatus, currentPage: count.max(2147483647).nullable(),
 }).openapi('PatchUserBookRequest')
 export const UserBookPage = cursorPage('UserBookPage', UserBook)

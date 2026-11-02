@@ -7,7 +7,7 @@ import { uuid } from '../shared/schemas'
 export type Identity = { id: string; isAnonymous: boolean }
 export type AuthBindings = { SUPABASE_URL?: string }
 export type AppEnv = {
-  Bindings: DatabaseBindings & AuthBindings & { CORS_ORIGIN?: string }
+  Bindings: DatabaseBindings & AuthBindings & { CORS_ORIGIN?: string; GOOGLE_BOOKS_API_KEY?: string }
   Variables: { identity: Identity | undefined }
 }
 export type TokenVerifier = (token: string, env: AuthBindings) => Promise<Identity>

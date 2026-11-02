@@ -39,6 +39,6 @@ export const ImportBookRequest = z.object({
   }
 }).openapi('ImportBookRequest', { description: '書誌情報はサーバーで再取得する。openBDのproviderIdはISBN-13。' })
 export const ManualBookRequest = z.object({
-  title: nonEmptyText(), author: z.string().nullable().optional(), totalPages: positivePage.nullable().optional(),
+  title: nonEmptyText(), author: z.string().nullable().optional(), totalPages: positivePage.max(2147483647).nullable().optional(),
 }).strict().openapi('ManualBookRequest')
 export const PublicBookPage = cursorPage('PublicBookPage', BookSummary)

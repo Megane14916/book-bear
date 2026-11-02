@@ -4,6 +4,8 @@ import { OpenAPIHono, z } from '@hono/zod-openapi'
 import app, { openApiConfig } from '../index'
 import { plannedRoutes } from './routes'
 import { profileRoutes } from '../modules/users/routes'
+import { bookRoutes } from '../modules/books/routes'
+import { libraryRoutes } from '../modules/library/routes'
 import { CreateBookmarkRequest } from '../modules/bookmarks/schemas'
 import { ErrorSchema } from '../shared/schemas'
 
@@ -12,7 +14,7 @@ const operations = Object.values(document.paths).flatMap((path) => Object.values
 
 describe('OpenAPI契約と稼働APIの区別', () => {
   it('主要34操作・healthが一意のoperationIdを持ち、全未実装操作を明示する', () => {
-    expect(plannedRoutes).toHaveLength(28)
+    expect(plannedRoutes).toHaveLength(19)
     expect(operations).toHaveLength(36)
     expect(new Set(operations.map((operation) => operation.operationId)).size).toBe(36)
     for (const route of plannedRoutes) {
@@ -25,11 +27,11 @@ describe('OpenAPI契約と稼働APIの区別', () => {
     }
     expect(document.paths['/api/v1/health']?.get?.['x-implementation-status']).toBe('implemented')
     expect(document.paths['/api/v1/health/db']?.get?.['x-implementation-status']).toBe('implemented')
-    for (const route of Object.values(profileRoutes)) {
+    for (const route of [...Object.values(profileRoutes), ...Object.values(bookRoutes), ...Object.values(libraryRoutes)]) {
       const operation = document.paths[route.path]?.[route.method]
       expect(operation?.['x-implementation-status']).toBe('implemented')
       expect(operation?.description ?? '').not.toContain('未実装・契約のみ')
-      expect(operation?.responses[503]).toBeDefined()
+      if (route['x-auth'] !== 'Public') expect(operation?.responses[503]).toBeDefined()
     }
   })
 
@@ -37,7 +39,7 @@ describe('OpenAPI契約と稼働APIの区別', () => {
     const draft = await readFile(new URL('../../../../contracts/openapi-draft.yaml', import.meta.url), 'utf8')
     const ids = [...draft.matchAll(/operationId: (\S+)/g)].map((match) => match[1])
     expect(ids).toHaveLength(34)
-    expect([...plannedRoutes, ...Object.values(profileRoutes)].map((route) => route.operationId).sort()).toEqual(ids.sort())
+    expect([...plannedRoutes, ...Object.values(profileRoutes), ...Object.values(bookRoutes), ...Object.values(libraryRoutes)].map((route) => route.operationId).sort()).toEqual(ids.sort())
   })
 
   it('必須・任意・正式認証と条件付き403を記載する', () => {

@@ -6,6 +6,8 @@ import { withDatabase } from './db/client'
 import { profiles } from './db/schema'
 import { authentication, createTokenVerifier, type AppEnv, type TokenVerifier } from './middleware/auth'
 import { registerProfileRoutes } from './modules/users/http'
+import { registerBookRoutes } from './modules/books/http'
+import { registerLibraryRoutes } from './modules/library/http'
 import { ApiError } from './shared/errors'
 import { ErrorSchema } from './shared/schemas'
 
@@ -18,7 +20,7 @@ export const openApiConfig = {
 }
 
 // Dependencies can be supplied by tests; no runtime flag disables JWT checks.
-export function createApp(dependencies: { verifyToken?: TokenVerifier; database?: typeof withDatabase } = {}) {
+export function createApp(dependencies: { verifyToken?: TokenVerifier; database?: typeof withDatabase; bookFetch?: typeof fetch } = {}) {
   const database = dependencies.database ?? withDatabase
   const auth = authentication(dependencies.verifyToken ?? createTokenVerifier())
   const app = new OpenAPIHono<AppEnv>({ defaultHook: (result, c) => {
@@ -74,6 +76,8 @@ export function createApp(dependencies: { verifyToken?: TokenVerifier; database?
   })
 
   registerProfileRoutes(app, database, auth)
+  registerBookRoutes(app, database, auth, dependencies.bookFetch)
+  registerLibraryRoutes(app, database, auth)
 
   app.openAPIRegistry.registerComponent('securitySchemes', 'bearerAuth', {
     type: 'http', scheme: 'bearer', bearerFormat: 'JWT',
