@@ -222,51 +222,6 @@
           "followedByMe"
         ]
       },
-      "UserSummary": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "displayName": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 50
-          },
-          "avatarUrl": {
-            "type": "string",
-            "nullable": true,
-            "format": "uri"
-          }
-        },
-        "required": [
-          "id",
-          "displayName",
-          "avatarUrl"
-        ]
-      },
-      "UserPage": {
-        "type": "object",
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/UserSummary"
-            }
-          },
-          "nextCursor": {
-            "type": "string",
-            "nullable": true,
-            "minLength": 1,
-            "description": "不透明なカーソル。内容を解析せず次回の同じ条件のリクエストに渡す。不正・期限切れは400 INVALID_CURSOR。"
-          }
-        },
-        "required": [
-          "items",
-          "nextCursor"
-        ]
-      },
       "BookSearchItem": {
         "type": "object",
         "properties": {
@@ -447,7 +402,8 @@
             "type": "integer",
             "nullable": true,
             "minimum": 0,
-            "exclusiveMinimum": true
+            "exclusiveMinimum": true,
+            "maximum": 2147483647
           }
         },
         "required": [
@@ -557,7 +513,8 @@
           "currentPage": {
             "type": "integer",
             "nullable": true,
-            "minimum": 0
+            "minimum": 0,
+            "maximum": 2147483647
           }
         },
         "additionalProperties": false,
@@ -570,6 +527,51 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/BookSummary"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true,
+            "minLength": 1,
+            "description": "不透明なカーソル。内容を解析せず次回の同じ条件のリクエストに渡す。不正・期限切れは400 INVALID_CURSOR。"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
+      "UserSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri"
+          }
+        },
+        "required": [
+          "id",
+          "displayName",
+          "avatarUrl"
+        ]
+      },
+      "UserPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserSummary"
             }
           },
           "nextCursor": {
@@ -1454,6 +1456,823 @@
         }
       }
     },
+    "/api/v1/books/search": {
+      "get": {
+        "tags": [
+          "Books"
+        ],
+        "x-implementation-status": "implemented",
+        "security": [],
+        "x-auth": "Public",
+        "operationId": "getBooksSearch",
+        "summary": "書名・著者・ISBNから書籍候補を検索",
+        "description": "DB候補を優先。外部API障害でもDB候補があれば200、なければ502。limit既定20・最大30。",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 30,
+              "default": 20
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookSearchResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_ERROR: 内部情報を含めないエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "BOOK_PROVIDER_UNAVAILABLE: 外部書籍API障害（検索はDB候補があれば200）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/books/{bookId}": {
+      "get": {
+        "tags": [
+          "Books"
+        ],
+        "x-implementation-status": "implemented",
+        "security": [],
+        "x-auth": "Public",
+        "operationId": "getBooksBookid",
+        "summary": "書籍詳細",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "bookId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Book"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND: 対象なし、または本人以外の本棚",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_ERROR: 内部情報を含めないエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/books/import": {
+      "post": {
+        "tags": [
+          "Books"
+        ],
+        "x-implementation-status": "implemented",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-auth": "AnyAuth",
+        "operationId": "postBooksImport",
+        "summary": "外部書籍情報の取り込み",
+        "description": "外部APIから再取得・検証。同一ISBN-13は既存を再利用。ISBNなしは重複を許容する。プロフィール未初期化は404。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportBookRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "既存書籍を再利用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Book"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "新規書籍",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Book"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHORIZED: JWTなし・無効・期限切れ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND: 対象なし、または本人以外の本棚",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_ERROR: 内部情報を含めないエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "BOOK_PROVIDER_UNAVAILABLE: 外部書籍API障害（検索はDB候補があれば200）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "INTERNAL_ERROR: 認証設定不備・JWKS取得失敗",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/books/manual": {
+      "post": {
+        "tags": [
+          "Books"
+        ],
+        "x-implementation-status": "implemented",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-auth": "AnyAuth",
+        "operationId": "postBooksManual",
+        "summary": "ISBNなしの書籍を手動登録",
+        "description": "ISBNは受け付けない。作成者はJWTから追跡。ISBNなしの重複は許容し、レート制限は今回の対象外。プロフィール未初期化は404。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualBookRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Book"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHORIZED: JWTなし・無効・期限切れ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND: 対象なし、または本人以外の本棚",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_ERROR: 内部情報を含めないエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "INTERNAL_ERROR: 認証設定不備・JWKS取得失敗",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/books": {
+      "get": {
+        "tags": [
+          "Library"
+        ],
+        "x-implementation-status": "implemented",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-auth": "Owner",
+        "operationId": "getMeBooks",
+        "summary": "自分の本棚",
+        "description": "created_at DESC, id DESC。limit既定15・最大30、limit+1件で続きを判定。日時（小数6桁）・IDのBase64URLカーソル。署名・有効期限なし。SQLで所有者・公開条件を毎回検証。",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "日時とIDのBase64URLカーソル。署名・有効期限なし。不正な形式は400 INVALID_CURSOR。認可はSQLで毎回確認。"
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 30,
+              "default": 15
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserBookPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHORIZED: JWTなし・無効・期限切れ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND: 対象なし、または本人以外の本棚",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_ERROR: 内部情報を含めないエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "INTERNAL_ERROR: 認証設定不備・JWKS取得失敗",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Library"
+        ],
+        "x-implementation-status": "implemented",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-auth": "AnyAuth",
+        "operationId": "postMeBooks",
+        "summary": "本棚へ登録（冪等）",
+        "description": "同一ユーザー・書籍は既存を返し、状態・進捗・日時を変更しない。status省略時want_to_read。プロフィール未初期化は404。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserBookRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "既存を再利用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserBook"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "新規登録",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserBook"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHORIZED: JWTなし・無効・期限切れ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND: 対象なし、または本人以外の本棚",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_ERROR: 内部情報を含めないエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "INTERNAL_ERROR: 認証設定不備・JWKS取得失敗",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/books/{userBookId}": {
+      "patch": {
+        "tags": [
+          "Library"
+        ],
+        "x-implementation-status": "implemented",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-auth": "Owner",
+        "operationId": "patchMeBooksUserbookid",
+        "summary": "本棚情報更新",
+        "description": "本人のみ。他人のIDは404。currentPageは0以上のDB整数またはnull。総ページ数を上限としない。",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "userBookId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchUserBookRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserBook"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHORIZED: JWTなし・無効・期限切れ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND: 対象なし、または本人以外の本棚",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_ERROR: 内部情報を含めないエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "INTERNAL_ERROR: 認証設定不備・JWKS取得失敗",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Library"
+        ],
+        "x-implementation-status": "implemented",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-auth": "Owner",
+        "operationId": "deleteMeBooksUserbookid",
+        "summary": "本棚から削除",
+        "description": "本人のみ。他人のIDは404。論理削除済みを含む栞の参照があれば409 HAS_BOOKMARKS。共有書籍は削除しない。",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "userBookId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "成功（本文なし）"
+          },
+          "400": {
+            "description": "VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHORIZED: JWTなし・無効・期限切れ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND: 対象なし、または本人以外の本棚",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "HAS_BOOKMARKS: 栞の参照が残っている",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_ERROR: 内部情報を含めないエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "INTERNAL_ERROR: 認証設定不備・JWKS取得失敗",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/{userId}/books": {
+      "get": {
+        "tags": [
+          "Library"
+        ],
+        "x-implementation-status": "implemented",
+        "security": [],
+        "x-auth": "Public",
+        "operationId": "getUsersUseridBooks",
+        "summary": "公開栞のある本一覧",
+        "description": "created_at DESC, id DESC。limit既定15・最大30、limit+1件で続きを判定。日時（小数6桁）・IDのBase64URLカーソル。署名・有効期限なし。SQLで所有者・公開条件を毎回検証。 公開中・未削除の栞がある本だけ。状態・進捗・非公開栞は返さない。",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "userId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "日時とIDのBase64URLカーソル。署名・有効期限なし。不正な形式は400 INVALID_CURSOR。認可はSQLで毎回確認。"
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 30,
+              "default": 15
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND: 対象なし、または本人以外の本棚",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_ERROR: 内部情報を含めないエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/users/{userId}/followers": {
       "get": {
         "operationId": "getUsersUseridFollowers",
@@ -1601,864 +2420,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UserPage"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "NOT_FOUND: 対象なし。第三者の非公開栞・削除済み栞も存在を明かさず404",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "RATE_LIMITED: 操作回数制限",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "INTERNAL_ERROR: 内部情報を含めないサーバーエラー",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/books/search": {
-      "get": {
-        "operationId": "getBooksSearch",
-        "tags": [
-          "Books"
-        ],
-        "summary": "書名・著者・ISBNから書籍候補を検索",
-        "security": [],
-        "description": "【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。認証なしで利用可能。 ",
-        "x-implementation-status": "planned",
-        "x-auth": "Public",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": true,
-            "name": "q",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 30,
-              "default": 20
-            },
-            "required": false,
-            "name": "limit",
-            "in": "query"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BookSearchResult"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "RATE_LIMITED: 操作回数制限",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "INTERNAL_ERROR: 内部情報を含めないサーバーエラー",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "BOOK_PROVIDER_UNAVAILABLE: 外部書籍API障害",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/books/{bookId}": {
-      "get": {
-        "operationId": "getBooksBookid",
-        "tags": [
-          "Books"
-        ],
-        "summary": "書籍詳細",
-        "security": [],
-        "description": "【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。認証なしで利用可能。 ",
-        "x-implementation-status": "planned",
-        "x-auth": "Public",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "bookId",
-            "in": "path"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Book"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "NOT_FOUND: 対象なし。第三者の非公開栞・削除済み栞も存在を明かさず404",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "RATE_LIMITED: 操作回数制限",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "INTERNAL_ERROR: 内部情報を含めないサーバーエラー",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/books/import": {
-      "post": {
-        "operationId": "postBooksImport",
-        "tags": [
-          "Books"
-        ],
-        "summary": "外部書籍情報の取り込み",
-        "description": "【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。Supabase Bearer JWT必須。匿名・正式ユーザーともに利用可能。 外部APIから再取得・正規化。同一ISBN-13は既存のbookIdを再利用。",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "x-implementation-status": "planned",
-        "x-auth": "AnyAuth",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ImportBookRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "既存書籍を再利用",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Book"
-                }
-              }
-            }
-          },
-          "201": {
-            "description": "新規書籍",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Book"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "UNAUTHORIZED: 必須JWTがない、または送信されたJWTが無効・期限切れ",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "NOT_FOUND: 対象なし。第三者の非公開栞・削除済み栞も存在を明かさず404",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "RATE_LIMITED: 操作回数制限",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "INTERNAL_ERROR: 内部情報を含めないサーバーエラー",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "BOOK_PROVIDER_UNAVAILABLE: 外部書籍API障害",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/books/manual": {
-      "post": {
-        "operationId": "postBooksManual",
-        "tags": [
-          "Books"
-        ],
-        "summary": "ISBNなしの書籍を手動登録",
-        "description": "【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。Supabase Bearer JWT必須。匿名・正式ユーザーともに利用可能。 ISBNは受け付けない。作成者はJWTから追跡する。",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "x-implementation-status": "planned",
-        "x-auth": "AnyAuth",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ManualBookRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Book"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "UNAUTHORIZED: 必須JWTがない、または送信されたJWTが無効・期限切れ",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "RATE_LIMITED: 操作回数制限",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "INTERNAL_ERROR: 内部情報を含めないサーバーエラー",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/me/books": {
-      "get": {
-        "operationId": "getMeBooks",
-        "tags": [
-          "Library"
-        ],
-        "summary": "自分の本棚",
-        "description": "【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。Supabase Bearer JWT必須。匿名・正式ともに本人のみ。所有者は検証済みJWTのsubから判定。 limitは既定15・最大30。SQLはlimit+1件取得し、続きがなければnextCursor=null。カーソルの署名または対象・条件の厳格照合が必要。 created_at DESC, id DESC。",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "x-implementation-status": "planned",
-        "x-auth": "Owner",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "description": "不透明なカーソル。内容を解析せず次回の同じ条件のリクエストに渡す。不正・期限切れは400 INVALID_CURSOR。"
-            },
-            "required": false,
-            "name": "cursor",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 30,
-              "default": 15
-            },
-            "required": false,
-            "name": "limit",
-            "in": "query"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserBookPage"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "UNAUTHORIZED: 必須JWTがない、または送信されたJWTが無効・期限切れ",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "REGISTRATION_REQUIRED: 正式登録が必要 / FORBIDDEN: 操作権限なし",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "RATE_LIMITED: 操作回数制限",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "INTERNAL_ERROR: 内部情報を含めないサーバーエラー",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "operationId": "postMeBooks",
-        "tags": [
-          "Library"
-        ],
-        "summary": "本棚へ登録（冪等）",
-        "description": "【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。Supabase Bearer JWT必須。匿名・正式ユーザーともに利用可能。 同一ユーザー・書籍は既存レコードを返す。",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "x-implementation-status": "planned",
-        "x-auth": "AnyAuth",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateUserBookRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "既存を再利用",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserBook"
-                }
-              }
-            }
-          },
-          "201": {
-            "description": "新規登録",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserBook"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "UNAUTHORIZED: 必須JWTがない、または送信されたJWTが無効・期限切れ",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "NOT_FOUND: 対象なし。第三者の非公開栞・削除済み栞も存在を明かさず404",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "RATE_LIMITED: 操作回数制限",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "INTERNAL_ERROR: 内部情報を含めないサーバーエラー",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/me/books/{userBookId}": {
-      "patch": {
-        "operationId": "patchMeBooksUserbookid",
-        "tags": [
-          "Library"
-        ],
-        "summary": "本棚情報更新",
-        "description": "【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。Supabase Bearer JWT必須。匿名・正式ともに本人のみ。所有者は検証済みJWTのsubから判定。 currentPageは0以上またはnull。総ページ数を上限としない。",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "x-implementation-status": "planned",
-        "x-auth": "Owner",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "userBookId",
-            "in": "path"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PatchUserBookRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserBook"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "UNAUTHORIZED: 必須JWTがない、または送信されたJWTが無効・期限切れ",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "REGISTRATION_REQUIRED: 正式登録が必要 / FORBIDDEN: 操作権限なし",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "NOT_FOUND: 対象なし。第三者の非公開栞・削除済み栞も存在を明かさず404",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "RATE_LIMITED: 操作回数制限",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "INTERNAL_ERROR: 内部情報を含めないサーバーエラー",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "operationId": "deleteMeBooksUserbookid",
-        "tags": [
-          "Library"
-        ],
-        "summary": "本棚から削除",
-        "description": "【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。Supabase Bearer JWT必須。匿名・正式ともに本人のみ。所有者は検証済みJWTのsubから判定。 栞があれば409 HAS_BOOKMARKS。共有の書籍マスタは削除しない。",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "x-implementation-status": "planned",
-        "x-auth": "Owner",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "userBookId",
-            "in": "path"
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "成功（本文なし）。PUT/DELETEのフォロー・いいねは冪等。"
-          },
-          "400": {
-            "description": "VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "UNAUTHORIZED: 必須JWTがない、または送信されたJWTが無効・期限切れ",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "REGISTRATION_REQUIRED: 正式登録が必要 / FORBIDDEN: 操作権限なし",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "NOT_FOUND: 対象なし。第三者の非公開栞・削除済み栞も存在を明かさず404",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "ALREADY_EXISTS / HAS_BOOKMARKS / ACCOUNT_LINK_CONFLICT: 重複・競合",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "RATE_LIMITED: 操作回数制限",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "INTERNAL_ERROR: 内部情報を含めないサーバーエラー",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/users/{userId}/books": {
-      "get": {
-        "operationId": "getUsersUseridBooks",
-        "tags": [
-          "Library"
-        ],
-        "summary": "公開栞のある本一覧",
-        "description": "【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。認証なしで利用可能。 limitは既定15・最大30。SQLはlimit+1件取得し、続きがなければnextCursor=null。カーソルの署名または対象・条件の厳格照合が必要。 created_at DESC, id DESC。 公開中・未削除の栞が1件以上ある本のみ。本棚全体は公開しない。",
-        "security": [],
-        "x-implementation-status": "planned",
-        "x-auth": "Public",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "userId",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "description": "不透明なカーソル。内容を解析せず次回の同じ条件のリクエストに渡す。不正・期限切れは400 INVALID_CURSOR。"
-            },
-            "required": false,
-            "name": "cursor",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 30,
-              "default": 15
-            },
-            "required": false,
-            "name": "limit",
-            "in": "query"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PublicBookPage"
                 }
               }
             }

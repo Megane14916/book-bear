@@ -1,11 +1,9 @@
 import { createRoute, type RouteConfig, z } from '@hono/zod-openapi'
 import {
-  BookmarkFlowParams, BookmarkIdParams, BookIdParams, ErrorSchema, PaginationQuery,
-  ReplyIdParams, SearchQuery, UserBookIdParams, UserIdParams, nonEmptyText,
+  BookmarkFlowParams, BookmarkIdParams, ErrorSchema, PaginationQuery,
+  ReplyIdParams, SearchQuery, UserIdParams, nonEmptyText,
 } from '../shared/schemas'
 import { UserPage } from '../modules/users/schemas'
-import { Book, BookSearchResult, ImportBookRequest, ManualBookRequest, PublicBookPage } from '../modules/books/schemas'
-import { CreateUserBookRequest, PatchUserBookRequest, UserBook, UserBookPage } from '../modules/library/schemas'
 import { BookmarkCard, BookmarkFlowPage, CreateBookmarkRequest, FeedPage, PatchBookmarkRequest } from '../modules/bookmarks/schemas'
 import { FeedQuery } from '../modules/feed/schemas'
 import { CreateReplyRequest, PatchReplyRequest, Reply, ReplyPage } from '../modules/replies/schemas'
@@ -69,27 +67,6 @@ export const plannedRoutes: PlannedRoute[] = [
     tags: ['Social'], summary: `${kind}一覧`, description: descPagination,
     request: { params: UserIdParams, query: PaginationQuery }, responses: { 200: json(UserPage) },
   }, 'Public', [404])),
-  planned({ method: 'get', path: '/api/v1/books/search', operationId: 'getBooksSearch', tags: ['Books'], summary: '書名・著者・ISBNから書籍候補を検索',
-    request: { query: SearchQuery }, responses: { 200: json(BookSearchResult) } }, 'Public', [502]),
-  planned({ method: 'get', path: '/api/v1/books/{bookId}', operationId: 'getBooksBookid', tags: ['Books'], summary: '書籍詳細',
-    request: { params: BookIdParams }, responses: { 200: json(Book) } }, 'Public', [404]),
-  planned({ method: 'post', path: '/api/v1/books/import', operationId: 'postBooksImport', tags: ['Books'], summary: '外部書籍情報の取り込み',
-    description: '外部APIから再取得・正規化。同一ISBN-13は既存のbookIdを再利用。',
-    request: { body: body(ImportBookRequest) }, responses: { 200: json(Book, '既存書籍を再利用'), 201: json(Book, '新規書籍') } }, 'AnyAuth', [404, 502]),
-  planned({ method: 'post', path: '/api/v1/books/manual', operationId: 'postBooksManual', tags: ['Books'], summary: 'ISBNなしの書籍を手動登録',
-    description: 'ISBNは受け付けない。作成者はJWTから追跡する。', request: { body: body(ManualBookRequest) }, responses: { 201: json(Book) } }, 'AnyAuth'),
-  planned({ method: 'get', path: '/api/v1/me/books', operationId: 'getMeBooks', tags: ['Library'], summary: '自分の本棚', description: descNewest,
-    request: { query: PaginationQuery }, responses: { 200: json(UserBookPage) } }, 'Owner'),
-  planned({ method: 'post', path: '/api/v1/me/books', operationId: 'postMeBooks', tags: ['Library'], summary: '本棚へ登録（冪等）',
-    description: '同一ユーザー・書籍は既存レコードを返す。', request: { body: body(CreateUserBookRequest) },
-    responses: { 200: json(UserBook, '既存を再利用'), 201: json(UserBook, '新規登録') } }, 'AnyAuth', [404]),
-  planned({ method: 'patch', path: '/api/v1/me/books/{userBookId}', operationId: 'patchMeBooksUserbookid', tags: ['Library'], summary: '本棚情報更新',
-    description: 'currentPageは0以上またはnull。総ページ数を上限としない。', request: { params: UserBookIdParams, body: body(PatchUserBookRequest) }, responses: { 200: json(UserBook) } }, 'Owner', [404]),
-  planned({ method: 'delete', path: '/api/v1/me/books/{userBookId}', operationId: 'deleteMeBooksUserbookid', tags: ['Library'], summary: '本棚から削除',
-    description: '栞があれば409 HAS_BOOKMARKS。共有の書籍マスタは削除しない。', request: { params: UserBookIdParams }, responses: { 204: noContent } }, 'Owner', [404, 409]),
-  planned({ method: 'get', path: '/api/v1/users/{userId}/books', operationId: 'getUsersUseridBooks', tags: ['Library'], summary: '公開栞のある本一覧',
-    description: `${descNewest} 公開中・未削除の栞が1件以上ある本のみ。本棚全体は公開しない。`,
-    request: { params: UserIdParams, query: PaginationQuery }, responses: { 200: json(PublicBookPage) } }, 'Public', [404]),
   planned({ method: 'post', path: '/api/v1/bookmarks', operationId: 'postBookmarks', tags: ['Bookmarks'], summary: '栞作成', description: registeredPublish,
     request: { body: body(CreateBookmarkRequest) }, responses: { 201: json(BookmarkCard) } }, 'AnyAuth', [403, 404]),
   planned({ method: 'get', path: '/api/v1/bookmarks/{bookmarkId}', operationId: 'getBookmarksBookmarkid', tags: ['Bookmarks'], summary: '公開または本人の栞詳細',
