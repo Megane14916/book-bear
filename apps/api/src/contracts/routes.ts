@@ -4,7 +4,7 @@ import {
   ReplyIdParams, SearchQuery, UserIdParams, nonEmptyText,
 } from '../shared/schemas'
 import { UserPage } from '../modules/users/schemas'
-import { BookmarkCard, BookmarkFlowPage, CreateBookmarkRequest, FeedPage, PatchBookmarkRequest } from '../modules/bookmarks/schemas'
+import { BookmarkFlowPage, FeedPage } from '../modules/bookmarks/schemas'
 import { FeedQuery } from '../modules/feed/schemas'
 import { CreateReplyRequest, PatchReplyRequest, Reply, ReplyPage } from '../modules/replies/schemas'
 
@@ -56,7 +56,6 @@ const descPagination = 'limitは既定15・最大30。SQLはlimit+1件取得し�
 const descNewest = `${descPagination} created_at DESC, id DESC。`
 const descOldest = `${descPagination} created_at ASC, id ASC（ページ番号順ではない）。`
 const publicBookmark = '公開栞のみ。他人の非公開栞および削除済み栞は返さない。'
-const registeredPublish = 'visibility=publicの作成・公開化は正式ユーザーのみ（匿名は403 REGISTRATION_REQUIRED）。userBookIdの所有権をJWTのsubで確認。'
 
 // These definitions are registered only in the OpenAPI registry, never as HTTP handlers.
 // When implementing an operation, reuse its schema/route and move it to app.openapi().
@@ -67,16 +66,6 @@ export const plannedRoutes: PlannedRoute[] = [
     tags: ['Social'], summary: `${kind}一覧`, description: descPagination,
     request: { params: UserIdParams, query: PaginationQuery }, responses: { 200: json(UserPage) },
   }, 'Public', [404])),
-  planned({ method: 'post', path: '/api/v1/bookmarks', operationId: 'postBookmarks', tags: ['Bookmarks'], summary: '栞作成', description: registeredPublish,
-    request: { body: body(CreateBookmarkRequest) }, responses: { 201: json(BookmarkCard) } }, 'AnyAuth', [403, 404]),
-  planned({ method: 'get', path: '/api/v1/bookmarks/{bookmarkId}', operationId: 'getBookmarksBookmarkid', tags: ['Bookmarks'], summary: '公開または本人の栞詳細',
-    description: '非公開は本人のみ取得可能。他人の非公開栞・削除済みは404。', request: { params: BookmarkIdParams }, responses: { 200: json(BookmarkCard) } }, 'OptionalAuth', [404]),
-  planned({ method: 'patch', path: '/api/v1/bookmarks/{bookmarkId}', operationId: 'patchBookmarksBookmarkid', tags: ['Bookmarks'], summary: '自分の栞を編集',
-    description: `${registeredPublish} createdAt・所属する本棚は変更できない。`, request: { params: BookmarkIdParams, body: body(PatchBookmarkRequest) }, responses: { 200: json(BookmarkCard) } }, 'Owner', [404]),
-  planned({ method: 'delete', path: '/api/v1/bookmarks/{bookmarkId}', operationId: 'deleteBookmarksBookmarkid', tags: ['Bookmarks'], summary: '自分の栞を論理削除',
-    request: { params: BookmarkIdParams }, responses: { 204: noContent } }, 'Owner', [404]),
-  planned({ method: 'get', path: '/api/v1/me/bookmarks', operationId: 'getMeBookmarks', tags: ['Bookmarks'], summary: '自分の公開・非公開栞', description: descNewest,
-    request: { query: PaginationQuery }, responses: { 200: json(FeedPage) } }, 'Owner'),
   planned({ method: 'get', path: '/api/v1/users/{userId}/books/{bookId}/bookmarks', operationId: 'getUsersUseridBooksBookidBookmarks', tags: ['Bookmarks'], summary: '栞の流れ',
     description: `${descOldest} 本人は公開・非公開、それ以外は公開のみ。ユーザー・本が存在しても組み合わせや公開栞がなければitems=[]。authorとbookはルートに1回だけ。`,
     request: { params: BookmarkFlowParams, query: PaginationQuery }, responses: { 200: json(BookmarkFlowPage) } }, 'OptionalAuth', [404]),
