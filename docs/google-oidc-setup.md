@@ -63,11 +63,13 @@ https://YOUR_PROJECT_REF.supabase.co/auth/v1/callback
 pnpm --filter api auth:google config
 ```
 
-### Scopesの入力欄が見つからない場合
+### ScopesやAuthorization paramsの入力欄が見つからない場合
 
 作成／更新画面のAdvanced設定も確認する。scopeを設定できない状態で組み込みGoogleへ切り替えない。
 
 管理画面で指定できない場合は、[公式Custom provider管理API](https://supabase.com/docs/guides/auth/custom-oauth-providers) を使用できる。以下は**利用者が設定を反映する場合だけ**実行する。SupabaseのSecret keyとGoogle Client Secretは対話入力し、このファイルや `.env.auth.local` へ保存しない。providerが既にある場合は作成し直さず、更新を使う。
+
+PowerShellの既定User-Agentは `Mozilla/…` で始まり、SupabaseのSecret key利用時にブラウザとして拒否されることがある。管理用PowerShellから実行する下記コマンドでは、`-UserAgent 'BookBear-Admin-PowerShell/1.0'` を明示する。[PowerShellの既定値](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/invoke-restmethod#-useragent)、[SupabaseのUser-Agent判定](https://supabase.com/docs/guides/getting-started/api-keys)
 
 ```powershell
 $bookBearSupabaseUrl = (Read-Host '開発用Supabase Project URL').Trim().TrimEnd('/')
@@ -96,6 +98,7 @@ try {
     # 新規作成時だけ実行する。
     $bookBearProvider = Invoke-RestMethod -Method Post `
         -Uri "$bookBearSupabaseUrl/auth/v1/admin/custom-providers" `
+        -UserAgent 'BookBear-Admin-PowerShell/1.0' `
         -Headers @{ apikey = $bookBearAdminSecret } `
         -ContentType 'application/json' -Body ($bookBearProviderBody | ConvertTo-Json -Depth 4)
     $bookBearProvider | Select-Object identifier, provider_type, issuer, scopes
@@ -104,11 +107,34 @@ try {
 }
 ```
 
-既存のproviderを更新する場合は、Secret keyを同様に対話取得したうえで、管理APIの `PUT /auth/v1/admin/custom-providers/custom:google` に以下を送る。指定したAuthorization paramsへ更新するため、既存の追加パラメータがある場合は内容を確認する。設定の読み取り・更新APIの詳細は公式資料を参照する。管理APIで保存できても、実際の認可URLの検査は後述のCLIで別途行う。
+既存のproviderを更新する場合は、次を実行する。Google Client ID・Client Secretは維持し、ScopesとAuthorization paramsだけを更新する。指定したAuthorization paramsへ更新するため、既存の追加パラメータがある場合は内容を確認する。管理APIで保存できても、実際の認可URLの検査は後述のCLIで別途行う。
 
-```json
-{"scopes":["openid","email"],"authorization_params":{"scope":"openid email","access_type":"online","include_granted_scopes":"false"}}
+```powershell
+$bookBearSupabaseUrl = (Read-Host '開発用Supabase Project URL').Trim().TrimEnd('/')
+$bookBearAdminSecret = [pscredential]::new('unused', (Read-Host 'Supabase Secret key' -AsSecureString)).GetNetworkCredential().Password
+$bookBearSettings = @{
+    scopes = @('openid', 'email')
+    authorization_params = @{
+        scope = 'openid email'
+        access_type = 'online'
+        include_granted_scopes = 'false'
+    }
+}
+try {
+    $bookBearProvider = Invoke-RestMethod -Method Put `
+        -Uri "$bookBearSupabaseUrl/auth/v1/admin/custom-providers/custom:google" `
+        -UserAgent 'BookBear-Admin-PowerShell/1.0' `
+        -Headers @{ apikey = $bookBearAdminSecret } `
+        -ContentType 'application/json' `
+        -Body ($bookBearSettings | ConvertTo-Json -Depth 4) `
+        -ErrorAction Stop
+    $bookBearProvider | Select-Object identifier, scopes, authorization_params | ConvertTo-Json -Depth 4
+} finally {
+    Remove-Variable bookBearAdminSecret, bookBearSettings -ErrorAction SilentlyContinue
+}
 ```
+
+失敗後も `finally` でSecret key変数を除去するため、再実行時は対話入力から全体を実行する。`Forbidden use of secret API key in browser` はこの判定でも発生するため、メッセージだけでは漏洩を意味しない。実際にWebコード・ブラウザの開発者ツール等へキーを入れた場合は、そのキーを失効・交換する。
 
 ### Manual Linkingと戻り先
 
@@ -282,6 +308,7 @@ Data API無効のままAuthとHonoが動作: OK / NG
 
 | 状況 | 確認する点 |
 |---|---|
+| 管理APIで `Forbidden use of secret API key in browser` | 管理用PowerShellの `-UserAgent 'BookBear-Admin-PowerShell/1.0'` 指定を確認。Secret keyは対話入力から再取得する |
 | `Google scope must be exactly openid email` | Custom providerのScopes、Authorization paramsを確認。profileを追加して回避しない |
 | `expected HTTP 302` / link時HTTP 400・422 | Custom provider有効化、識別子、issuer、Client ID、Manual Linkingを確認 |
 | Googleのredirect_uri_mismatch | GoogleのAuthorized redirect URIsにSupabase表示のCallback URLを正確に登録 |
