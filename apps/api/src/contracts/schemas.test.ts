@@ -49,7 +49,7 @@ describe('作成時の既定値と厳格なJSON入力', () => {
     expect(CreateBookmarkRequest.parse(input)).toEqual({ ...input, visibility: 'private', isSpoiler: false })
     expect(CreateReplyRequest.parse({ content: '返信' })).toEqual({ content: '返信', isSpoiler: false })
     expect(CreateBookmarkRequest.safeParse({ ...input, visibility: 'public' }).success).toBe(true)
-    // Registered/owner authorization requires verified JWT and belongs to the future handler.
+    // Registered/owner authorization is verified through the real bookmark HTTP handlers.
   })
   it('栞のページは正整数またはnull、進捗は0以上で総ページ数を上限にしない', () => {
     for (const pageNumber of [1, 99999, null]) expect(CreateBookmarkRequest.safeParse({ ...input, pageNumber }).success).toBe(true)
