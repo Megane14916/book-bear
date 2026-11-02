@@ -8,7 +8,7 @@
 
 `apps/api/src/modules/*/schemas.ts` と `src/contracts/routes.ts` を正本として、主要34操作の `contracts/openapi.json` とWebの `src/lib/api/generated.ts` を生成する。`GET /openapi.json` も同一仕様を返す。手書きの初期ドラフトは履歴資料とし、以降の変更はZod定義・生成物・本書に反映する。
 
-- 操作単位の `x-implementation-status: implemented` は実装済み（health・DB接続確認と、Issue #9のプロフィール／設定6操作）。
+- 操作単位の `x-implementation-status: implemented` は実装済み（health・DB接続確認と、Issue #9のプロフィール／設定6操作、Issue #10の書籍・本棚9操作）。
 - `x-implementation-status: planned` は契約のみ。OpenAPIレジストリに登録するが、HonoのHTTPハンドラーには登録しないため、実APIは現在404となる。記載した成功・認証エラーは今後の実装の契約であり、認証や認可が稼働している意味ではない。
 - `x-auth` は `Public / OptionalAuth / AnyAuth / Owner / Registered`。`OptionalAuth` はJWTなしでも閲覧可、送信時は必ず検証して無効なら401。`Registered` は匿名ユーザーに403。公開化・followingフィードなどの条件付き制限は各操作の説明と403レスポンスに記載する。
 - `followedByMe`・`likedByMe` を返す公開GETと、本人の非公開情報を返し得るGETは任意認証。初期ドラフトの公開プロフィール・返信一覧・投稿検索の認証記載を補完した。
@@ -30,7 +30,7 @@
 
 ### 認証・プロフィール（Issue #9）
 
-`GET/PUT/PATCH /me`、`GET/PATCH /me/preferences`、`GET /users/{userId}` の6操作を実装した。定義は `modules/users/routes.ts`、HTTP処理は `http.ts`、DB操作は `service.ts`。生成契約の34操作のうち28操作は引き続きplanned。
+`GET/PUT/PATCH /me`、`GET/PATCH /me/preferences`、`GET /users/{userId}` の6操作を実装した。定義は `modules/users/routes.ts`、HTTP処理は `http.ts`、DB操作は `service.ts`。Issue #9完了時点では34操作のうち28操作がplannedだった。Issue #10完了後は19操作がplanned。
 
 - `middleware/auth.ts` で固定プロジェクトのJWKSからES256／RS256を検証する。issuerは `SUPABASE_URL + /auth/v1`、audienceは `authenticated`。exp／iat／sub／role／session_id／is_anonymousを必須とする。JWTなし・不正・期限切れは401、設定不備・JWKS取得障害は503。HS256は使わない。
 - 本人のID・匿名状態は検証済みclaimから取得し、本文やユーザーメタデータで上書きしない。公開プロフィールは任意認証で、提示したJWTが不正なら401。
@@ -46,6 +46,17 @@ MSWは未導入のためモックの変更はない。Web用生成型を更新�
 Custom providerの識別子は `custom:google`、要求scopeは `openid email` のみ。Honoは既存のSupabase JWT検証・プロフィールAPIを再利用し、GoogleのID tokenやprovider access tokenを直接受け付けない。Google由来のmetadataから氏名・画像・emailをアプリへコピーせず、同UIDの既存値と設定を保持する。API契約とDBスキーマの変更はない。
 
 `pnpm --filter api auth:google` に設定表示・ローカル形式検査・利用者自身のブラウザによるログイン／匿名連携の確認を用意した。2026-11-02に利用者がGoogleログイン・Supabase Auth登録、scope、link／login、JWT更新後のUID・既存値保持、Auth追加メタデータ、競合・キャンセル時の挙動を確認済み。結果の根拠と確認範囲は [Google OIDC検証記録](google-oidc-setup.md#11-実サービスの検証記録) を参照。フロントのSDK・UIは後続実装で、SDKはAuth専用、Data APIは使用しない。
+
+### 書籍・本棚（Issue #10）
+
+書籍検索・取得・import・manual、本棚の取得・登録・更新・削除、公開栞のある本一覧の9操作を実装。詳細は [設計書](books-library-design.md) を参照。
+
+- ISBN-13は既存UNIQUEで競合処理し200/201を区別。ISBNなしは外部importも含め重複を許容し、新規UNIQUE制約・マイグレーションは追加しない。
+- 検索はDBを優先し、外部API障害でもDB候補があれば200、なければ502。正常な0件は200。Google Booksの公開書誌取得にはAPIキーを使う。
+- 手動登録のレート制限は今回の対象外。登録・本棚操作は匿名でも可能で、プロフィール未初期化は404。他人の本棚の更新・削除は存在情報を明かさず404。
+- 栞が参照する本棚は論理削除済みの栞も含め409。公開本一覧は公開中・未削除の栞がある本だけを返し、進捗・状態・非公開栞の情報は返さない。
+- 本棚のカーソルは署名・期限なしのBase64URL形式。認可と公開条件をSQLで再確認し、PostgreSQLの日時精度を保持する。
+- 認証付きAPIと公開本一覧はno-store。MSWは未導入で、変更は既存の生成契約・Web生成型と実APIテストへ反映する。
 
 ## 1. 共通ルール
 
@@ -150,7 +161,7 @@ export type CursorPage<T> = {
 | GET | `/me/books` | AnyAuth/Owner | 自分の本棚（登録日時降順、カーソル可） |
 | POST | `/me/books` | AnyAuth | 指定書籍を本棚へ登録（冪等・重複再利用） |
 | PATCH | `/me/books/{userBookId}` | Owner | 読書状態・現在ページを更新 |
-| DELETE | `/me/books/{userBookId}` | Owner | 栞がなければ削除、あれば409 `HAS_BOOKMARKS` |
+| DELETE | `/me/books/{userBookId}` | Owner | 論理削除済みを含む栞の参照がなければ削除、あれば409 `HAS_BOOKMARKS` |
 | GET | `/users/{userId}/books` | Public | **公開栞が1件以上ある本のみ**一覧で返す |
 
 #### 書籍検索候補の正規化形式
@@ -175,7 +186,7 @@ export type CursorPage<T> = {
 - すでにDBに存在する候補は `localBookId` を返す（この場合import不要）。外部候補は `provider` と `providerId` を返す。
 - `POST /books/import` ：`{ "provider": "google_books", "providerId": "external-volume-id" }`（openBDの場合、`providerId` はISBN）。**バックが再取得・正規化**して保存。フロント送信の書誌情報をそのまま信頼しない。
 - ISBNが有効で同一ISBNレコードがあれば既存の `bookId` を返す。201=新規、200=既存を再利用。
-- `POST /books/manual`：`{ "title": "ISBNのない本", "author": "著者名", "totalPages": null }`。ISBNを任意で受け付ける仕様にはせず、ISBN付きは通常のインポート／検索を優先する。[暫定] 手動作成は共有マスタに保存、作成者IDを追跡して連投を制限する。
+- `POST /books/manual`：`{ "title": "ISBNのない本", "author": "著者名", "totalPages": null }`。ISBNを任意で受け付ける仕様にはせず、ISBN付きは通常のインポート／検索を優先する。手動作成は共有マスタに保存し、作成者IDを追跡する。連投のレート制限は今後の課題とし、Issue #10の実装・テスト・完了条件には含めない。
 - `POST /me/books`：`{ "bookId": "UUID", "status": "reading" }`。201新規／200既存、レスポンスは `UserBook`。同一 `(user_id, book_id)` は一意。
 - `PATCH /me/books/{id}`：`{ "status": "completed", "currentPage": 250 }`。ページは未設定可、総ページ数による厳密な上限は課さない。
 - `GET /users/{id}/books`：登録した全本棚を公開しない。公開栞がある書籍だけを `EXISTS` で取得。本人用は `/me/books` に分ける。
@@ -333,10 +344,10 @@ MVPでは日本語検索を `ILIKE` 等の簡易検索で開始。データ量�
 - **全体／フォロー中フィード**：`ORDER BY created_at DESC, id DESC`。次ページは `(created_at, id) < (lastCreatedAt, lastId)`。
 - **栞の流れ**：`ORDER BY created_at ASC, id ASC`。次ページは `(created_at, id) > (lastCreatedAt, lastId)`。
 - **返信**：[暫定] `created_at ASC, id ASC` とする。
-- カーソルには日時・IDに加え、必要に応じて並び順や対象（scope、userId、bookId）の検証情報を持たせる。外部からはopaque。改ざんを防ぐため署名付き形式またはクエリ条件の厳格な照合を行う。
+- 本棚と公開本一覧（Issue #10）は `created_at DESC, id DESC` のkeyset方式。日時・IDのJSONをBase64URL化し、署名・有効期限は設けない。日時はDBから小数6桁のUTC文字列で取得し、ミリ秒へ切り捨てずSQLへ渡す。カーソルは認可に使用せず、所有者・公開条件をSQLで毎回確認する。他の未実装一覧のカーソル方式は各Issueで確定する。
 - `limit=15`のときDBでは最大16件取り、返すのは15件。16件目があれば `nextCursor` を返す。ない場合はnull。
 - 新しい投稿が途中に追加されても、カーソルで既存の続きが取得できる。編集・削除で結果が変わる可能性は許容し、重要な変更時は先頭から再取得。
-- 期限切れ・不正なcursorは400 `INVALID_CURSOR` とし、UIで一覧を再取得できるようにする。
+- 不正なcursorは400 `INVALID_CURSOR` とし、UIで一覧を再取得できるようにする。空のcursorは入力スキーマで400 `VALIDATION_ERROR`。本棚と公開本一覧のcursorに有効期限はない。
 
 ## 4. 認証と例外フロー
 

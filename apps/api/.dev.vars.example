@@ -1,4 +1,8 @@
 # Copy to .dev.vars for local Wrangler only (ignored by Git).
-# dev:remote / deploy:worker use .env.deploy.local instead.
+# dev:remote / deploy:worker read non-secret config from .env.deploy.local.
+# Development secrets (including remote dev) belong here; deployed secrets use Wrangler.
 SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
 CORS_ORIGIN=http://localhost:5173
+
+# Google Books public metadata requests only. Never use a user OAuth token.
+GOOGLE_BOOKS_API_KEY=

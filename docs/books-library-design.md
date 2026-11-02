@@ -1,12 +1,12 @@
 # 書籍・本棚API 設計書（Issue #10）
 
-状態: 指定方針を反映し、API・テストを実装する。
+状態: 指定方針を反映し、9操作と自動テストを実装済み。設計書・コード・生成契約の整合性を確認済み。
 
 関連: [Issue #10](https://github.com/Megane14916/book-bear/issues/10) / 基準: main `f99e05e` / 2026-11-03（日本時間）
 
 ## 1. 目的・範囲
 
-書籍を検索・取得・登録し、匿名を含む認証ユーザーが自分の本棚と読書進捗を管理できるようにする。READMEと `docs/` の全10文書を確認し、既存のHono/Zod契約、Drizzle定義、認証・DBテスト、CIを基準とする。
+書籍を検索・取得・登録し、匿名を含む認証ユーザーが自分の本棚と読書進捗を管理できるようにする。着手時にREADMEと `docs/` の既存全10文書を確認し、既存のHono/Zod契約、Drizzle定義、認証・DBテスト、CIを基準とする。
 
 対象は以下の9操作。パスは `/api/v1` 以下。栞CRUD・栞の流れ・フィード・SNS操作とフロントUIは後続Issueの範囲とする。
 
@@ -27,7 +27,7 @@
 ### 2.1 書籍検索・取得
 
 1. 既存の `SearchQuery` で空白のみのqを拒否し、limitは既定20・最大30とする。
-2. ISBN検索は空白・ハイフンを除いてISBN-13の接頭辞・桁数・チェックディジットを検証する。ISBN形式の入力が不正なら400。ISBN-10からの変換は今回追加しない。
+2. ISBN検索は空白・ハイフンを除いてISBN-13の接頭辞・桁数・チェックディジットを検証する。空白・ハイフンを除くと10桁以上の数字になる入力をISBN形式とみなし、不正なら400。ISBN-10からの変換は今回追加しない。
 3. DBはISBNの完全一致、またはタイトル・著者の部分一致で検索する。SQLはパラメーター化し、部分一致の `%`・`_` は検索文字としてエスケープする。
 4. 書名・著者検索にはGoogle Booksを使う。ISBNはDBに一致があればその本を返し、なければopenBD、該当なしならGoogle BooksのISBN検索を行う。
 5. DB候補を優先し、外部候補のISBNが登録済みならDBの情報と `localBookId` を使う。この照合は候補のISBN集合で一括取得する。ISBNで重複排除し、ISBNなしの外部候補はproviderとproviderIdでまとめ、全体でlimit件まで返す。ISBNなしの別の手動登録本は統合しない。DB候補の順序はタイトル・ID、外部候補はproviderの返却順とする。
@@ -35,12 +35,12 @@
 
 外部APIは固定HTTPS originを使用する。Google BooksのIDはURLの単一path要素としてエンコードし、任意URL・redirect先へアクセスしない。各リクエストは5秒で打ち切り、自動リトライは行わない。
 
-外部レスポンスは必要な項目だけ検証・正規化する。ISBNは有効なISBN-13のみ採用し、取得できなければnull。著者・出版社・書影・正整数の総ページ数は欠損を許容する。書影はHTTP(S)のURLだけを返し、API側で画像を取得・複製しない。タイトルや候補IDがない検索要素は除外し、外部応答全体の形式不正は外部API障害として扱う。DBに検索候補がある場合はその候補を200で返し、DBにも候補がなければ502とする。
+外部レスポンスは必要な項目だけ検証・正規化する。ISBNは有効なISBN-13のみ採用し、取得できなければnull。著者・出版社・書影・正整数の総ページ数は欠損を許容する。openBDはsummaryの情報を使用し、総ページ数はnullとする。書影はHTTP(S)のURLだけを返し、API側で画像を取得・複製しない。タイトルや候補IDがない検索要素は除外し、外部応答全体の形式不正は外部API障害として扱う。DBに検索候補がある場合はその候補を200で返し、DBにも候補がなければ502とする。
 
 ### 2.2 取り込み・手動登録
 
 - 書き込みの前提は有効なSupabase JWTと `PUT /me` によるプロフィール初期化。未初期化は404とし、各APIでプロフィールを暗黙作成しない。
-- importは `provider` と `providerId` だけを受け付け、指定providerから再取得して検証する。取得ID／ISBNと要求の対応を確認し、クライアントの書誌情報は保存しない。再取得した候補に必須情報がなければ502、外部に該当する本がなければ404。
+- importは `provider` と `providerId` だけを受け付け、指定providerから再取得して検証する。取得ID／ISBNと要求の対応を確認し、クライアントの書誌情報は保存しない。GoogleのIDが `.`／`..` なら400。再取得した候補に必須情報がなければ502、外部に該当する本がなければ404。
 - 有効なISBNがあれば `ux_books_isbn13` を競合判定に使い、`INSERT ... ON CONFLICT DO NOTHING` と既存行の取得で重複を防ぐ。並行要求でも1行だけ作成し、新規は201、既存は200。既存の書誌情報を上書きしない。
 - ISBNなしのimport・手動登録は重複を許容し、それぞれ新規作成する。新しいUNIQUE制約・マイグレーションは追加しない。sourceとsourceIdは出所の追跡に使い、タイトルやproviderIdを理由に共有マスタを自動統合しない。
 - manualは既存の `ManualBookRequest` を再利用する。タイトルはtrim後必須、authorとtotalPagesは任意。ISBN・所有者ID等の未知フィールドは400。`isbn13=null`、`source=manual`、作成者はJWTのsubを保存する。
@@ -61,7 +61,7 @@
 
 本棚と公開本一覧は `user_books.created_at DESC, id DESC`、既定15・最大30件。limit+1件を取得し、続きがある場合だけ最終返却行からnextCursorを生成する。日時はDBの精度を保持し、同時刻・ミリ秒未満の差でも欠落や重複を防ぐ。
 
-カーソルはDB精度の境界日時とUUIDを含むJSONをBase64URL化する。HMAC署名・有効期限・追加Secretは使わない。形式・日時・UUIDが不正なら400 `INVALID_CURSOR`。日時はPostgreSQLからUTC・小数6桁の文字列として取得し、JavaScript Dateを介さずSQLのtimestamptz境界へ渡す。カーソルは認可の根拠にせず、ユーザーを切り替えたり境界を変更してもSQLの所有者・公開条件を毎回適用する。
+カーソルはDB精度の境界日時とUUIDを含むJSONをBase64URL化する。HMAC署名・有効期限・追加Secretは使わない。形式・日時・UUIDが不正なら400 `INVALID_CURSOR`（空文字は入力スキーマで400 `VALIDATION_ERROR`）。日時はPostgreSQLからUTC・小数6桁の文字列として取得し、JavaScript Dateを介さずSQLのtimestamptz境界へ渡す。カーソルは認可の根拠にせず、ユーザーを切り替えたり境界を変更してもSQLの所有者・公開条件を毎回適用する。
 
 ## 3. 例外処理・認可
 
@@ -87,9 +87,9 @@ JWT検証は既存の `authentication` を再利用する。Publicの3操作は�
 | 公開本一覧はEXISTS | JOINで栞の件数分だけ本が重複することを避け、公開条件をSQL内で完結させる |
 | 単純なBase64URLのkeysetカーソル | OFFSETの位置ずれを避け、境界行の削除後も継続できる。署名・期限管理を省き、認可は常にSQL条件で保証する |
 | 外部通信は標準fetchと小さな変換関数 | SDK・汎用providerフレームワークを増やさず、fetchをテストへ注入して障害を再現できる |
-| 既存DB構造を利用 | books・user_books・bookmarksに必要な列と制約がある。追加マイグレーションは予定しない。新規インデックスは実測で必要な場合のみ検討 |
+| 既存DB構造を利用 | books・user_books・bookmarksに必要な列と制約がある。新しいUNIQUE制約・マイグレーション・インデックスは追加しない |
 
-Google Booksの公開書誌取得にはアプリ用APIキーを使う。`GOOGLE_BOOKS_API_KEY` をWorker Secretとして扱い、ユーザーのGoogle OAuth権限を追加しない。ローカル例と設定手順を追加し、リモート設定CLIがSecretをvarsへコピーしないことを維持する。[Google公式の認証・API説明](https://developers.google.com/books/docs/v1/using)
+Google Booksの公開書誌取得にはアプリ用APIキーを使う。`GOOGLE_BOOKS_API_KEY` をWorker Secretとして扱い、ユーザーのGoogle OAuth権限を追加しない。APIキー未設定は外部API障害と同じ扱いで、検索はDB候補があれば200、なければ502、Googleからのimportは502とする。ローカル例と設定手順を追加し、リモート設定CLIがSecretをvarsへコピーしないことを維持する。[Google公式の認証・API説明](https://developers.google.com/books/docs/v1/using)
 
 openBDはISBN取得に使い、未収録・項目欠損・書影なしを許容する。公式には代替書誌への切替と書影収録範囲の縮小が案内されている。外部データは書籍紹介目的で利用し、書影は提供URLを参照する。[openBD仕様・利用条件](https://openbd.jp/)、[代替書誌のお知らせ](https://openbd.jp/news/20230829.html)
 
@@ -121,8 +121,14 @@ openBDはISBN取得に使い、未収録・項目欠損・書影なしを許容�
 
 完了時は `pnpm typecheck`、`pnpm test`、`pnpm check:openapi`、`pnpm build` を実行する。DB構造を変更した場合は `db:generate`／`db:check` と生成差分も確認する。lintは未導入のため実行できたとは記載しない。
 
-## 6. 作業の進め方
+## 6. 設定・確認手順
+
+ローカル・リモート開発は `apps/api/.dev.vars` に `GOOGLE_BOOKS_API_KEY` を設定する（既存のSUPABASE_URL等は保持）。`.env.deploy.local` の値をSecret代わりに転送しない。配信済みWorkerへの設定は、対象Workerを確認して `pnpm --filter api exec wrangler secret put GOOGLE_BOOKS_API_KEY` から対話入力する。通常のリモート起動・デプロイ手順は既存ドキュメントを使う。Secretの登録・デプロイ・実サービスへの書き込みは自動テストでは行わない。[CloudflareのSecret設定](https://developers.cloudflare.com/workers/configuration/secrets/)
+
+## 7. 作業記録
 
 作業ブランチは `feat/api-books-library-issue-10`。方針修正をコミット後、書籍API・テスト、本棚／公開本一覧API・認可テスト、契約・ドキュメントの順で意味のある単位にコミットする。
 
 実装と検証完了後にpushし、目的・変更点・確認結果・関連Issue・API／DB差分を記載したPRを作成する。レビューリクエストは送らない。
+
+2026-11-03（日本時間）のローカル確認: `pnpm typecheck`、`pnpm test`（276成功・PostgreSQL専用3件はCI対象）、`pnpm check:openapi`、`pnpm build`、`pnpm --filter api db:check` が成功。DBスキーマ・マイグレーションの変更なし。日時精度と認可は実DBテスト、外部障害はHTTP fixtureで確認した。実Google Books／openBDへの結合・Secret登録・デプロイは未実施。

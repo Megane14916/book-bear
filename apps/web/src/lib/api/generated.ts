@@ -103,6 +103,151 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/books/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 書名・著者・ISBNから書籍候補を検索
+         * @description DB候補を優先。外部API障害でもDB候補があれば200、なければ502。limit既定20・最大30。
+         */
+        get: operations["getBooksSearch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/books/{bookId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 書籍詳細 */
+        get: operations["getBooksBookid"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/books/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 外部書籍情報の取り込み
+         * @description 外部APIから再取得・検証。同一ISBN-13は既存を再利用。ISBNなしは重複を許容する。プロフィール未初期化は404。
+         */
+        post: operations["postBooksImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/books/manual": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * ISBNなしの書籍を手動登録
+         * @description ISBNは受け付けない。作成者はJWTから追跡。ISBNなしの重複は許容し、レート制限は今回の対象外。プロフィール未初期化は404。
+         */
+        post: operations["postBooksManual"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/books": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 自分の本棚
+         * @description created_at DESC, id DESC。limit既定15・最大30、limit+1件で続きを判定。日時（小数6桁）・IDのBase64URLカーソル。署名・有効期限なし。SQLで所有者・公開条件を毎回検証。
+         */
+        get: operations["getMeBooks"];
+        put?: never;
+        /**
+         * 本棚へ登録（冪等）
+         * @description 同一ユーザー・書籍は既存を返し、状態・進捗・日時を変更しない。status省略時want_to_read。プロフィール未初期化は404。
+         */
+        post: operations["postMeBooks"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/books/{userBookId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * 本棚から削除
+         * @description 本人のみ。他人のIDは404。論理削除済みを含む栞の参照があれば409 HAS_BOOKMARKS。共有書籍は削除しない。
+         */
+        delete: operations["deleteMeBooksUserbookid"];
+        options?: never;
+        head?: never;
+        /**
+         * 本棚情報更新
+         * @description 本人のみ。他人のIDは404。currentPageは0以上のDB整数またはnull。総ページ数を上限としない。
+         */
+        patch: operations["patchMeBooksUserbookid"];
+        trace?: never;
+    };
+    "/api/v1/users/{userId}/books": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 公開栞のある本一覧
+         * @description created_at DESC, id DESC。limit既定15・最大30、limit+1件で続きを判定。日時（小数6桁）・IDのBase64URLカーソル。署名・有効期限なし。SQLで所有者・公開条件を毎回検証。 公開中・未削除の栞がある本だけ。状態・進捗・非公開栞は返さない。
+         */
+        get: operations["getUsersUseridBooks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/users/{userId}/followers": {
         parameters: {
             query?: never;
@@ -135,154 +280,6 @@ export interface paths {
          * @description 【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。認証なしで利用可能。 limitは既定15・最大30。SQLはlimit+1件取得し、続きがなければnextCursor=null。カーソルの署名または対象・条件の厳格照合が必要。
          */
         get: operations["getUsersUseridFollowing"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/books/search": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * 書名・著者・ISBNから書籍候補を検索
-         * @description 【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。認証なしで利用可能。
-         */
-        get: operations["getBooksSearch"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/books/{bookId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * 書籍詳細
-         * @description 【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。認証なしで利用可能。
-         */
-        get: operations["getBooksBookid"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/books/import": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * 外部書籍情報の取り込み
-         * @description 【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。Supabase Bearer JWT必須。匿名・正式ユーザーともに利用可能。 外部APIから再取得・正規化。同一ISBN-13は既存のbookIdを再利用。
-         */
-        post: operations["postBooksImport"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/books/manual": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * ISBNなしの書籍を手動登録
-         * @description 【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。Supabase Bearer JWT必須。匿名・正式ユーザーともに利用可能。 ISBNは受け付けない。作成者はJWTから追跡する。
-         */
-        post: operations["postBooksManual"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/me/books": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * 自分の本棚
-         * @description 【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。Supabase Bearer JWT必須。匿名・正式ともに本人のみ。所有者は検証済みJWTのsubから判定。 limitは既定15・最大30。SQLはlimit+1件取得し、続きがなければnextCursor=null。カーソルの署名または対象・条件の厳格照合が必要。 created_at DESC, id DESC。
-         */
-        get: operations["getMeBooks"];
-        put?: never;
-        /**
-         * 本棚へ登録（冪等）
-         * @description 【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。Supabase Bearer JWT必須。匿名・正式ユーザーともに利用可能。 同一ユーザー・書籍は既存レコードを返す。
-         */
-        post: operations["postMeBooks"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/me/books/{userBookId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * 本棚から削除
-         * @description 【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。Supabase Bearer JWT必須。匿名・正式ともに本人のみ。所有者は検証済みJWTのsubから判定。 栞があれば409 HAS_BOOKMARKS。共有の書籍マスタは削除しない。
-         */
-        delete: operations["deleteMeBooksUserbookid"];
-        options?: never;
-        head?: never;
-        /**
-         * 本棚情報更新
-         * @description 【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。Supabase Bearer JWT必須。匿名・正式ともに本人のみ。所有者は検証済みJWTのsubから判定。 currentPageは0以上またはnull。総ページ数を上限としない。
-         */
-        patch: operations["patchMeBooksUserbookid"];
-        trace?: never;
-    };
-    "/api/v1/users/{userId}/books": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * 公開栞のある本一覧
-         * @description 【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。認証なしで利用可能。 limitは既定15・最大30。SQLはlimit+1件取得し、続きがなければnextCursor=null。カーソルの署名または対象・条件の厳格照合が必要。 created_at DESC, id DESC。 公開中・未削除の栞が1件以上ある本のみ。本棚全体は公開しない。
-         */
-        get: operations["getUsersUseridBooks"];
         put?: never;
         post?: never;
         delete?: never;
@@ -587,18 +584,6 @@ export interface components {
             publicBookmarkCount: number;
             followedByMe: boolean;
         };
-        UserSummary: {
-            /** Format: uuid */
-            id: string;
-            displayName: string;
-            /** Format: uri */
-            avatarUrl: string | null;
-        };
-        UserPage: {
-            items: components["schemas"]["UserSummary"][];
-            /** @description 不透明なカーソル。内容を解析せず次回の同じ条件のリクエストに渡す。不正・期限切れは400 INVALID_CURSOR。 */
-            nextCursor: string | null;
-        };
         /** @description localBookIdがあればimport不要。外部候補はproviderとproviderIdを必ず持つ。 */
         BookSearchItem: {
             /** @description ハイフンなしのISBN-13。978/979の接頭辞とチェックディジットを検証。 */
@@ -676,6 +661,18 @@ export interface components {
         };
         PublicBookPage: {
             items: components["schemas"]["BookSummary"][];
+            /** @description 不透明なカーソル。内容を解析せず次回の同じ条件のリクエストに渡す。不正・期限切れは400 INVALID_CURSOR。 */
+            nextCursor: string | null;
+        };
+        UserSummary: {
+            /** Format: uuid */
+            id: string;
+            displayName: string;
+            /** Format: uri */
+            avatarUrl: string | null;
+        };
+        UserPage: {
+            items: components["schemas"]["UserSummary"][];
             /** @description 不透明なカーソル。内容を解析せず次回の同じ条件のリクエストに渡す。不正・期限切れは400 INVALID_CURSOR。 */
             nextCursor: string | null;
         };
@@ -1229,6 +1226,604 @@ export interface operations {
             };
         };
     };
+    getBooksSearch: {
+        parameters: {
+            query: {
+                q: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookSearchResult"];
+                };
+            };
+            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description INTERNAL_ERROR: 内部情報を含めないエラー */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description BOOK_PROVIDER_UNAVAILABLE: 外部書籍API障害（検索はDB候補があれば200） */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getBooksBookid: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Book"];
+                };
+            };
+            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description NOT_FOUND: 対象なし、または本人以外の本棚 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description INTERNAL_ERROR: 内部情報を含めないエラー */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    postBooksImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportBookRequest"];
+            };
+        };
+        responses: {
+            /** @description 既存書籍を再利用 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Book"];
+                };
+            };
+            /** @description 新規書籍 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Book"];
+                };
+            };
+            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description UNAUTHORIZED: JWTなし・無効・期限切れ */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description NOT_FOUND: 対象なし、または本人以外の本棚 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description INTERNAL_ERROR: 内部情報を含めないエラー */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description BOOK_PROVIDER_UNAVAILABLE: 外部書籍API障害（検索はDB候補があれば200） */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description INTERNAL_ERROR: 認証設定不備・JWKS取得失敗 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    postBooksManual: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManualBookRequest"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Book"];
+                };
+            };
+            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description UNAUTHORIZED: JWTなし・無効・期限切れ */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description NOT_FOUND: 対象なし、または本人以外の本棚 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description INTERNAL_ERROR: 内部情報を含めないエラー */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description INTERNAL_ERROR: 認証設定不備・JWKS取得失敗 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getMeBooks: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserBookPage"];
+                };
+            };
+            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description UNAUTHORIZED: JWTなし・無効・期限切れ */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description NOT_FOUND: 対象なし、または本人以外の本棚 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description INTERNAL_ERROR: 内部情報を含めないエラー */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description INTERNAL_ERROR: 認証設定不備・JWKS取得失敗 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    postMeBooks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateUserBookRequest"];
+            };
+        };
+        responses: {
+            /** @description 既存を再利用 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserBook"];
+                };
+            };
+            /** @description 新規登録 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserBook"];
+                };
+            };
+            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description UNAUTHORIZED: JWTなし・無効・期限切れ */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description NOT_FOUND: 対象なし、または本人以外の本棚 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description INTERNAL_ERROR: 内部情報を含めないエラー */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description INTERNAL_ERROR: 認証設定不備・JWKS取得失敗 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deleteMeBooksUserbookid: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userBookId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功（本文なし） */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description UNAUTHORIZED: JWTなし・無効・期限切れ */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description NOT_FOUND: 対象なし、または本人以外の本棚 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description HAS_BOOKMARKS: 栞の参照が残っている */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description INTERNAL_ERROR: 内部情報を含めないエラー */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description INTERNAL_ERROR: 認証設定不備・JWKS取得失敗 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    patchMeBooksUserbookid: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userBookId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatchUserBookRequest"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserBook"];
+                };
+            };
+            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description UNAUTHORIZED: JWTなし・無効・期限切れ */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description NOT_FOUND: 対象なし、または本人以外の本棚 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description INTERNAL_ERROR: 内部情報を含めないエラー */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description INTERNAL_ERROR: 認証設定不備・JWKS取得失敗 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getUsersUseridBooks: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBookPage"];
+                };
+            };
+            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description NOT_FOUND: 対象なし、または本人以外の本棚 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description INTERNAL_ERROR: 内部情報を含めないエラー */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     getUsersUseridFollowers: {
         parameters: {
             query?: {
@@ -1311,640 +1906,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserPage"];
-                };
-            };
-            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description NOT_FOUND: 対象なし。第三者の非公開栞・削除済み栞も存在を明かさず404 */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description RATE_LIMITED: 操作回数制限 */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description INTERNAL_ERROR: 内部情報を含めないサーバーエラー */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    getBooksSearch: {
-        parameters: {
-            query: {
-                q: string;
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BookSearchResult"];
-                };
-            };
-            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description RATE_LIMITED: 操作回数制限 */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description INTERNAL_ERROR: 内部情報を含めないサーバーエラー */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description BOOK_PROVIDER_UNAVAILABLE: 外部書籍API障害 */
-            502: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    getBooksBookid: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                bookId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Book"];
-                };
-            };
-            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description NOT_FOUND: 対象なし。第三者の非公開栞・削除済み栞も存在を明かさず404 */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description RATE_LIMITED: 操作回数制限 */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description INTERNAL_ERROR: 内部情報を含めないサーバーエラー */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    postBooksImport: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ImportBookRequest"];
-            };
-        };
-        responses: {
-            /** @description 既存書籍を再利用 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Book"];
-                };
-            };
-            /** @description 新規書籍 */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Book"];
-                };
-            };
-            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description UNAUTHORIZED: 必須JWTがない、または送信されたJWTが無効・期限切れ */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description NOT_FOUND: 対象なし。第三者の非公開栞・削除済み栞も存在を明かさず404 */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description RATE_LIMITED: 操作回数制限 */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description INTERNAL_ERROR: 内部情報を含めないサーバーエラー */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description BOOK_PROVIDER_UNAVAILABLE: 外部書籍API障害 */
-            502: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    postBooksManual: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ManualBookRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Book"];
-                };
-            };
-            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description UNAUTHORIZED: 必須JWTがない、または送信されたJWTが無効・期限切れ */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description RATE_LIMITED: 操作回数制限 */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description INTERNAL_ERROR: 内部情報を含めないサーバーエラー */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    getMeBooks: {
-        parameters: {
-            query?: {
-                cursor?: string;
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["UserBookPage"];
-                };
-            };
-            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description UNAUTHORIZED: 必須JWTがない、または送信されたJWTが無効・期限切れ */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description REGISTRATION_REQUIRED: 正式登録が必要 / FORBIDDEN: 操作権限なし */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description RATE_LIMITED: 操作回数制限 */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description INTERNAL_ERROR: 内部情報を含めないサーバーエラー */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    postMeBooks: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateUserBookRequest"];
-            };
-        };
-        responses: {
-            /** @description 既存を再利用 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["UserBook"];
-                };
-            };
-            /** @description 新規登録 */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["UserBook"];
-                };
-            };
-            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description UNAUTHORIZED: 必須JWTがない、または送信されたJWTが無効・期限切れ */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description NOT_FOUND: 対象なし。第三者の非公開栞・削除済み栞も存在を明かさず404 */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description RATE_LIMITED: 操作回数制限 */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description INTERNAL_ERROR: 内部情報を含めないサーバーエラー */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    deleteMeBooksUserbookid: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                userBookId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功（本文なし）。PUT/DELETEのフォロー・いいねは冪等。 */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description UNAUTHORIZED: 必須JWTがない、または送信されたJWTが無効・期限切れ */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description REGISTRATION_REQUIRED: 正式登録が必要 / FORBIDDEN: 操作権限なし */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description NOT_FOUND: 対象なし。第三者の非公開栞・削除済み栞も存在を明かさず404 */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description ALREADY_EXISTS / HAS_BOOKMARKS / ACCOUNT_LINK_CONFLICT: 重複・競合 */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description RATE_LIMITED: 操作回数制限 */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description INTERNAL_ERROR: 内部情報を含めないサーバーエラー */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    patchMeBooksUserbookid: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                userBookId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PatchUserBookRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["UserBook"];
-                };
-            };
-            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description UNAUTHORIZED: 必須JWTがない、または送信されたJWTが無効・期限切れ */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description REGISTRATION_REQUIRED: 正式登録が必要 / FORBIDDEN: 操作権限なし */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description NOT_FOUND: 対象なし。第三者の非公開栞・削除済み栞も存在を明かさず404 */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description RATE_LIMITED: 操作回数制限 */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description INTERNAL_ERROR: 内部情報を含めないサーバーエラー */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    getUsersUseridBooks: {
-        parameters: {
-            query?: {
-                cursor?: string;
-                limit?: number;
-            };
-            header?: never;
-            path: {
-                userId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PublicBookPage"];
                 };
             };
             /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル */

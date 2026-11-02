@@ -17,7 +17,7 @@ Issue #8で8テーブルの定義を `apps/api/src/db/schema/index.ts`、初回S
 ## 1. 設計方針
 
 - ユーザー認証はSupabase Authの `auth.users`。アプリ側プロフィールは `public.profiles` と別管理し、IDを一致させる。
-- **ISBNがある本はISBN-13で重複排除**。ISBNのない本は `isbn13=NULL` とし重複を許容。主キーはUUID。
+- **ISBNがある本はISBN-13で重複排除**。ISBNのない本は外部importでも `isbn13=NULL` とし重複を許容。source/source_idの新しいUNIQUE制約は追加しない。主キーはUUID。
 - **本棚 `user_books` は私有データ**。公開範囲は`bookmarks.visibility` に持たせる。公開本棚機能は作らない。
 - 栞は「ユーザー×本」の `user_books.id` に所属。栞の流れは**投稿日時ASC**で取得。`page_number` は並び順に使わない。
 - 投稿時刻はDB作成後変更しない。編集は `updated_at` を変更する。
@@ -205,7 +205,7 @@ erDiagram
 ## 4. 制約・削除戦略
 
 - `profiles.id` はSupabase AuthのUIDと一致させ、`PUT /me` で生成。Authユーザーの削除時にアプリデータをどう消すかは別途運用手順を用意。
-- `user_books` に栞がある状態で本棚レコードを削除すると栞が失われるため、**DELETEを409で拒否**する。栞を削除後に削除する。[暫定]
+- `user_books` に栞がある状態で本棚レコードを削除すると栞が失われるため、**DELETEを409で拒否**する。Issue #10では論理削除済みの栞も参照が残るため409とする。物理削除・CASCADEによる整理は行わない。
 - `bookmarks` の論理削除後も `bookmark_likes` と `bookmark_replies` は内部に残るが、APIで参照されない。長期保持方針は後で決める。
 - 書籍レコードは複数ユーザーで共有するので、本棚から外した際に `books` 自体は削除しない。
 - `visibility` と `status` などはDB `CHECK`、参照整合性はFK、重複は`UNIQUE`で保証。サービスコードだけに頼らない。
