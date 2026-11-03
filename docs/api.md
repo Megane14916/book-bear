@@ -8,7 +8,7 @@
 
 `apps/api/src/modules/*/schemas.ts` と `src/contracts/routes.ts` を正本として、主要34操作の `contracts/openapi.json` とWebの `src/lib/api/generated.ts` を生成する。`GET /openapi.json` も同一仕様を返す。手書きの初期ドラフトは履歴資料とし、以降の変更はZod定義・生成物・本書に反映する。
 
-- 操作単位の `x-implementation-status: implemented` は実装済み（health・DB接続確認と、Issue #9のプロフィール／設定6操作、Issue #10の書籍・本棚9操作、Issue #11の栞CRUD・本人一覧5操作、Issue #12の栞の流れ1操作、Issue #13の全体フィード1操作）。GET /feedはscope=allのみ実装済みで、followingはIssue #14まで未実装。
+- 操作単位の `x-implementation-status: implemented` は実装済み（health・DB接続確認、プロフィール／設定6操作、書籍・本棚9操作、栞CRUD・本人一覧5操作、栞の流れ1操作、all／followingフィード1操作、フォロー・いいね・返信10操作）。未実装は投稿／ユーザー検索の2操作。
 - `x-implementation-status: planned` は契約のみ。OpenAPIレジストリに登録するが、HonoのHTTPハンドラーには登録しないため、実APIは現在404となる。記載した成功・認証エラーは今後の実装の契約であり、認証や認可が稼働している意味ではない。
 - `x-auth` は `Public / OptionalAuth / AnyAuth / Owner / Registered`。`OptionalAuth` はJWTなしでも閲覧可、送信時は必ず検証して無効なら401。`Registered` は匿名ユーザーに403。公開化・followingフィードなどの条件付き制限は各操作の説明と403レスポンスに記載する。
 - `followedByMe`・`likedByMe` を返す公開GETと、本人の非公開情報を返し得るGETは任意認証。初期ドラフトの公開プロフィール・返信一覧・投稿検索の認証記載を補完した。
@@ -30,7 +30,7 @@
 
 ### 認証・プロフィール（Issue #9）
 
-`GET/PUT/PATCH /me`、`GET/PATCH /me/preferences`、`GET /users/{userId}` の6操作を実装した。定義は `modules/users/routes.ts`、HTTP処理は `http.ts`、DB操作は `service.ts`。Issue #9完了時点では34操作のうち28操作がplannedだった。Issue #10完了後は19操作、Issue #11完了後は14操作、Issue #12完了後は13操作、Issue #13完了後は12操作がplanned（followingの実装待ちはgetFeedの説明に記載）。
+`GET/PUT/PATCH /me`、`GET/PATCH /me/preferences`、`GET /users/{userId}` の6操作を実装した。定義は `modules/users/routes.ts`、HTTP処理は `http.ts`、DB操作は `service.ts`。Issue #9完了時点では34操作のうち28操作がplannedだった。Issue #10後19、#11後14、#12後13、#13後12、#14後2操作がplanned。
 
 - `middleware/auth.ts` で固定プロジェクトのJWKSからES256／RS256を検証する。issuerは `SUPABASE_URL + /auth/v1`、audienceは `authenticated`。exp／iat／sub／role／session_id／is_anonymousを必須とする。JWTなし・不正・期限切れは401、設定不備・JWKS取得障害は503。HS256は使わない。
 - 本人のID・匿名状態は検証済みclaimから取得し、本文やユーザーメタデータで上書きしない。公開プロフィールは任意認証で、提示したJWTが不正なら401。
@@ -81,9 +81,17 @@ Custom providerの識別子は `custom:google`、要求scopeは `openid email` �
 
 `GET /feed` のscope省略時・scope=allを実装。公開・未削除のみを投稿日時・IDの降順で返し、本人の非公開も含めない。既存カーソルと高精度日時、カード射影・withCountsの一括集計を再利用する。認可・入力検証の順序とテストデータ管理は [全体フィード設計書](feed-design.md) を参照。
 
-GET /feed全体の実装状態はimplementedだが、scope=followingはIssue #14まで未実装。JWT検証→Zod入力検証→followingガードの順で、未認証401／匿名403／正式JWT404を返し、DBへ接続しない。正式JWTへの404はフォロー対象なしを意味しない一時的な未実装応答。followingでは非空カーソルの内容検証を行わず、空カーソル・不正scope・不正limitはZodで400にする。フロントはIssue #14完了までフォロー中フィードを利用可能扱いしない。
+Issue #14でscope=followingも実装した。JWT検証→Zod入力検証→未認証401／匿名403のガード→カーソル内容検証→取得の順。正式JWTへの未実装応答404は廃止し、フォロー先・公開栞なしは200空結果、本人プロフィール未初期化は404とする。フォロー・公開・未削除条件は候補CTEからSQLに適用する。allの挙動は維持する。
 
 allの閲覧にプロフィール初期化は不要。提示JWTは必ず検証し、likedByMeは検証済みUIDから算出する。全応答no-store。DB構造・依存・レート制限・モック基盤の追加はない。
+
+### フォロー・いいね・返信（Issue #14）
+
+関係一覧・フォロー／いいねのPUT/DELETE・返信CRUDの10操作を実装。業務ルールとロック・検証順序は [SNS API設計書](social-design.md) を参照。Registered操作はJWT→Zod→handler内の正式登録ガードの順で、匿名でも不正入力は400、有効な入力はDB前に403とする。
+
+フォロー対象は、正式JWTのPUT /meで初回記録する内部列registration_confirmed_atで確認する。既存の正式ユーザーも記録までは対象未確認として404。ログイン・匿名昇格後に新しい正式JWTでPUT /meを呼ぶことがフロントの必須接続条件。確認日時は登録日そのものではなく、API応答には含めず、既存内容・設定・createdAt／updatedAtも変更しない。Auth読取権限は増やさない。
+
+返信GETは可読親を残すLATERALで、親が読めない404と返信0件の200を区別する。POSTは正式・公開中のみ、PATCHは本人と親の可読性を確認する。自分の未削除返信DELETEは匿名・正式とも親の非公開化・削除後も可能で、親情報を返さず204。登録確認列1つのマイグレーション以外にDB構造や依存・基盤の追加はない。
 
 ## 1. 共通ルール
 
@@ -292,7 +300,7 @@ export type CursorPage<T> = {
 | Method | Path | 権限 | 内容 |
 |---|---|---|---|
 | GET | `/feed?scope=all&limit=15&cursor=` | Public | 全体公開栞を新着順に取得 |
-| GET | `/feed?scope=following&limit=15&cursor=` | Registered | Issue #14まで未実装。未認証401／匿名403／正式JWTは暫定404 |
+| GET | `/feed?scope=following&limit=15&cursor=` | Registered | 本人のフォロー先の公開栞のみ。関係・公開栞なしは200空結果 |
 
 レスポンス：`CursorPage<BookmarkCard>`。`content` は公開本文を含める。`isSpoiler` と閲覧設定はフロントの表示判定に使う。
 
@@ -329,7 +337,7 @@ export type CursorPage<T> = {
 | GET | `/bookmarks/{bookmarkId}/replies?cursor=&limit=15` | Public | 公開栞の返信を投稿順（古い順）に取得 |
 | POST | `/bookmarks/{bookmarkId}/replies` | Registered | 公開栞にテキスト返信を作成 |
 | PATCH | `/replies/{replyId}` | Owner | 自分の返信本文・ネタバレ指定変更 |
-| DELETE | `/replies/{replyId}` | Owner | 論理削除 |
+| DELETE | `/replies/{replyId}` | Owner | 自分の未削除返信を論理削除。親の非公開化・削除後も可能 |
 
 返信入力例：`{ "content": "私もそう思います", "isSpoiler": false }`。返信は1階層のみ・最大1,000文字。[暫定] 返信へのいいね／スレッド返信はMVP外。
 
@@ -351,7 +359,7 @@ export type CursorPage<T> = {
 }
 ```
 
-`GET /bookmarks/{id}/replies` は元投稿が非公開なら第三者へ404。いいね・返信は公開中の投稿にだけ許可。非公開化／削除後は第三者が既存返信を取得できなくなる。
+`GET /bookmarks/{id}/replies` は元投稿が非公開なら第三者へ404。いいね操作・返信POSTは公開中の投稿だけに許可。非公開化／削除後は第三者が既存返信を取得・編集できなくなるが、返信本人のDELETEは可能。
 
 ### 2.6 検索
 
@@ -375,7 +383,7 @@ MVPでは日本語検索を `ILIKE` 等の簡易検索で開始。データ量�
 - 本棚と公開本一覧（Issue #10）・本人栞一覧（Issue #11）・全体フィード（Issue #13）は `created_at DESC, id DESC`、栞の流れ（Issue #12）は `created_at ASC, id ASC` のkeyset方式。日時・IDのJSONをBase64URL化し、署名・有効期限は設けない。日時はDBから小数6桁のUTC文字列で取得し、ミリ秒へ切り捨てずSQLへ渡す。カーソルは認可に使用せず、所有者・公開条件をSQLで毎回確認する。他の未実装一覧のカーソル方式は各Issueで確定する。
 - `limit=15`のときDBでは最大16件取り、返すのは15件。16件目があれば `nextCursor` を返す。ない場合はnull。
 - 新しい投稿が途中に追加されても、カーソルで既存の続きが取得できる。編集・削除で結果が変わる可能性は許容し、重要な変更時は先頭から再取得。
-- 不正なcursorは400 `INVALID_CURSOR` とし、UIで一覧を再取得できるようにする。空のcursorは入力スキーマで400 `VALIDATION_ERROR`。本棚・公開本一覧・本人栞一覧・栞の流れ・全体フィードのcursorに有効期限はない。followingの暫定ガードはカーソル内容検証より優先する。
+- 不正なcursorは400 `INVALID_CURSOR`、空のcursorは400 `VALIDATION_ERROR`。実装済み一覧は署名・有効期限なしの同じ形式を使う。関係一覧は関係日時・相手IDの降順、返信は返信日時・IDの昇順。followingの未認証／匿名ガードはカーソル内容検証より優先する。
 
 ## 4. 認証と例外フロー
 

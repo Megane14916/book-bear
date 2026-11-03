@@ -51,7 +51,7 @@ export interface paths {
         get: operations["getMe"];
         /**
          * プロフィール初期化（冪等）
-         * @description JWTのsubでprofilesとuser_preferencesを同一トランザクション内で既定値作成。既存データは変更しない。表示名ゲスト、設定tap。クライアントのIDやメタデータは使用しない。
+         * @description JWTのsubでprofilesとuser_preferencesを同一トランザクション内で既定値作成。正式JWTの場合のみ内部の登録確認日時を初回記録し、既存内容・設定・createdAt・updatedAtを変更しない。匿名JWT・再実行で確認日時は不変、応答には含めない。ログイン・匿名昇格後の正式JWTでも実行が必要。表示名ゲスト、設定tap。クライアントのIDやメタデータは使用しない。
          */
         put: operations["putMe"];
         post?: never;
@@ -345,7 +345,7 @@ export interface paths {
         };
         /**
          * 公開タイムライン
-         * @description scope=allのみ実装済み（省略時all）。公開・未削除のみ、本人の非公開も除外。created_at DESC, id DESC、limit既定15・最大30、limit+1件で続きを判定。日時の小数6桁を保持。JWT任意だが提示時は必ず検証。未認証のlikedByMe=false。JWT検証→Zod入力検証→followingガード→allのみカーソル内容検証。scope=followingはIssue #14まで未実装で、未認証401・匿名403・正式JWT404。404はフォロー対象なしを意味せず一時的な未実装応答。フロントではIssue #14完了まで利用可能扱いしない。
+         * @description all（省略時）はJWT任意、followingは正式ユーザー本人のフォロー先のみ。両方とも公開・未削除のみで本人の非公開も除外。created_at DESC, id DESC、limit既定15・最大30、limit+1件で続きを判定。DB日時の小数6桁を保持し一括集計。提示JWTは必ず検証、未認証のlikedByMe=false。JWT→Zod入力検証→followingの認証・登録ガード→カーソル内容検証。フォロー先・公開栞なしは200空結果。
          */
         get: operations["getFeed"];
         put?: never;
@@ -365,7 +365,7 @@ export interface paths {
         };
         /**
          * followers一覧
-         * @description 【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。認証なしで利用可能。 limitは既定15・最大30。SQLはlimit+1件取得し、続きがなければnextCursor=null。カーソルの署名または対象・条件の厳格照合が必要。
+         * @description 公開のUserSummaryのみ。関係のcreated_at DESC, 相手ID DESC。limit既定15・最大30、limit+1件で続きを判定。対象プロフィールなし404、関係なし200空結果。
          */
         get: operations["getUsersUseridFollowers"];
         put?: never;
@@ -385,7 +385,7 @@ export interface paths {
         };
         /**
          * following一覧
-         * @description 【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。認証なしで利用可能。 limitは既定15・最大30。SQLはlimit+1件取得し、続きがなければnextCursor=null。カーソルの署名または対象・条件の厳格照合が必要。
+         * @description 公開のUserSummaryのみ。関係のcreated_at DESC, 相手ID DESC。limit既定15・最大30、limit+1件で続きを判定。対象プロフィールなし404、関係なし200空結果。
          */
         get: operations["getUsersUseridFollowing"];
         put?: never;
@@ -406,13 +406,13 @@ export interface paths {
         get?: never;
         /**
          * フォロー追加
-         * @description 【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。Supabase Bearer JWT必須。is_anonymous=falseの正式ユーザーのみ。匿名は403 REGISTRATION_REQUIRED。 自己フォローは禁止。対象も正式ユーザーであることをサーバーで確認。
+         * @description JWT→Zod入力検証→正式登録ガード。自己指定400。本人プロフィールと対象の正式登録確認履歴が必要、未確認・不存在404。正式JWTでPUT /meを実行して確認履歴を記録する。重複で日時・件数を変えない。
          */
         put: operations["putUsersUseridFollow"];
         post?: never;
         /**
          * フォロー解除
-         * @description 【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。Supabase Bearer JWT必須。is_anonymous=falseの正式ユーザーのみ。匿名は403 REGISTRATION_REQUIRED。 自己フォローは禁止。対象も正式ユーザーであることをサーバーで確認。
+         * @description JWT→Zod入力検証→正式登録ガード。自己指定400、プロフィールなし404。対象の登録確認履歴は不問で、自分の関係だけを解除。解除済みも204。
          */
         delete: operations["deleteUsersUseridFollow"];
         options?: never;
@@ -430,13 +430,13 @@ export interface paths {
         get?: never;
         /**
          * いいね追加
-         * @description 【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。Supabase Bearer JWT必須。is_anonymous=falseの正式ユーザーのみ。匿名は403 REGISTRATION_REQUIRED。 公開栞のみ。他人の非公開栞および削除済み栞は返さない。
+         * @description JWT→Zod入力検証→正式登録ガード。公開・未削除の元栞だけ。FOR SHAREで状態を確認して本人のいいねを追加。非公開は本人にも404。重複は204。
          */
         put: operations["putBookmarksBookmarkidLike"];
         post?: never;
         /**
          * いいね解除
-         * @description 【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。Supabase Bearer JWT必須。is_anonymous=falseの正式ユーザーのみ。匿名は403 REGISTRATION_REQUIRED。 公開栞のみ。他人の非公開栞および削除済み栞は返さない。
+         * @description JWT→Zod入力検証→正式登録ガード。公開・未削除の元栞をFOR SHAREで確認し、本人のいいねだけを解除。解除済みも204。非公開化・削除後は本人にも404。
          */
         delete: operations["deleteBookmarksBookmarkidLike"];
         options?: never;
@@ -453,13 +453,13 @@ export interface paths {
         };
         /**
          * 栞の返信一覧
-         * @description 【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。JWTは任意。送信されたJWTは検証し、無効なら401。 limitは既定15・最大30。SQLはlimit+1件取得し、続きがなければnextCursor=null。カーソルの署名または対象・条件の厳格照合が必要。 created_at ASC, id ASC（ページ番号順ではない）。 元栞が非公開なら本人のみ取得可能。他人の非公開・削除済み栞は返信も404。
+         * @description JWT任意、提示時は検証。公開元栞は全員、非公開は元栞の所有者だけ。元栞なし・削除済み・閲覧不可404。返信なし・削除済みのみ・境界より後なしは200空結果。返信のcreated_at ASC, id ASC、既定15・最大30、limit+1。親の可読性と返信条件は同じSQLで適用。
          */
         get: operations["getBookmarksBookmarkidReplies"];
         put?: never;
         /**
          * 公開栞に返信
-         * @description 【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。Supabase Bearer JWT必須。is_anonymous=falseの正式ユーザーのみ。匿名は403 REGISTRATION_REQUIRED。 公開栞のみ。他人の非公開栞および削除済み栞は返さない。 返信は1階層のみ。
+         * @description JWT→Zod入力検証→正式登録ガード。公開・未削除の元栞をFOR SHAREで確認。INSERTと応答取得を同一トランザクションで実施。返信は1階層、isSpoiler省略時false。
          */
         post: operations["postBookmarksBookmarkidReplies"];
         delete?: never;
@@ -480,14 +480,14 @@ export interface paths {
         post?: never;
         /**
          * 自分の返信を論理削除
-         * @description 【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。Supabase Bearer JWT必須。匿名・正式ともに本人のみ。所有者は検証済みJWTのsubから判定。
+         * @description 匿名・正式とも自分の未削除返信を削除可能。元栞の非公開化・論理削除後も可。親の確認・ロックなし。返信の所有者・未削除条件をSQLで適用し、deletedAtとupdatedAtを同じDB時刻で更新。成功204本文なしで親情報は返さない。他人・削除済み・不存在・再DELETEは404。
          */
         delete: operations["deleteRepliesReplyid"];
         options?: never;
         head?: never;
         /**
          * 自分の返信を編集
-         * @description 【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。Supabase Bearer JWT必須。匿名・正式ともに本人のみ。所有者は検証済みJWTのsubから判定。
+         * @description 本人・未削除と元栞の可読性が必要。親FOR SHARE→返信FOR UPDATEの順。公開元栞への編集は匿名403。自分の非公開元栞の自分の返信は匿名でも編集可。本文・isSpoiler以外は変更不可。
          */
         patch: operations["patchRepliesReplyid"];
         trace?: never;
@@ -2302,7 +2302,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description NOT_FOUND: followingはIssue #14まで未実装（正式JWT）。フォロー対象の不存在ではない */
+            /** @description NOT_FOUND: followingで本人プロフィール未初期化 */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -2354,7 +2354,7 @@ export interface operations {
                     "application/json": components["schemas"]["UserPage"];
                 };
             };
-            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル */
+            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正 */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -2363,7 +2363,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description NOT_FOUND: 対象なし。第三者の非公開栞・削除済み栞も存在を明かさず404 */
+            /** @description NOT_FOUND: 対象なし、または本人以外の本棚 */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -2372,16 +2372,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description RATE_LIMITED: 操作回数制限 */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description INTERNAL_ERROR: 内部情報を含めないサーバーエラー */
+            /** @description INTERNAL_ERROR: 内部情報を含めないエラー */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -2415,7 +2406,7 @@ export interface operations {
                     "application/json": components["schemas"]["UserPage"];
                 };
             };
-            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル */
+            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正 */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -2424,7 +2415,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description NOT_FOUND: 対象なし。第三者の非公開栞・削除済み栞も存在を明かさず404 */
+            /** @description NOT_FOUND: 対象なし、または本人以外の本棚 */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -2433,16 +2424,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description RATE_LIMITED: 操作回数制限 */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description INTERNAL_ERROR: 内部情報を含めないサーバーエラー */
+            /** @description INTERNAL_ERROR: 内部情報を含めないエラー */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -2464,14 +2446,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description 成功（本文なし）。PUT/DELETEのフォロー・いいねは冪等。 */
+            /** @description 成功（本文なし）。有効な対象へのPUT/DELETEは冪等。 */
             204: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル */
+            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正 */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -2480,7 +2462,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description UNAUTHORIZED: 必須JWTがない、または送信されたJWTが無効・期限切れ */
+            /** @description UNAUTHORIZED: JWTなし・無効・期限切れ */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -2489,7 +2471,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description REGISTRATION_REQUIRED: 正式登録が必要 / FORBIDDEN: 操作権限なし */
+            /** @description REGISTRATION_REQUIRED: 匿名ユーザーの公開操作は不可 */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -2498,7 +2480,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description NOT_FOUND: 対象なし。第三者の非公開栞・削除済み栞も存在を明かさず404 */
+            /** @description NOT_FOUND: 対象なし、または本人以外の本棚 */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -2507,8 +2489,8 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description RATE_LIMITED: 操作回数制限 */
-            429: {
+            /** @description INTERNAL_ERROR: 内部情報を含めないエラー */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2516,8 +2498,8 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description INTERNAL_ERROR: 内部情報を含めないサーバーエラー */
-            500: {
+            /** @description INTERNAL_ERROR: 認証設定不備・JWKS取得失敗 */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2538,14 +2520,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description 成功（本文なし）。PUT/DELETEのフォロー・いいねは冪等。 */
+            /** @description 成功（本文なし）。有効な対象へのPUT/DELETEは冪等。 */
             204: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル */
+            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正 */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -2554,7 +2536,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description UNAUTHORIZED: 必須JWTがない、または送信されたJWTが無効・期限切れ */
+            /** @description UNAUTHORIZED: JWTなし・無効・期限切れ */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -2563,7 +2545,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description REGISTRATION_REQUIRED: 正式登録が必要 / FORBIDDEN: 操作権限なし */
+            /** @description REGISTRATION_REQUIRED: 匿名ユーザーの公開操作は不可 */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -2572,7 +2554,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description NOT_FOUND: 対象なし。第三者の非公開栞・削除済み栞も存在を明かさず404 */
+            /** @description NOT_FOUND: 対象なし、または本人以外の本棚 */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -2581,8 +2563,8 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description RATE_LIMITED: 操作回数制限 */
-            429: {
+            /** @description INTERNAL_ERROR: 内部情報を含めないエラー */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2590,8 +2572,8 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description INTERNAL_ERROR: 内部情報を含めないサーバーエラー */
-            500: {
+            /** @description INTERNAL_ERROR: 認証設定不備・JWKS取得失敗 */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2612,14 +2594,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description 成功（本文なし）。PUT/DELETEのフォロー・いいねは冪等。 */
+            /** @description 成功（本文なし）。有効な対象へのPUT/DELETEは冪等。 */
             204: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル */
+            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正 */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -2628,7 +2610,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description UNAUTHORIZED: 必須JWTがない、または送信されたJWTが無効・期限切れ */
+            /** @description UNAUTHORIZED: JWTなし・無効・期限切れ */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -2637,7 +2619,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description REGISTRATION_REQUIRED: 正式登録が必要 / FORBIDDEN: 操作権限なし */
+            /** @description REGISTRATION_REQUIRED: 匿名ユーザーの公開操作は不可 */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -2646,7 +2628,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description NOT_FOUND: 対象なし。第三者の非公開栞・削除済み栞も存在を明かさず404 */
+            /** @description NOT_FOUND: 対象なし、または本人以外の本棚 */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -2655,8 +2637,8 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description RATE_LIMITED: 操作回数制限 */
-            429: {
+            /** @description INTERNAL_ERROR: 内部情報を含めないエラー */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2664,8 +2646,8 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description INTERNAL_ERROR: 内部情報を含めないサーバーエラー */
-            500: {
+            /** @description INTERNAL_ERROR: 認証設定不備・JWKS取得失敗 */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2686,14 +2668,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description 成功（本文なし）。PUT/DELETEのフォロー・いいねは冪等。 */
+            /** @description 成功（本文なし）。有効な対象へのPUT/DELETEは冪等。 */
             204: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル */
+            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正 */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -2702,7 +2684,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description UNAUTHORIZED: 必須JWTがない、または送信されたJWTが無効・期限切れ */
+            /** @description UNAUTHORIZED: JWTなし・無効・期限切れ */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -2711,7 +2693,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description REGISTRATION_REQUIRED: 正式登録が必要 / FORBIDDEN: 操作権限なし */
+            /** @description REGISTRATION_REQUIRED: 匿名ユーザーの公開操作は不可 */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -2720,7 +2702,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description NOT_FOUND: 対象なし。第三者の非公開栞・削除済み栞も存在を明かさず404 */
+            /** @description NOT_FOUND: 対象なし、または本人以外の本棚 */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -2729,8 +2711,8 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description RATE_LIMITED: 操作回数制限 */
-            429: {
+            /** @description INTERNAL_ERROR: 内部情報を含めないエラー */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2738,8 +2720,8 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description INTERNAL_ERROR: 内部情報を含めないサーバーエラー */
-            500: {
+            /** @description INTERNAL_ERROR: 認証設定不備・JWKS取得失敗 */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2772,7 +2754,7 @@ export interface operations {
                     "application/json": components["schemas"]["ReplyPage"];
                 };
             };
-            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル */
+            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正 */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -2781,7 +2763,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description UNAUTHORIZED: 必須JWTがない、または送信されたJWTが無効・期限切れ */
+            /** @description UNAUTHORIZED: JWTなし・無効・期限切れ */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -2790,7 +2772,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description NOT_FOUND: 対象なし。第三者の非公開栞・削除済み栞も存在を明かさず404 */
+            /** @description NOT_FOUND: 対象なし、削除済み、または操作の所有者・閲覧条件を満たさない */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -2799,8 +2781,8 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description RATE_LIMITED: 操作回数制限 */
-            429: {
+            /** @description INTERNAL_ERROR: 内部情報を含めないエラー */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2808,8 +2790,8 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description INTERNAL_ERROR: 内部情報を含めないサーバーエラー */
-            500: {
+            /** @description INTERNAL_ERROR: 認証設定不備・JWKS取得失敗 */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2843,7 +2825,7 @@ export interface operations {
                     "application/json": components["schemas"]["Reply"];
                 };
             };
-            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル */
+            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正 */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -2852,7 +2834,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description UNAUTHORIZED: 必須JWTがない、または送信されたJWTが無効・期限切れ */
+            /** @description UNAUTHORIZED: JWTなし・無効・期限切れ */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -2861,7 +2843,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description REGISTRATION_REQUIRED: 正式登録が必要 / FORBIDDEN: 操作権限なし */
+            /** @description REGISTRATION_REQUIRED: 公開操作は正式登録が必要 */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -2870,7 +2852,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description NOT_FOUND: 対象なし。第三者の非公開栞・削除済み栞も存在を明かさず404 */
+            /** @description NOT_FOUND: 対象なし、削除済み、または操作の所有者・閲覧条件を満たさない */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -2879,8 +2861,8 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description RATE_LIMITED: 操作回数制限 */
-            429: {
+            /** @description INTERNAL_ERROR: 内部情報を含めないエラー */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2888,8 +2870,8 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description INTERNAL_ERROR: 内部情報を含めないサーバーエラー */
-            500: {
+            /** @description INTERNAL_ERROR: 認証設定不備・JWKS取得失敗 */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2910,14 +2892,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description 成功（本文なし）。PUT/DELETEのフォロー・いいねは冪等。 */
+            /** @description 成功（本文なし） */
             204: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル */
+            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正 */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -2926,7 +2908,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description UNAUTHORIZED: 必須JWTがない、または送信されたJWTが無効・期限切れ */
+            /** @description UNAUTHORIZED: JWTなし・無効・期限切れ */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -2935,16 +2917,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description REGISTRATION_REQUIRED: 正式登録が必要 / FORBIDDEN: 操作権限なし */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description NOT_FOUND: 対象なし。第三者の非公開栞・削除済み栞も存在を明かさず404 */
+            /** @description NOT_FOUND: 対象なし、削除済み、または操作の所有者・閲覧条件を満たさない */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -2953,8 +2926,8 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description RATE_LIMITED: 操作回数制限 */
-            429: {
+            /** @description INTERNAL_ERROR: 内部情報を含めないエラー */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2962,8 +2935,8 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description INTERNAL_ERROR: 内部情報を含めないサーバーエラー */
-            500: {
+            /** @description INTERNAL_ERROR: 認証設定不備・JWKS取得失敗 */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2997,7 +2970,7 @@ export interface operations {
                     "application/json": components["schemas"]["Reply"];
                 };
             };
-            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル */
+            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正 */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -3006,7 +2979,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description UNAUTHORIZED: 必須JWTがない、または送信されたJWTが無効・期限切れ */
+            /** @description UNAUTHORIZED: JWTなし・無効・期限切れ */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -3015,7 +2988,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description REGISTRATION_REQUIRED: 正式登録が必要 / FORBIDDEN: 操作権限なし */
+            /** @description REGISTRATION_REQUIRED: 公開操作は正式登録が必要 */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -3024,7 +2997,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description NOT_FOUND: 対象なし。第三者の非公開栞・削除済み栞も存在を明かさず404 */
+            /** @description NOT_FOUND: 対象なし、削除済み、または操作の所有者・閲覧条件を満たさない */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -3033,8 +3006,8 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description RATE_LIMITED: 操作回数制限 */
-            429: {
+            /** @description INTERNAL_ERROR: 内部情報を含めないエラー */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3042,8 +3015,8 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description INTERNAL_ERROR: 内部情報を含めないサーバーエラー */
-            500: {
+            /** @description INTERNAL_ERROR: 認証設定不備・JWKS取得失敗 */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

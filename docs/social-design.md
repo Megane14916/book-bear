@@ -1,6 +1,6 @@
 # フォロー・いいね・返信・フォロー中フィード 設計書（Issue #14）
 
-状態: 実装前の設計。基準: main `6063e23`（PR #23マージ後）／2026-11-03（日本時間）。
+状態: 実装済み。基準: main `6063e23`（PR #23マージ後）／2026-11-03（日本時間）。実装は [social](../apps/api/src/modules/social/service.ts)・[replies](../apps/api/src/modules/replies/service.ts)、検証は [SNS・返信APIテスト](../apps/api/tests/social-replies.test.ts) を参照。
 
 関連: [Issue #14](https://github.com/Megane14916/book-bear/issues/14)、[API設計書](api.md#25-フォローいいね返信)、[要件書の認可](requirements.md#4-アカウント認可)、[DB設計書](database.md)、[認証設計](auth-design.md#8-既存apidbとの接続契約)。入力・応答の詳細は既存の [契約ルート](../apps/api/src/contracts/routes.ts)、[返信スキーマ](../apps/api/src/modules/replies/schemas.ts)、[UserPage](../apps/api/src/modules/users/schemas.ts)、[FeedQuery](../apps/api/src/modules/feed/schemas.ts)／[FeedPage](../apps/api/src/modules/bookmarks/schemas.ts) を正本とし、フィールドを複製しない。
 
@@ -44,7 +44,7 @@ followingも既存のfeed/http.tsと同様にhandler内で登録ガードを実�
 
 ### フォロー対象の正式登録確認
 
-既存契約はフォロー対象も正式ユーザーであることを求めるが、profilesには登録状態がなく、検証済みJWTで分かるのはアクセス中の本人だけ。[認証設計](auth-design.md#8-既存apidbとの接続契約) はauth.users／auth.identitiesへの読み取り権限追加を禁止している。プロフィール存在、email、metadata、公開栞の有無から正式ユーザーと推測しない。
+既存契約はフォロー対象も正式ユーザーであることを求めるが、Issue #13時点のprofilesには登録状態がなく、検証済みJWTで分かるのはアクセス中の本人だけ。[認証設計](auth-design.md#8-既存apidbとの接続契約) はauth.users／auth.identitiesへの読み取り権限追加を禁止している。プロフィール存在、email、metadata、公開栞の有無から正式ユーザーと推測しない。
 
 列名は **registration_confirmed_at**（DrizzleではregistrationConfirmedAt、nullable timestamptz）を採用する。厳密なアカウント登録日時ではなく、**正式JWTで登録状態を初めて確認したDB時刻**であるため、旧案のregistered_atより意味が正確な名前とする。profilesへの追加はこの内部列1つだけで、追加マイグレーションが必要。「DB変更なし」とは扱わない。
 
@@ -127,7 +127,7 @@ socialにフォロー・いいね、repliesに返信のroutes/http/serviceを設
 
 既存パス・operationId・Zodスキーマ・JSON形状を維持する。10操作をplannedRoutesから実ルートへ移し、全36操作の一意性・初期ドラフトの網羅を残す。plannedは12→2（投稿／ユーザー検索のみ）。PUT /meの内部履歴記録、各403/404、一覧の向き・カーソル、following対応を説明へ反映し、稼働しない429等は持ち込まない。返信DELETEの説明には、匿名・正式とも本人の未削除返信のみ、親の非公開化・削除後も可能、成功204本文なし、他人／削除済み／不存在・再DELETEは404、親情報を返さないことを明記する。共通エラーコードは追加せず、OpenAPIとWeb生成型は既存手順で再生成する。
 
-実装時にfeed設計書・API設計書・READMEのfollowing暫定404／利用不可の記述を更新し、DB・認証設計にも登録確認履歴の差分と理由を反映する。MSWは未導入のため新規モック基盤は追加しない。今回の文書作成ではこれらのコード・契約・生成物を変更しない。
+feed設計書・API設計書・READMEのfollowing暫定404／利用不可の記述を更新し、DB・認証設計にも登録確認履歴の差分と理由を反映する。MSWは未導入のため新規モック基盤は追加しない。
 
 登録確認列以外のDB列・制約・インデックス追加、Auth DDL、CASCADE・物理削除、外部サービス照会・依存追加は不要。既存PK／FK／CHECK・索引を使い、followingや関係一覧の性能は必要時にEXPLAIN ANALYZEで検証する。レート制限・通報等は今後の課題であり、今回の実装・テスト・完了条件へ含めない。
 
@@ -150,4 +150,4 @@ socialにフォロー・いいね、repliesに返信のroutes/http/serviceを設
 
 共有DBの既存行を前提にfixture ID・専用日時領域・制御可能な基準集合で比較する。並行追加は自テストで日時・タイミングを制御し、他テストのデータを変更せず、現在時刻やDB全体の固定件数に依存しない。[全体フィードのテストデータ方針](feed-design.md#テストデータ管理) を継承する。
 
-実装前の主な確認事項は、登録確認列のマイグレーションと移行後の正式PUT /me呼び出し、返信GETの親行を残すSQL構成、登録確認時の既存日時保持。元栞の非公開化／削除後にいいね解除と返信PATCHは制限するが、自分の返信DELETEは許可する。実装完了時は [開発ルール](development.md) に従い、型・全テスト・OpenAPI・ビルド、DB変更の生成／履歴確認を行う。今回は本設計書だけを修正し、コード・マイグレーション・テスト・OpenAPI／生成型・PRは作成／更新しない。
+移行には [登録確認列のマイグレーション](../apps/api/drizzle/0001_registration_confirmation.sql) と、ログイン・昇格後の正式PUT /me呼び出しが必要。返信GETは親行を残すSQL構成、登録確認は既存日時を保持する明示SQLで検証する。元栞の非公開化／削除後にいいね解除と返信PATCHは制限するが、自分の返信DELETEは許可する。検証は [開発ルール](development.md) に従い、型・全テスト・OpenAPI・ビルド、DB変更の生成／履歴確認を行う。
