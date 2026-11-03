@@ -9,6 +9,7 @@ import { registerProfileRoutes } from './modules/users/http'
 import { registerBookRoutes } from './modules/books/http'
 import { registerLibraryRoutes } from './modules/library/http'
 import { registerBookmarkRoutes } from './modules/bookmarks/http'
+import { registerFeedRoutes } from './modules/feed/http'
 import { ApiError } from './shared/errors'
 import { ErrorSchema } from './shared/schemas'
 
@@ -80,6 +81,7 @@ export function createApp(dependencies: { verifyToken?: TokenVerifier; database?
   registerBookRoutes(app, database, auth, dependencies.bookFetch)
   registerLibraryRoutes(app, database, auth)
   registerBookmarkRoutes(app, database, auth)
+  registerFeedRoutes(app, database, auth)
 
   app.openAPIRegistry.registerComponent('securitySchemes', 'bearerAuth', {
     type: 'http', scheme: 'bearer', bearerFormat: 'JWT',

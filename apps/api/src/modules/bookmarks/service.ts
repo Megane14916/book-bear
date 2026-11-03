@@ -53,6 +53,18 @@ export async function listBookmarks(db: Database, viewer: Identity, query: { lim
   const cards = rows.slice(0, query.limit), last = cards.at(-1)
   return { items: await withCounts(db, cards, viewer), nextCursor: rows.length > query.limit && last ? encodeCursor({ createdAt: last.createdAt, id: last.id }) : null }
 }
+export async function listPublicBookmarks(db: Database, query: { limit: number; boundary?: ReturnType<typeof decodeCursor> }, viewer?: Identity) {
+  const publicOnly = and(eq(bookmarks.visibility, 'public'), isNull(bookmarks.deletedAt))
+  const page = db.$with('feed_page').as(db.select({ id: bookmarks.id }).from(bookmarks)
+    .where(and(publicOnly, olderThan(bookmarks.createdAt, bookmarks.id, query.boundary)))
+    .orderBy(desc(bookmarks.createdAt), desc(bookmarks.id)).limit(query.limit + 1))
+  const rows = await db.with(page).select(fields).from(page).innerJoin(bookmarks, eq(bookmarks.id, page.id))
+    .innerJoin(userBooks, eq(userBooks.id, bookmarks.userBookId)).innerJoin(profiles, eq(profiles.id, userBooks.userId))
+    .innerJoin(books, eq(books.id, userBooks.bookId)).where(publicOnly)
+    .orderBy(desc(bookmarks.createdAt), desc(bookmarks.id))
+  const cards = rows.slice(0, query.limit), last = cards.at(-1)
+  return { items: await withCounts(db, cards, viewer), nextCursor: rows.length > query.limit && last ? encodeCursor({ createdAt: last.createdAt, id: last.id }) : null }
+}
 export async function getBookmarkFlow(db: Database, userId: string, bookId: string, query: { limit: number; cursor?: string }, viewer?: Identity) {
   const boundary = decodeCursor(query.cursor)
   const [author] = await db.select(authorFields).from(profiles).where(eq(profiles.id, userId))
