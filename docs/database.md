@@ -284,7 +284,7 @@ ORDER BY created_at DESC, id DESC
 LIMIT 16;
 ```
 
-**まず15件を確定**し、`JOIN user_books, profiles, books` や件数集計を**その15件に対して実施**。投稿全体を集計したり、1件ずつ取得したりしない。
+Issue #13の実装では、CTEで候補IDを最大limit+1件（既定16件）に絞ってから `JOIN user_books, profiles, books` を実施する。先読み1件分の関連情報取得を許容してSQLを単純に保ち、いいね・返信の件数集計は返却するlimit件（既定15件）だけに限定する。投稿全体を集計したり、1件ずつ取得したりしない。
 
 いいね数と返信数を同じFROM句で無条件にJOINすると `likes × replies` の行が生成され得るため、事前集計したサブクエリを使う／別クエリで投稿ID集合に対して集計する。
 

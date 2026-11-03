@@ -2877,6 +2877,132 @@
         }
       }
     },
+    "/api/v1/feed": {
+      "get": {
+        "operationId": "getFeed",
+        "tags": [
+          "Feed"
+        ],
+        "summary": "公開タイムライン",
+        "x-implementation-status": "implemented",
+        "x-auth": "OptionalAuth",
+        "security": [
+          {},
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "scope=allのみ実装済み（省略時all）。公開・未削除のみ、本人の非公開も除外。created_at DESC, id DESC、limit既定15・最大30、limit+1件で続きを判定。日時の小数6桁を保持。JWT任意だが提示時は必ず検証。未認証のlikedByMe=false。JWT検証→Zod入力検証→followingガード→allのみカーソル内容検証。scope=followingはIssue #14まで未実装で、未認証401・匿名403・正式JWT404。404はフォロー対象なしを意味せず一時的な未実装応答。フロントではIssue #14完了まで利用可能扱いしない。",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "日時・IDのBase64URLカーソル。署名・有効期限なし。allの内容不正は400 INVALID_CURSOR。followingでは非空文字列の内容検証よりガードを優先。空文字は400 VALIDATION_ERROR。公開・未削除条件をSQLで毎回確認。"
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 30,
+              "default": 15
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "all",
+                "following"
+              ],
+              "default": "all"
+            },
+            "required": false,
+            "name": "scope",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHORIZED: 提示JWTが無効・期限切れ、またはfollowingでJWTなし",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "REGISTRATION_REQUIRED: followingを匿名JWTで指定",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND: followingはIssue #14まで未実装（正式JWT）。フォロー対象の不存在ではない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_ERROR: 内部情報を含めないエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "INTERNAL_ERROR: 認証設定不備・JWKS取得失敗",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/users/{userId}/followers": {
       "get": {
         "operationId": "getUsersUseridFollowers",
@@ -3040,122 +3166,6 @@
           },
           "404": {
             "description": "NOT_FOUND: 対象なし。第三者の非公開栞・削除済み栞も存在を明かさず404",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "RATE_LIMITED: 操作回数制限",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "INTERNAL_ERROR: 内部情報を含めないサーバーエラー",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/feed": {
-      "get": {
-        "operationId": "getFeed",
-        "tags": [
-          "Feed"
-        ],
-        "summary": "公開タイムライン",
-        "description": "【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。JWTは任意。送信されたJWTは検証し、無効なら401。 limitは既定15・最大30。SQLはlimit+1件取得し、続きがなければnextCursor=null。カーソルの署名または対象・条件の厳格照合が必要。 created_at DESC, id DESC。 公開栞のみ。他人の非公開栞および削除済み栞は返さない。 scope=followingは正式ユーザーのみ（未認証401、匿名403 REGISTRATION_REQUIRED）。allはJWT任意。未認証のlikedByMeはfalse。",
-        "security": [
-          {},
-          {
-            "bearerAuth": []
-          }
-        ],
-        "x-implementation-status": "planned",
-        "x-auth": "OptionalAuth",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "description": "不透明なカーソル。内容を解析せず次回の同じ条件のリクエストに渡す。不正・期限切れは400 INVALID_CURSOR。"
-            },
-            "required": false,
-            "name": "cursor",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 30,
-              "default": 15
-            },
-            "required": false,
-            "name": "limit",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "enum": [
-                "all",
-                "following"
-              ],
-              "default": "all"
-            },
-            "required": false,
-            "name": "scope",
-            "in": "query"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FeedPage"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "UNAUTHORIZED: 必須JWTがない、または送信されたJWTが無効・期限切れ",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "REGISTRATION_REQUIRED: 正式登録が必要 / FORBIDDEN: 操作権限なし",
             "content": {
               "application/json": {
                 "schema": {

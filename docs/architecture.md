@@ -238,7 +238,7 @@ sequenceDiagram
 
 ## 6. タイムラインと栞の流れの高速化
 
-1. フィードでは公開投稿を `created_at DESC, id DESC` で**まず15件に絞る**。
+1. フィードでは公開・未削除の投稿を `created_at DESC, id DESC` で**まず返却15件＋先読み1件に絞り**、関連情報をJOINする。集計は返却分だけに行う。
 2. フォロー中は `follows` で対象投稿者を条件に加える（Fan-out on Read）。
 3. 栞の流れは `(user_id, book_id)` → `user_books.id` → `bookmarks` の順で、**`created_at ASC, id ASC`**。ページ番号は使わない。
 4. いいねと返信は対象投稿ID集合で一括集計。返信本文は投稿詳細で取得。

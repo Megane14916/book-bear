@@ -5,7 +5,6 @@ import {
 } from '../shared/schemas'
 import { UserPage } from '../modules/users/schemas'
 import { FeedPage } from '../modules/bookmarks/schemas'
-import { FeedQuery } from '../modules/feed/schemas'
 import { CreateReplyRequest, PatchReplyRequest, Reply, ReplyPage } from '../modules/replies/schemas'
 
 const json = (schema: z.ZodTypeAny, description = '成功') => ({
@@ -66,9 +65,6 @@ export const plannedRoutes: PlannedRoute[] = [
     tags: ['Social'], summary: `${kind}一覧`, description: descPagination,
     request: { params: UserIdParams, query: PaginationQuery }, responses: { 200: json(UserPage) },
   }, 'Public', [404])),
-  planned({ method: 'get', path: '/api/v1/feed', operationId: 'getFeed', tags: ['Feed'], summary: '公開タイムライン',
-    description: `${descNewest} ${publicBookmark} scope=followingは正式ユーザーのみ（未認証401、匿名403 REGISTRATION_REQUIRED）。allはJWT任意。未認証のlikedByMeはfalse。`,
-    request: { query: FeedQuery }, responses: { 200: json(FeedPage) } }, 'OptionalAuth', [403]),
   ...(['put', 'delete'] as const).map((method) => planned({
     method, path: '/api/v1/users/{userId}/follow', operationId: `${method}UsersUseridFollow`, tags: ['Social'], summary: method === 'put' ? 'フォロー追加' : 'フォロー解除',
     description: '自己フォローは禁止。対象も正式ユーザーであることをサーバーで確認。', request: { params: UserIdParams }, responses: { 204: noContent },
