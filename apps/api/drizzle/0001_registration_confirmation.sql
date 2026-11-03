@@ -1,0 +1,1 @@
+ALTER TABLE "profiles" ADD COLUMN "registration_confirmed_at" timestamp with time zone;

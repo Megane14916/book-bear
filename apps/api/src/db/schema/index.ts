@@ -20,6 +20,7 @@ export const profiles = pgTable('profiles', {
   displayName: varchar('display_name', { length: 50 }).notNull().default('ゲスト'),
   bio: text('bio'),
   avatarUrl: text('avatar_url'),
+  registrationConfirmedAt: timestamp('registration_confirmed_at', { withTimezone: true, mode: 'date' }),
   createdAt: createdAt(), updatedAt: updatedAt(),
 }, (table) => [
   uniqueIndex('ux_profiles_handle').on(table.handle),

@@ -4,6 +4,8 @@
 
 Issue #8で8テーブルの定義を `apps/api/src/db/schema/index.ts`、初回SQLを `apps/api/drizzle/0000_initial_schema.sql` に実装した。適用・Supabase作成・Hyperdrive設定は [初期設定手順](database-setup.md) を参照。
 
+Issue #14は [0001_registration_confirmation.sql](../apps/api/drizzle/0001_registration_confirmation.sql) でprofilesの内部確認列だけを追加する。既存行はNULLで移行し、正式JWTのPUT /meまでフォロー対象として未確認。詳細は [SNS API設計書](social-design.md#フォロー対象の正式登録確認) を参照。Auth DDL・追加権限・追加索引はない。
+
 - `pnpm --filter api db:generate` で生成、`db:check` で履歴の整合性を確認、`db:migrate` で管理用接続に適用する。SQL・snapshotをコミットし、生成差分をCIで検出する。
 - `auth.users` はSupabase管理の既存テーブルへのFK参照だけを定義し、作成・変更の対象に含めない。ローカルテストだけはid列のみの代替テーブルを使用する。
 - UUIDを自動生成し、日時のDB既定値はtimestamptz・now()。`created_at` は更新時の自動変更対象にせず、`updated_at` はDrizzleの `$onUpdate(() => new Date())` で更新する。生SQLでの更新は明示的に `updated_at=now()` を指定する。
@@ -104,6 +106,7 @@ erDiagram
 | `display_name` | VARCHAR(50) NOT NULL | 初期値はゲスト表示名 |
 | `bio` | TEXT NULL | 自己紹介、最大500文字[暫定] |
 | `avatar_url` | TEXT NULL | 初期はなし、将来拡張 |
+| `registration_confirmed_at` | TIMESTAMPTZ NULL | 正式JWTのPUT /meによる初回確認日時。登録日ではなく、APIへは返さない |
 | `created_at` | TIMESTAMPTZ NOT NULL DEFAULT now() | 作成日 |
 | `updated_at` | TIMESTAMPTZ NOT NULL DEFAULT now() | 更新日 |
 

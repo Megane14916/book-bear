@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, exists, inArray, isNull, or, sql } from 'drizzle-orm'
 import type { z } from '@hono/zod-openapi'
 import type { Database } from '../../db/client'
-import { bookmarkLikes, bookmarkReplies, bookmarks, books, profiles, userBooks } from '../../db/schema'
+import { bookmarkLikes, bookmarkReplies, bookmarks, books, follows, profiles, userBooks } from '../../db/schema'
 import type { Identity } from '../../middleware/auth'
 import { decodeCursor, encodeCursor, newerThan, olderThan, preciseTimestamp } from '../../shared/cursor'
 import { ApiError, notFound } from '../../shared/errors'
@@ -19,7 +19,7 @@ const cardQuery = (db: Database) => db.select(fields).from(bookmarks)
   .innerJoin(profiles, eq(profiles.id, userBooks.userId)).innerJoin(books, eq(books.id, userBooks.bookId))
 const owned = (db: Database, viewer: Identity) => exists(db.select({ id: userBooks.id }).from(userBooks)
   .where(and(eq(userBooks.id, bookmarks.userBookId), eq(userBooks.userId, viewer.id))))
-const canRead = (db: Database, viewer?: Identity) => and(isNull(bookmarks.deletedAt),
+export const canReadBookmark = (db: Database, viewer?: Identity) => and(isNull(bookmarks.deletedAt),
   viewer ? or(eq(bookmarks.visibility, 'public'), owned(db, viewer)) : eq(bookmarks.visibility, 'public'))
 
 async function withCounts<T extends { id: string }>(db: Database, cards: T[], viewer?: Identity) {
@@ -35,7 +35,7 @@ async function withCounts<T extends { id: string }>(db: Database, cards: T[], vi
     likedByMe: likesById.get(card.id)?.liked ?? false, replyCount: repliesById.get(card.id) ?? 0 }))
 }
 export async function getBookmark(db: Database, id: string, viewer?: Identity) {
-  const rows = await cardQuery(db).where(and(eq(bookmarks.id, id), canRead(db, viewer)))
+  const rows = await cardQuery(db).where(and(eq(bookmarks.id, id), canReadBookmark(db, viewer)))
   if (!rows.length) throw notFound()
   return (await withCounts(db, rows, viewer))[0]
 }
@@ -53,8 +53,11 @@ export async function listBookmarks(db: Database, viewer: Identity, query: { lim
   const cards = rows.slice(0, query.limit), last = cards.at(-1)
   return { items: await withCounts(db, cards, viewer), nextCursor: rows.length > query.limit && last ? encodeCursor({ createdAt: last.createdAt, id: last.id }) : null }
 }
-export async function listPublicBookmarks(db: Database, query: { limit: number; boundary?: ReturnType<typeof decodeCursor> }, viewer?: Identity) {
-  const publicOnly = and(eq(bookmarks.visibility, 'public'), isNull(bookmarks.deletedAt))
+export async function listPublicBookmarks(db: Database, query: { limit: number; boundary?: ReturnType<typeof decodeCursor>; followingUserId?: string }, viewer?: Identity) {
+  const followed = query.followingUserId ? exists(db.select({ id: userBooks.id }).from(userBooks)
+    .innerJoin(follows, eq(follows.followingId, userBooks.userId))
+    .where(and(eq(userBooks.id, bookmarks.userBookId), eq(follows.followerId, query.followingUserId)))) : undefined
+  const publicOnly = and(eq(bookmarks.visibility, 'public'), isNull(bookmarks.deletedAt), followed)
   const page = db.$with('feed_page').as(db.select({ id: bookmarks.id }).from(bookmarks)
     .where(and(publicOnly, olderThan(bookmarks.createdAt, bookmarks.id, query.boundary)))
     .orderBy(desc(bookmarks.createdAt), desc(bookmarks.id)).limit(query.limit + 1))
@@ -64,6 +67,12 @@ export async function listPublicBookmarks(db: Database, query: { limit: number; 
     .orderBy(desc(bookmarks.createdAt), desc(bookmarks.id))
   const cards = rows.slice(0, query.limit), last = cards.at(-1)
   return { items: await withCounts(db, cards, viewer), nextCursor: rows.length > query.limit && last ? encodeCursor({ createdAt: last.createdAt, id: last.id }) : null }
+}
+export async function lockBookmark(db: Database, id: string, viewer?: Identity) {
+  const [row] = await db.select({ visibility: bookmarks.visibility }).from(bookmarks)
+    .where(and(eq(bookmarks.id, id), canReadBookmark(db, viewer))).for('share', { of: bookmarks })
+  if (!row) throw notFound()
+  return row
 }
 export async function getBookmarkFlow(db: Database, userId: string, bookId: string, query: { limit: number; cursor?: string }, viewer?: Identity) {
   const boundary = decodeCursor(query.cursor)

@@ -203,12 +203,12 @@ describe('認証→Zod→followingガード→allのカーソル検証', () => {
       expect(database).not.toHaveBeenCalled()
     } finally { decode.mockRestore() }
   })
-  it.each(['', '&cursor=invalid!', `&cursor=${before('2300-01-01T00:00:00.000000Z')}`])('followingは内容検証・DB前に未認証401／匿名403／正式404: %s', async (query) => {
+  it.each(['', '&cursor=invalid!', `&cursor=${before('2300-01-01T00:00:00.000000Z')}`])('followingは内容検証・DB前に未認証401／匿名403: %s', async (query) => {
     const database = vi.fn(async () => { throw new Error('DB must not be called') })
     const guarded = createApp({ database, verifyToken: createTokenVerifier(signing.fetcher) })
     const decode = vi.spyOn(cursors, 'decodeCursor')
     try {
-      for (const [token, status, code] of [[null, 401, 'UNAUTHORIZED'], [anonymous.token, 403, 'REGISTRATION_REQUIRED'], [owner.token, 404, 'NOT_FOUND']] as const) {
+      for (const [token, status, code] of [[null, 401, 'UNAUTHORIZED'], [anonymous.token, 403, 'REGISTRATION_REQUIRED']] as const) {
         const response = await guarded.request(`/api/v1/feed?scope=following${query}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} }, env())
         expect(response.status).toBe(status)
         expect(await response.json()).toMatchObject({ error: { code } })
@@ -296,7 +296,7 @@ it('実Workersで公開閲覧・likedByMe・降順カーソルとfollowingの検
     expect(next.items[0].likedByMe).toBe(false)
     expect(next.nextCursor).toBeNull()
     expect(response.headers.get('Cache-Control')).toBe('no-store')
-    for (const [token, status] of [[null, 401], [anonymous.token, 403], [owner.token, 404]] as const) {
+    for (const [token, status] of [[null, 401], [anonymous.token, 403], [owner.token, 400]] as const) {
       expect((await worker.fetch('/api/v1/feed?scope=following&cursor=invalid!', { headers: token ? { Authorization: `Bearer ${token}` } : {} })).status).toBe(status)
     }
     expect((await worker.fetch('/api/v1/feed?scope=following&cursor=', { headers })).status).toBe(400)

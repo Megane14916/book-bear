@@ -135,6 +135,7 @@ describe('プロフィール・表示設定API（実DB・最小権限・署名�
     const metadata = { email: 'private@example.invalid', name: 'Google name', full_name: 'Google full name',
       picture: 'https://example.invalid/google.png', avatar_url: 'https://example.invalid/avatar.png',
       sub: otherId, is_anonymous: true }
+    let confirmedAt: Date | undefined
     for (const phase of ['linked', 'refreshed']) {
       const linked = await signing.sign({ sub: id, session_id: sessionId, is_anonymous: false, jti: phase,
         app_metadata: { provider: 'custom:google', providers: ['anonymous', 'custom:google'] }, user_metadata: metadata })
@@ -144,7 +145,11 @@ describe('プロフィール・表示設定API（実DB・最小権限・署名�
       expect(profile).toMatchObject({ id, isAnonymous: false, displayName: '自分で設定した名前', bio: '既存の紹介', avatarUrl: null, handle: null })
       expect(JSON.stringify(profile)).not.toContain('private@example.invalid')
       expect(await (await request('/api/v1/me/preferences', 'GET', undefined, linked)).json()).toEqual({ feedContentMode: 'all' })
-      expect((await fixture.client.query('SELECT p.*, u.feed_content_mode, u.updated_at AS preference_updated_at FROM profiles p JOIN user_preferences u ON u.user_id=p.id WHERE p.id=$1', [id])).rows[0]).toEqual(before)
+      const after = (await fixture.client.query('SELECT p.*, u.feed_content_mode, u.updated_at AS preference_updated_at FROM profiles p JOIN user_preferences u ON u.user_id=p.id WHERE p.id=$1', [id])).rows[0]
+      expect(after.registration_confirmed_at).toBeInstanceOf(Date)
+      confirmedAt ??= after.registration_confirmed_at
+      expect(after.registration_confirmed_at).toEqual(confirmedAt)
+      expect({ ...after, registration_confirmed_at: null }).toEqual(before)
     }
     const publicProfile = await (await request(`/api/v1/users/${id}`, 'GET', undefined, null)).json()
     expect(Object.keys(publicProfile).sort()).toEqual(['id', 'displayName', 'handle', 'bio', 'avatarUrl', 'followersCount', 'followingCount', 'publicBookmarkCount', 'followedByMe'].sort())

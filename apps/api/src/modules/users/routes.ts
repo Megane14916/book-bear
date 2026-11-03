@@ -19,7 +19,7 @@ export const profileRoutes = {
   getMe: createRoute({ ...authenticated, method: 'get', path: '/api/v1/me', operationId: 'getMe', summary: '自分のプロフィール',
     responses: { ...responses, 200: json(Profile) } }),
   putMe: createRoute({ ...authenticated, method: 'put', path: '/api/v1/me', operationId: 'putMe', summary: 'プロフィール初期化（冪等）',
-    description: 'JWTのsubでprofilesとuser_preferencesを同一トランザクション内で既定値作成。既存データは変更しない。表示名ゲスト、設定tap。クライアントのIDやメタデータは使用しない。',
+    description: 'JWTのsubでprofilesとuser_preferencesを同一トランザクション内で既定値作成。正式JWTの場合のみ内部の登録確認日時を初回記録し、既存内容・設定・createdAt・updatedAtを変更しない。匿名JWT・再実行で確認日時は不変、応答には含めない。ログイン・匿名昇格後の正式JWTでも実行が必要。表示名ゲスト、設定tap。クライアントのIDやメタデータは使用しない。',
     responses: { ...responses, 200: json(Profile) } }),
   patchMe: createRoute({ ...authenticated, 'x-auth': 'Owner', method: 'patch', path: '/api/v1/me', operationId: 'patchMe', summary: '本人のプロフィール編集',
     description: 'JWTのsubに一致するプロフィールのみ更新。handleは小文字英数字と_の3〜30文字、nullで解除。',

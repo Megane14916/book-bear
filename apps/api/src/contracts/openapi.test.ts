@@ -8,6 +8,8 @@ import { bookRoutes } from '../modules/books/routes'
 import { libraryRoutes } from '../modules/library/routes'
 import { bookmarkRoutes } from '../modules/bookmarks/routes'
 import { feedRoutes } from '../modules/feed/routes'
+import { socialRoutes } from '../modules/social/routes'
+import { replyRoutes } from '../modules/replies/routes'
 import { CreateBookmarkRequest } from '../modules/bookmarks/schemas'
 import { ErrorSchema } from '../shared/schemas'
 
@@ -16,7 +18,7 @@ const operations = Object.values(document.paths).flatMap((path) => Object.values
 
 describe('OpenAPI契約と稼働APIの区別', () => {
   it('主要34操作・healthが一意のoperationIdを持ち、全未実装操作を明示する', () => {
-    expect(plannedRoutes).toHaveLength(12)
+    expect(plannedRoutes).toHaveLength(2)
     expect(operations).toHaveLength(36)
     expect(new Set(operations.map((operation) => operation.operationId)).size).toBe(36)
     for (const route of plannedRoutes) {
@@ -29,7 +31,7 @@ describe('OpenAPI契約と稼働APIの区別', () => {
     }
     expect(document.paths['/api/v1/health']?.get?.['x-implementation-status']).toBe('implemented')
     expect(document.paths['/api/v1/health/db']?.get?.['x-implementation-status']).toBe('implemented')
-    for (const route of [...Object.values(profileRoutes), ...Object.values(bookRoutes), ...Object.values(libraryRoutes), ...Object.values(bookmarkRoutes), ...Object.values(feedRoutes)]) {
+    for (const route of [...Object.values(profileRoutes), ...Object.values(bookRoutes), ...Object.values(libraryRoutes), ...Object.values(bookmarkRoutes), ...Object.values(feedRoutes), ...Object.values(socialRoutes), ...Object.values(replyRoutes)]) {
       const operation = document.paths[route.path]?.[route.method]
       expect(operation?.['x-implementation-status']).toBe('implemented')
       expect(operation?.description ?? '').not.toContain('未実装・契約のみ')
@@ -41,14 +43,18 @@ describe('OpenAPI契約と稼働APIの区別', () => {
     const draft = await readFile(new URL('../../../../contracts/openapi-draft.yaml', import.meta.url), 'utf8')
     const ids = [...draft.matchAll(/operationId: (\S+)/g)].map((match) => match[1])
     expect(ids).toHaveLength(34)
-    expect([...plannedRoutes, ...Object.values(profileRoutes), ...Object.values(bookRoutes), ...Object.values(libraryRoutes), ...Object.values(bookmarkRoutes), ...Object.values(feedRoutes)].map((route) => route.operationId).sort()).toEqual(ids.sort())
+    expect([...plannedRoutes, ...Object.values(profileRoutes), ...Object.values(bookRoutes), ...Object.values(libraryRoutes), ...Object.values(bookmarkRoutes), ...Object.values(feedRoutes), ...Object.values(socialRoutes), ...Object.values(replyRoutes)].map((route) => route.operationId).sort()).toEqual(ids.sort())
   })
 
-  it('全体フィードの実装範囲とfollowingの一時応答を契約に明記する', () => {
+  it('followingと自分の返信DELETEの実際の認可を契約に明記する', () => {
     const feed = document.paths['/api/v1/feed']?.get
-    expect(feed?.description).toContain('scope=allのみ実装済み')
-    expect(feed?.description).toContain('scope=followingはIssue #14まで未実装')
-    expect(feed?.responses[404]?.description).toContain('フォロー対象の不存在ではない')
+    expect(feed?.description).toContain('followingは正式ユーザー本人のフォロー先のみ')
+    expect(feed?.description).not.toContain('未実装')
+    expect(feed?.responses[404]?.description).toContain('本人プロフィール未初期化')
+    const deletion = document.paths['/api/v1/replies/{replyId}']?.delete
+    expect(deletion?.description).toContain('元栞の非公開化・論理削除後も可')
+    expect(deletion?.responses[204]).not.toHaveProperty('content')
+    expect(deletion?.responses[403]).toBeUndefined()
     expect(feed?.responses[503]).toBeDefined()
     expect(feed?.responses[429]).toBeUndefined()
     expect(feed?.parameters?.find((param) => 'name' in param && param.name === 'scope')).toMatchObject({ schema: { enum: ['all', 'following'], default: 'all' } })
