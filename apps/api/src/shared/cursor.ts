@@ -30,3 +30,6 @@ export const preciseTimestamp = (column: AnyColumn) => sql<string>`to_char(${col
 export function olderThan(createdAt: AnyColumn, id: AnyColumn, boundary?: Boundary) {
   return boundary ? sql`(${createdAt}, ${id}) < (${boundary.createdAt}::timestamptz, ${boundary.id}::uuid)` : undefined
 }
+export function newerThan(createdAt: AnyColumn, id: AnyColumn, boundary?: Boundary) {
+  return boundary ? sql`(${createdAt}, ${id}) > (${boundary.createdAt}::timestamptz, ${boundary.id}::uuid)` : undefined
+}

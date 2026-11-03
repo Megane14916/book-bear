@@ -10,6 +10,11 @@ export function registerBookmarkRoutes(app: OpenAPIHono<AppEnv>, database: typeo
   // Detail GET is public/optional; mutations on the same path require a JWT.
   app.use('/api/v1/bookmarks/:bookmarkId', (c, next) => (c.req.method === 'GET' ? auth.optional : auth.required)(c, next))
   app.use('/api/v1/me/bookmarks', auth.required)
+  app.use('/api/v1/users/:userId/books/:bookId/bookmarks', auth.optional)
+  app.openapi(bookmarkRoutes.flow, async (c) => {
+    const { userId, bookId } = c.req.valid('param')
+    return c.json(await database(c.env ?? {}, (db) => bookmarks.getBookmarkFlow(db, userId, bookId, c.req.valid('query'), c.get('identity'))), 200)
+  })
   app.openapi(bookmarkRoutes.create, async (c) => c.json(await database(c.env ?? {}, (db) => bookmarks.createBookmark(db, identity(c), c.req.valid('json'))), 201))
   app.openapi(bookmarkRoutes.get, async (c) => c.json(await database(c.env ?? {}, (db) => bookmarks.getBookmark(db, c.req.valid('param').bookmarkId, c.get('identity'))), 200))
   app.openapi(bookmarkRoutes.list, async (c) => c.json(await database(c.env ?? {}, (db) => bookmarks.listBookmarks(db, identity(c), c.req.valid('query'))), 200))
