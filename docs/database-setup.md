@@ -39,7 +39,7 @@ pnpmストアは `pnpm-workspace.yaml` の `storeDir` で `.pnpm-store` に統�
 
 1. Supabaseにログインし、開発用の新規プロジェクトを作成する。プロジェクト名の例は `book-bear-dev`。DBパスワードはパスワード管理ツールに保存する。
 2. プロジェクトの **Connect** からPostgreSQLの接続情報を取得する。マイグレーションは管理用の `postgres` 接続を使い、Workers用接続とは分離する。
-3. `apps/api/.env.db.local` の `MIGRATION_DATABASE_URL` を管理用接続文字列に置き換える。パスワードの特殊文字はURLエンコードする。TLSの証明書検証を有効にし、必要ならSupabaseが提供するCA証明書を取得して `sslrootcert` を指定する。
+3. `apps/api/.env.db.local` の `MIGRATION_DATABASE_URL` を管理用接続文字列に置き換える。パスワードの特殊文字はURLエンコードする。TLS検証は `sslmode=verify-full&sslrootcert=certs/prod-ca-2021.crt` を指定する。共有の [公開CA証明書](../apps/api/certs/prod-ca-2021.crt) が接続対象のCAであることを確認し、異なる環境ではその環境のCAを使用する。
 4. ローカル回線からDirect connectionへIPv6接続できない場合、管理用CLIにはConnect画面の **Session pooler（5432）** を使用できる。Transaction pooler（6543）はマイグレーションに使用しない。
 5. 生成SQL `apps/api/drizzle/0000_initial_schema.sql` と `scripts/sql/` を確認してから、開発用接続先で次を実行する。
 
@@ -106,15 +106,15 @@ DBパスワードはHyperdriveの接続設定で保持する。Workersはbinding
 
 ## 4. 実サービスとの接続確認
 
-まずローカルWorkersからSupabaseを確認する場合、管理用ではなく `book_bear_api` の接続文字列を `apps/api/.env.local` に設定して `pnpm dev:api` を起動する。Wranglerがファイルを読み込むため、Cloudflareへのログインは不要。API実行時のSUPABASE_URL・CORS_ORIGIN・GOOGLE_BOOKS_API_KEYは引き続き `.dev.vars` に置く。
+まずローカルWorkersからSupabaseを確認する場合、`apps/api/.env.local.example` を `.env.local` にコピーし、管理用ではなく `book_bear_api` の接続文字列を設定して `pnpm dev:api` を起動する。既存ファイルは上書きせず編集する。Wranglerがファイルを読み込むため、Cloudflareへのログインは不要。API実行時のSUPABASE_URL・CORS_ORIGIN・GOOGLE_BOOKS_API_KEYは引き続き `.dev.vars` に置く。
 
 ```dotenv
-CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE="postgresql://book_bear_api.PROJECT_REF:ENCODED_PASSWORD@POOLER_HOST:5432/postgres?sslmode=verify-full&sslrootcert=C%3A%2Fcerts%2Fsupabase-ca.crt"
+CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE="postgresql://book_bear_api.PROJECT_REF:ENCODED_PASSWORD@POOLER_HOST:5432/postgres?sslmode=verify-full&sslrootcert=certs/prod-ca-2021.crt"
 ```
 
-上記はSession poolerの例。ユーザー名は `book_bear_api.PROJECT_REF`、ホストはSupabaseのConnect画面からコピーし、パスワードは専用ロールの値をURLエンコードする。Direct connectionの場合はユーザー名 `book_bear_api`、ホスト `db.PROJECT_REF.supabase.co` を使う。CA証明書はSupabase Database Settingsから取得し、sslrootcertを各PCの実在するファイルへ合わせる。URLのパラメーター値もURLエンコードする。`.env.local` はGit対象外で、シェルに同名変数がある場合はそちらが優先される。
+上記はSession poolerの例。ユーザー名は `book_bear_api.PROJECT_REF`、ホストはSupabaseのConnect画面からコピーし、パスワードは専用ロールの値をURLエンコードする。Direct connectionの場合はユーザー名 `book_bear_api`、ホスト `db.PROJECT_REF.supabase.co` を使う。[共有CAの管理](../apps/api/certs/README.md) に従い、証明書は `apps/api/certs/prod-ca-2021.crt` を使う。コマンドは内部で `apps/api` を作業ディレクトリにするため、この相対パスは各PCで共通にできる。`.env.local` はGit対象外で、シェルに同名変数がある場合はそちらが優先される。
 
-`SELF_SIGNED_CERT_IN_CHAIN` はCA不足の可能性がある。証明書検証を無効にせず、対応するCAと `sslrootcert` の指定を確認する。環境変数ファイル変更後は開発サーバーを再起動する。証明書パスを含む接続文字列は、相手のPCへそのままコピーしても証明書がなければ接続できない。
+`SELF_SIGNED_CERT_IN_CHAIN` はCA不足の可能性がある。証明書検証を無効にせず、対応するCAと `sslrootcert` の指定を確認する。環境変数ファイル変更後は開発サーバーを再起動する。再起動後は `GET http://127.0.0.1:8787/api/v1/health/db` の200と `{"status":"ok"}` を確認する。書籍検索は `GET /api/v1/books/search?q=吾輩は猫である` の200とitemsを確認し、0件も正常結果とする。
 
 `GET /api/v1/health/db` が200ならDB接続とprofilesの読み取り権限を確認できる。ただし `wrangler dev` はDirect connectionを使い、実際のHyperdriveプール／キャッシュは通らない。
 
