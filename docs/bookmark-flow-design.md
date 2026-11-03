@@ -32,8 +32,8 @@ JWTは任意。提示された場合は既存の `authentication.optional` で�
 2. 対象プロフィールと書籍の公開ヘッダーを取得する。存在しなければ404。本人判定とヘッダー取得に、プロフィール件数集計等の不要な処理は持ち込まない。
 3. `user_books(user_id, book_id)` の既存UNIQUEを使い、対象のuserBookIdを特定する。なければ空結果を返す。ブラウザへ本棚のレコードは返さない。
 4. 栞のSQLに対象userBookIdと `deleted_at IS NULL` を必ず含め、本人以外は `visibility='public'` を加える。これらの条件を適用してから、昇順の境界・並び順・limit+1件で絞る。非公開・削除済みの行を取得後に除外する方式は採らない。
-5. 返却する最大limit件について、Issue #11の `withCounts` を同じbookmarksモジュール内で再利用し、いいね・未削除返信を対象ID集合でそれぞれ一括集計する。likedByMeは検証済み閲覧者のUIDを使い、未認証ならfalse。空結果では集計を実行しない。
-6. ヘッダー・軽量なitems・nextCursorを既存の `BookmarkFlowPage` で返す。集計処理の内部でカード形状を利用しても、itemsへauthor・bookや私有項目を混入させない。
+5. 返却する最大limit件について、Issue #11の `withCounts` を同じbookmarksモジュール内で再利用し、いいね・未削除返信を対象ID集合でそれぞれ一括集計する。関数は `T extends { id: string }` の栞データを受け取り、入力型を保ったまま集計フィールドを追加する。既存のカードと今回の軽量な `BookmarkFlowItem` に共用し、集計のためにauthor・bookを取得しない。likedByMeは検証済み閲覧者のUIDを使い、未認証ならfalse。空結果では集計を実行しない。
+6. ヘッダー・軽量なitems・nextCursorを既存の `BookmarkFlowPage` で返す。itemsのSQL射影には栞の公開項目だけを指定し、author・bookや私有項目を混入させない。
 
 処理は読み取りのみで、行ロック・明示トランザクション・外部書籍API呼び出しは追加しない。既存withDatabaseの短いDB処理範囲で完結させ、投稿数に比例するDB往復を作らない。いいねと返信の直接多重JOINによる件数の水増しも避ける。
 
