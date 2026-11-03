@@ -106,7 +106,15 @@ DBパスワードはHyperdriveの接続設定で保持する。Workersはbinding
 
 ## 4. 実サービスとの接続確認
 
-まずローカルWorkersからSupabaseを確認する場合、管理用ではなく `book_bear_api` の接続文字列を、シェルの環境変数 `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE` に設定して `pnpm dev:api` を起動する。TLSを有効にした接続を使う。秘密値はコミットしない。
+まずローカルWorkersからSupabaseを確認する場合、管理用ではなく `book_bear_api` の接続文字列を `apps/api/.env.local` に設定して `pnpm dev:api` を起動する。Wranglerがファイルを読み込むため、Cloudflareへのログインは不要。API実行時のSUPABASE_URL・CORS_ORIGIN・GOOGLE_BOOKS_API_KEYは引き続き `.dev.vars` に置く。
+
+```dotenv
+CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE="postgresql://book_bear_api.PROJECT_REF:ENCODED_PASSWORD@POOLER_HOST:5432/postgres?sslmode=verify-full&sslrootcert=C%3A%2Fcerts%2Fsupabase-ca.crt"
+```
+
+上記はSession poolerの例。ユーザー名は `book_bear_api.PROJECT_REF`、ホストはSupabaseのConnect画面からコピーし、パスワードは専用ロールの値をURLエンコードする。Direct connectionの場合はユーザー名 `book_bear_api`、ホスト `db.PROJECT_REF.supabase.co` を使う。CA証明書はSupabase Database Settingsから取得し、sslrootcertを各PCの実在するファイルへ合わせる。URLのパラメーター値もURLエンコードする。`.env.local` はGit対象外で、シェルに同名変数がある場合はそちらが優先される。
+
+`SELF_SIGNED_CERT_IN_CHAIN` はCA不足の可能性がある。証明書検証を無効にせず、対応するCAと `sslrootcert` の指定を確認する。環境変数ファイル変更後は開発サーバーを再起動する。証明書パスを含む接続文字列は、相手のPCへそのままコピーしても証明書がなければ接続できない。
 
 `GET /api/v1/health/db` が200ならDB接続とprofilesの読み取り権限を確認できる。ただし `wrangler dev` はDirect connectionを使い、実際のHyperdriveプール／キャッシュは通らない。
 

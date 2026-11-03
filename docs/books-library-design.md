@@ -93,6 +93,8 @@ JWT検証は既存の `authentication` を再利用する。Publicの3操作は�
 
 Google Booksの公開書誌取得にはアプリ用APIキーを使う。`GOOGLE_BOOKS_API_KEY` をWorker Secretとして扱い、ユーザーのGoogle OAuth権限を追加しない。APIキー未設定は外部API障害と同じ扱いで、検索はDB候補があれば200、なければ502、Googleからのimportは502とする。ローカル例と設定手順を追加し、リモート設定CLIがSecretをvarsへコピーしないことを維持する。[Google公式の認証・API説明](https://developers.google.com/books/docs/v1/using)
 
+外部HTTP取得はWorkers対応の `redirect: manual` を使い、3xxは非成功応答として502へ変換する。自動追従は行わない。Workers未対応の `redirect: error` は使わず、実WorkersとローカルHTTPサーバーで正常取得・リダイレクト拒否を回帰検証する。
+
 openBDはISBN取得に使い、未収録・項目欠損・書影なしを許容する。公式には代替書誌への切替と書影収録範囲の縮小が案内されている。外部データは書籍紹介目的で利用し、書影は提供URLを参照する。[openBD仕様・利用条件](https://openbd.jp/)、[代替書誌のお知らせ](https://openbd.jp/news/20230829.html)
 
 ## 5. 契約とテスト
