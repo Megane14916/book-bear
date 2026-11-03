@@ -565,27 +565,6 @@
           "avatarUrl"
         ]
       },
-      "UserPage": {
-        "type": "object",
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/UserSummary"
-            }
-          },
-          "nextCursor": {
-            "type": "string",
-            "nullable": true,
-            "minLength": 1,
-            "description": "不透明なカーソル。内容を解析せず次回の同じ条件のリクエストに渡す。不正・期限切れは400 INVALID_CURSOR。"
-          }
-        },
-        "required": [
-          "items",
-          "nextCursor"
-        ]
-      },
       "BookmarkFlowItem": {
         "type": "object",
         "properties": {
@@ -680,7 +659,8 @@
             "type": "integer",
             "nullable": true,
             "minimum": 0,
-            "exclusiveMinimum": true
+            "exclusiveMinimum": true,
+            "maximum": 2147483647
           },
           "content": {
             "type": "string",
@@ -706,6 +686,27 @@
         ],
         "additionalProperties": false
       },
+      "FeedPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BookmarkCard"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true,
+            "minLength": 1,
+            "description": "不透明なカーソル。内容を解析せず次回の同じ条件のリクエストに渡す。不正・期限切れは400 INVALID_CURSOR。"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
       "PatchBookmarkRequest": {
         "type": "object",
         "properties": {
@@ -713,7 +714,8 @@
             "type": "integer",
             "nullable": true,
             "minimum": 0,
-            "exclusiveMinimum": true
+            "exclusiveMinimum": true,
+            "maximum": 2147483647
           },
           "content": {
             "type": "string",
@@ -734,13 +736,13 @@
         "additionalProperties": false,
         "minProperties": 1
       },
-      "FeedPage": {
+      "UserPage": {
         "type": "object",
         "properties": {
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/BookmarkCard"
+              "$ref": "#/components/schemas/UserSummary"
             }
           },
           "nextCursor": {
@@ -2273,6 +2275,487 @@
         }
       }
     },
+    "/api/v1/bookmarks": {
+      "post": {
+        "tags": [
+          "Bookmarks"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-implementation-status": "implemented",
+        "x-auth": "AnyAuth",
+        "operationId": "postBookmarks",
+        "summary": "栞作成",
+        "description": "JWT本人の本棚のみ。公開は正式ユーザーのみ。省略時private・isSpoiler=false。所有者確認・INSERT・応答取得は同一トランザクション。本棚の明示ロックは追加しない。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBookmarkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookmarkCard"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHORIZED: JWTなし・無効・期限切れ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "REGISTRATION_REQUIRED: 匿名ユーザーは公開状態の作成・編集不可",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND: 対象なし。他人の栞・本棚、第三者の非公開栞、削除済み栞も404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_ERROR: 内部情報を含めないエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "INTERNAL_ERROR: 認証設定不備・JWKS取得失敗",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bookmarks/{bookmarkId}": {
+      "get": {
+        "tags": [
+          "Bookmarks"
+        ],
+        "security": [
+          {},
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-implementation-status": "implemented",
+        "x-auth": "OptionalAuth",
+        "operationId": "getBookmarksBookmarkid",
+        "summary": "公開または本人の栞詳細",
+        "description": "JWT任意。提示時は必ず検証。不正JWTは401。非公開は本人のみ、削除済みは本人にも404。",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "bookmarkId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookmarkCard"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHORIZED: JWTなし・無効・期限切れ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND: 対象なし。他人の栞・本棚、第三者の非公開栞、削除済み栞も404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_ERROR: 内部情報を含めないエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "INTERNAL_ERROR: 認証設定不備・JWKS取得失敗",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Bookmarks"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-implementation-status": "implemented",
+        "x-auth": "Owner",
+        "operationId": "patchBookmarksBookmarkid",
+        "summary": "自分の栞を編集",
+        "description": "本人・未削除を行ロックして確認。更新後がpublicなら匿名は403（visibility省略も同様）。所属先・createdAtは変更不可。pageNumberはDB正整数またはnull。",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "bookmarkId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchBookmarkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookmarkCard"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHORIZED: JWTなし・無効・期限切れ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "REGISTRATION_REQUIRED: 匿名ユーザーは公開状態の作成・編集不可",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND: 対象なし。他人の栞・本棚、第三者の非公開栞、削除済み栞も404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_ERROR: 内部情報を含めないエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "INTERNAL_ERROR: 認証設定不備・JWKS取得失敗",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Bookmarks"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-implementation-status": "implemented",
+        "x-auth": "Owner",
+        "operationId": "deleteBookmarksBookmarkid",
+        "summary": "自分の栞を論理削除",
+        "description": "本人のみ。deletedAt・updatedAtをDB時刻で更新。削除済みへの再DELETEは404。関連行と本棚を保持する。",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "bookmarkId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "成功（本文なし）"
+          },
+          "400": {
+            "description": "VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHORIZED: JWTなし・無効・期限切れ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND: 対象なし。他人の栞・本棚、第三者の非公開栞、削除済み栞も404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_ERROR: 内部情報を含めないエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "INTERNAL_ERROR: 認証設定不備・JWKS取得失敗",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/bookmarks": {
+      "get": {
+        "tags": [
+          "Bookmarks"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-implementation-status": "implemented",
+        "x-auth": "Owner",
+        "operationId": "getMeBookmarks",
+        "summary": "自分の公開・非公開栞",
+        "description": "JWT本人の未削除栞のみ。created_at DESC, id DESC（ページ番号順ではない）。limit既定15・最大30、limit+1件で続きを判定。日時はDBの小数6桁を保持。",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "日時・IDのBase64URLカーソル。署名・有効期限なし。不正形式は400 INVALID_CURSOR。SQLで本人・未削除条件を毎回確認。"
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 30,
+              "default": 15
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHORIZED: JWTなし・無効・期限切れ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND: 対象なし。他人の栞・本棚、第三者の非公開栞、削除済み栞も404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_ERROR: 内部情報を含めないエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "INTERNAL_ERROR: 認証設定不備・JWKS取得失敗",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/users/{userId}/followers": {
       "get": {
         "operationId": "getUsersUseridFollowers",
@@ -2436,497 +2919,6 @@
           },
           "404": {
             "description": "NOT_FOUND: 対象なし。第三者の非公開栞・削除済み栞も存在を明かさず404",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "RATE_LIMITED: 操作回数制限",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "INTERNAL_ERROR: 内部情報を含めないサーバーエラー",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/bookmarks": {
-      "post": {
-        "operationId": "postBookmarks",
-        "tags": [
-          "Bookmarks"
-        ],
-        "summary": "栞作成",
-        "description": "【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。Supabase Bearer JWT必須。匿名・正式ユーザーともに利用可能。 visibility=publicの作成・公開化は正式ユーザーのみ（匿名は403 REGISTRATION_REQUIRED）。userBookIdの所有権をJWTのsubで確認。",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "x-implementation-status": "planned",
-        "x-auth": "AnyAuth",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateBookmarkRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BookmarkCard"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "UNAUTHORIZED: 必須JWTがない、または送信されたJWTが無効・期限切れ",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "REGISTRATION_REQUIRED: 正式登録が必要 / FORBIDDEN: 操作権限なし",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "NOT_FOUND: 対象なし。第三者の非公開栞・削除済み栞も存在を明かさず404",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "RATE_LIMITED: 操作回数制限",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "INTERNAL_ERROR: 内部情報を含めないサーバーエラー",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/bookmarks/{bookmarkId}": {
-      "get": {
-        "operationId": "getBookmarksBookmarkid",
-        "tags": [
-          "Bookmarks"
-        ],
-        "summary": "公開または本人の栞詳細",
-        "description": "【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。JWTは任意。送信されたJWTは検証し、無効なら401。 非公開は本人のみ取得可能。他人の非公開栞・削除済みは404。",
-        "security": [
-          {},
-          {
-            "bearerAuth": []
-          }
-        ],
-        "x-implementation-status": "planned",
-        "x-auth": "OptionalAuth",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "bookmarkId",
-            "in": "path"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BookmarkCard"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "UNAUTHORIZED: 必須JWTがない、または送信されたJWTが無効・期限切れ",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "NOT_FOUND: 対象なし。第三者の非公開栞・削除済み栞も存在を明かさず404",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "RATE_LIMITED: 操作回数制限",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "INTERNAL_ERROR: 内部情報を含めないサーバーエラー",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      },
-      "patch": {
-        "operationId": "patchBookmarksBookmarkid",
-        "tags": [
-          "Bookmarks"
-        ],
-        "summary": "自分の栞を編集",
-        "description": "【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。Supabase Bearer JWT必須。匿名・正式ともに本人のみ。所有者は検証済みJWTのsubから判定。 visibility=publicの作成・公開化は正式ユーザーのみ（匿名は403 REGISTRATION_REQUIRED）。userBookIdの所有権をJWTのsubで確認。 createdAt・所属する本棚は変更できない。",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "x-implementation-status": "planned",
-        "x-auth": "Owner",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "bookmarkId",
-            "in": "path"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PatchBookmarkRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BookmarkCard"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "UNAUTHORIZED: 必須JWTがない、または送信されたJWTが無効・期限切れ",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "REGISTRATION_REQUIRED: 正式登録が必要 / FORBIDDEN: 操作権限なし",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "NOT_FOUND: 対象なし。第三者の非公開栞・削除済み栞も存在を明かさず404",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "RATE_LIMITED: 操作回数制限",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "INTERNAL_ERROR: 内部情報を含めないサーバーエラー",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "operationId": "deleteBookmarksBookmarkid",
-        "tags": [
-          "Bookmarks"
-        ],
-        "summary": "自分の栞を論理削除",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "description": "【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。Supabase Bearer JWT必須。匿名・正式ともに本人のみ。所有者は検証済みJWTのsubから判定。 ",
-        "x-implementation-status": "planned",
-        "x-auth": "Owner",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "bookmarkId",
-            "in": "path"
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "成功（本文なし）。PUT/DELETEのフォロー・いいねは冪等。"
-          },
-          "400": {
-            "description": "VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "UNAUTHORIZED: 必須JWTがない、または送信されたJWTが無効・期限切れ",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "REGISTRATION_REQUIRED: 正式登録が必要 / FORBIDDEN: 操作権限なし",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "NOT_FOUND: 対象なし。第三者の非公開栞・削除済み栞も存在を明かさず404",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "RATE_LIMITED: 操作回数制限",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "INTERNAL_ERROR: 内部情報を含めないサーバーエラー",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/me/bookmarks": {
-      "get": {
-        "operationId": "getMeBookmarks",
-        "tags": [
-          "Bookmarks"
-        ],
-        "summary": "自分の公開・非公開栞",
-        "description": "【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。Supabase Bearer JWT必須。匿名・正式ともに本人のみ。所有者は検証済みJWTのsubから判定。 limitは既定15・最大30。SQLはlimit+1件取得し、続きがなければnextCursor=null。カーソルの署名または対象・条件の厳格照合が必要。 created_at DESC, id DESC。",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "x-implementation-status": "planned",
-        "x-auth": "Owner",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "description": "不透明なカーソル。内容を解析せず次回の同じ条件のリクエストに渡す。不正・期限切れは400 INVALID_CURSOR。"
-            },
-            "required": false,
-            "name": "cursor",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 30,
-              "default": 15
-            },
-            "required": false,
-            "name": "limit",
-            "in": "query"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FeedPage"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "UNAUTHORIZED: 必須JWTがない、または送信されたJWTが無効・期限切れ",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "REGISTRATION_REQUIRED: 正式登録が必要 / FORBIDDEN: 操作権限なし",
             "content": {
               "application/json": {
                 "schema": {

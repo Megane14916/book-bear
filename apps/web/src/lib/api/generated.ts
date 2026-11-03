@@ -248,6 +248,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/bookmarks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 栞作成
+         * @description JWT本人の本棚のみ。公開は正式ユーザーのみ。省略時private・isSpoiler=false。所有者確認・INSERT・応答取得は同一トランザクション。本棚の明示ロックは追加しない。
+         */
+        post: operations["postBookmarks"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/bookmarks/{bookmarkId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 公開または本人の栞詳細
+         * @description JWT任意。提示時は必ず検証。不正JWTは401。非公開は本人のみ、削除済みは本人にも404。
+         */
+        get: operations["getBookmarksBookmarkid"];
+        put?: never;
+        post?: never;
+        /**
+         * 自分の栞を論理削除
+         * @description 本人のみ。deletedAt・updatedAtをDB時刻で更新。削除済みへの再DELETEは404。関連行と本棚を保持する。
+         */
+        delete: operations["deleteBookmarksBookmarkid"];
+        options?: never;
+        head?: never;
+        /**
+         * 自分の栞を編集
+         * @description 本人・未削除を行ロックして確認。更新後がpublicなら匿名は403（visibility省略も同様）。所属先・createdAtは変更不可。pageNumberはDB正整数またはnull。
+         */
+        patch: operations["patchBookmarksBookmarkid"];
+        trace?: never;
+    };
+    "/api/v1/me/bookmarks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 自分の公開・非公開栞
+         * @description JWT本人の未削除栞のみ。created_at DESC, id DESC（ページ番号順ではない）。limit既定15・最大30、limit+1件で続きを判定。日時はDBの小数6桁を保持。
+         */
+        get: operations["getMeBookmarks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/users/{userId}/followers": {
         parameters: {
             query?: never;
@@ -280,74 +348,6 @@ export interface paths {
          * @description 【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。認証なしで利用可能。 limitは既定15・最大30。SQLはlimit+1件取得し、続きがなければnextCursor=null。カーソルの署名または対象・条件の厳格照合が必要。
          */
         get: operations["getUsersUseridFollowing"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/bookmarks": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * 栞作成
-         * @description 【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。Supabase Bearer JWT必須。匿名・正式ユーザーともに利用可能。 visibility=publicの作成・公開化は正式ユーザーのみ（匿名は403 REGISTRATION_REQUIRED）。userBookIdの所有権をJWTのsubで確認。
-         */
-        post: operations["postBookmarks"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/bookmarks/{bookmarkId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * 公開または本人の栞詳細
-         * @description 【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。JWTは任意。送信されたJWTは検証し、無効なら401。 非公開は本人のみ取得可能。他人の非公開栞・削除済みは404。
-         */
-        get: operations["getBookmarksBookmarkid"];
-        put?: never;
-        post?: never;
-        /**
-         * 自分の栞を論理削除
-         * @description 【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。Supabase Bearer JWT必須。匿名・正式ともに本人のみ。所有者は検証済みJWTのsubから判定。
-         */
-        delete: operations["deleteBookmarksBookmarkid"];
-        options?: never;
-        head?: never;
-        /**
-         * 自分の栞を編集
-         * @description 【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。Supabase Bearer JWT必須。匿名・正式ともに本人のみ。所有者は検証済みJWTのsubから判定。 visibility=publicの作成・公開化は正式ユーザーのみ（匿名は403 REGISTRATION_REQUIRED）。userBookIdの所有権をJWTのsubで確認。 createdAt・所属する本棚は変更できない。
-         */
-        patch: operations["patchBookmarksBookmarkid"];
-        trace?: never;
-    };
-    "/api/v1/me/bookmarks": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * 自分の公開・非公開栞
-         * @description 【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。Supabase Bearer JWT必須。匿名・正式ともに本人のみ。所有者は検証済みJWTのsubから判定。 limitは既定15・最大30。SQLはlimit+1件取得し、続きがなければnextCursor=null。カーソルの署名または対象・条件の厳格照合が必要。 created_at DESC, id DESC。
-         */
-        get: operations["getMeBookmarks"];
         put?: never;
         post?: never;
         delete?: never;
@@ -671,11 +671,6 @@ export interface components {
             /** Format: uri */
             avatarUrl: string | null;
         };
-        UserPage: {
-            items: components["schemas"]["UserSummary"][];
-            /** @description 不透明なカーソル。内容を解析せず次回の同じ条件のリクエストに渡す。不正・期限切れは400 INVALID_CURSOR。 */
-            nextCursor: string | null;
-        };
         BookmarkFlowItem: {
             /** Format: uuid */
             id: string;
@@ -709,6 +704,11 @@ export interface components {
             /** @default false */
             isSpoiler?: boolean;
         };
+        FeedPage: {
+            items: components["schemas"]["BookmarkCard"][];
+            /** @description 不透明なカーソル。内容を解析せず次回の同じ条件のリクエストに渡す。不正・期限切れは400 INVALID_CURSOR。 */
+            nextCursor: string | null;
+        };
         PatchBookmarkRequest: {
             pageNumber?: number | null;
             content?: string;
@@ -716,8 +716,8 @@ export interface components {
             visibility?: "public" | "private";
             isSpoiler?: boolean;
         };
-        FeedPage: {
-            items: components["schemas"]["BookmarkCard"][];
+        UserPage: {
+            items: components["schemas"]["UserSummary"][];
             /** @description 不透明なカーソル。内容を解析せず次回の同じ条件のリクエストに渡す。不正・期限切れは400 INVALID_CURSOR。 */
             nextCursor: string | null;
         };
@@ -1824,6 +1824,364 @@ export interface operations {
             };
         };
     };
+    postBookmarks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateBookmarkRequest"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookmarkCard"];
+                };
+            };
+            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description UNAUTHORIZED: JWTなし・無効・期限切れ */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description REGISTRATION_REQUIRED: 匿名ユーザーは公開状態の作成・編集不可 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description NOT_FOUND: 対象なし。他人の栞・本棚、第三者の非公開栞、削除済み栞も404 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description INTERNAL_ERROR: 内部情報を含めないエラー */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description INTERNAL_ERROR: 認証設定不備・JWKS取得失敗 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getBookmarksBookmarkid: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookmarkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookmarkCard"];
+                };
+            };
+            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description UNAUTHORIZED: JWTなし・無効・期限切れ */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description NOT_FOUND: 対象なし。他人の栞・本棚、第三者の非公開栞、削除済み栞も404 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description INTERNAL_ERROR: 内部情報を含めないエラー */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description INTERNAL_ERROR: 認証設定不備・JWKS取得失敗 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deleteBookmarksBookmarkid: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookmarkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功（本文なし） */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description UNAUTHORIZED: JWTなし・無効・期限切れ */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description NOT_FOUND: 対象なし。他人の栞・本棚、第三者の非公開栞、削除済み栞も404 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description INTERNAL_ERROR: 内部情報を含めないエラー */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description INTERNAL_ERROR: 認証設定不備・JWKS取得失敗 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    patchBookmarksBookmarkid: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookmarkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatchBookmarkRequest"];
+            };
+        };
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookmarkCard"];
+                };
+            };
+            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description UNAUTHORIZED: JWTなし・無効・期限切れ */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description REGISTRATION_REQUIRED: 匿名ユーザーは公開状態の作成・編集不可 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description NOT_FOUND: 対象なし。他人の栞・本棚、第三者の非公開栞、削除済み栞も404 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description INTERNAL_ERROR: 内部情報を含めないエラー */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description INTERNAL_ERROR: 認証設定不備・JWKS取得失敗 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getMeBookmarks: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedPage"];
+                };
+            };
+            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description UNAUTHORIZED: JWTなし・無効・期限切れ */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description NOT_FOUND: 対象なし。他人の栞・本棚、第三者の非公開栞、削除済み栞も404 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description INTERNAL_ERROR: 内部情報を含めないエラー */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description INTERNAL_ERROR: 認証設定不備・JWKS取得失敗 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     getUsersUseridFollowers: {
         parameters: {
             query?: {
@@ -1919,373 +2277,6 @@ export interface operations {
             };
             /** @description NOT_FOUND: 対象なし。第三者の非公開栞・削除済み栞も存在を明かさず404 */
             404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description RATE_LIMITED: 操作回数制限 */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description INTERNAL_ERROR: 内部情報を含めないサーバーエラー */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    postBookmarks: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateBookmarkRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BookmarkCard"];
-                };
-            };
-            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description UNAUTHORIZED: 必須JWTがない、または送信されたJWTが無効・期限切れ */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description REGISTRATION_REQUIRED: 正式登録が必要 / FORBIDDEN: 操作権限なし */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description NOT_FOUND: 対象なし。第三者の非公開栞・削除済み栞も存在を明かさず404 */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description RATE_LIMITED: 操作回数制限 */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description INTERNAL_ERROR: 内部情報を含めないサーバーエラー */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    getBookmarksBookmarkid: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                bookmarkId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BookmarkCard"];
-                };
-            };
-            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description UNAUTHORIZED: 必須JWTがない、または送信されたJWTが無効・期限切れ */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description NOT_FOUND: 対象なし。第三者の非公開栞・削除済み栞も存在を明かさず404 */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description RATE_LIMITED: 操作回数制限 */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description INTERNAL_ERROR: 内部情報を含めないサーバーエラー */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    deleteBookmarksBookmarkid: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                bookmarkId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功（本文なし）。PUT/DELETEのフォロー・いいねは冪等。 */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description UNAUTHORIZED: 必須JWTがない、または送信されたJWTが無効・期限切れ */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description REGISTRATION_REQUIRED: 正式登録が必要 / FORBIDDEN: 操作権限なし */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description NOT_FOUND: 対象なし。第三者の非公開栞・削除済み栞も存在を明かさず404 */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description RATE_LIMITED: 操作回数制限 */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description INTERNAL_ERROR: 内部情報を含めないサーバーエラー */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    patchBookmarksBookmarkid: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                bookmarkId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PatchBookmarkRequest"];
-            };
-        };
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BookmarkCard"];
-                };
-            };
-            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description UNAUTHORIZED: 必須JWTがない、または送信されたJWTが無効・期限切れ */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description REGISTRATION_REQUIRED: 正式登録が必要 / FORBIDDEN: 操作権限なし */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description NOT_FOUND: 対象なし。第三者の非公開栞・削除済み栞も存在を明かさず404 */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description RATE_LIMITED: 操作回数制限 */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description INTERNAL_ERROR: 内部情報を含めないサーバーエラー */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    getMeBookmarks: {
-        parameters: {
-            query?: {
-                cursor?: string;
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["FeedPage"];
-                };
-            };
-            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description UNAUTHORIZED: 必須JWTがない、または送信されたJWTが無効・期限切れ */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description REGISTRATION_REQUIRED: 正式登録が必要 / FORBIDDEN: 操作権限なし */
-            403: {
                 headers: {
                     [name: string]: unknown;
                 };
