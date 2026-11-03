@@ -8,7 +8,7 @@
 
 `apps/api/src/modules/*/schemas.ts` と `src/contracts/routes.ts` を正本として、主要34操作の `contracts/openapi.json` とWebの `src/lib/api/generated.ts` を生成する。`GET /openapi.json` も同一仕様を返す。手書きの初期ドラフトは履歴資料とし、以降の変更はZod定義・生成物・本書に反映する。
 
-- 操作単位の `x-implementation-status: implemented` は実装済み（health・DB接続確認と、Issue #9のプロフィール／設定6操作、Issue #10の書籍・本棚9操作、Issue #11の栞CRUD・本人一覧5操作）。
+- 操作単位の `x-implementation-status: implemented` は実装済み（health・DB接続確認と、Issue #9のプロフィール／設定6操作、Issue #10の書籍・本棚9操作、Issue #11の栞CRUD・本人一覧5操作、Issue #12の栞の流れ1操作）。
 - `x-implementation-status: planned` は契約のみ。OpenAPIレジストリに登録するが、HonoのHTTPハンドラーには登録しないため、実APIは現在404となる。記載した成功・認証エラーは今後の実装の契約であり、認証や認可が稼働している意味ではない。
 - `x-auth` は `Public / OptionalAuth / AnyAuth / Owner / Registered`。`OptionalAuth` はJWTなしでも閲覧可、送信時は必ず検証して無効なら401。`Registered` は匿名ユーザーに403。公開化・followingフィードなどの条件付き制限は各操作の説明と403レスポンスに記載する。
 - `followedByMe`・`likedByMe` を返す公開GETと、本人の非公開情報を返し得るGETは任意認証。初期ドラフトの公開プロフィール・返信一覧・投稿検索の認証記載を補完した。
@@ -30,7 +30,7 @@
 
 ### 認証・プロフィール（Issue #9）
 
-`GET/PUT/PATCH /me`、`GET/PATCH /me/preferences`、`GET /users/{userId}` の6操作を実装した。定義は `modules/users/routes.ts`、HTTP処理は `http.ts`、DB操作は `service.ts`。Issue #9完了時点では34操作のうち28操作がplannedだった。Issue #10完了後は19操作、Issue #11完了後は14操作がplanned。
+`GET/PUT/PATCH /me`、`GET/PATCH /me/preferences`、`GET /users/{userId}` の6操作を実装した。定義は `modules/users/routes.ts`、HTTP処理は `http.ts`、DB操作は `service.ts`。Issue #9完了時点では34操作のうち28操作がplannedだった。Issue #10完了後は19操作、Issue #11完了後は14操作、Issue #12完了後は13操作がplanned。
 
 - `middleware/auth.ts` で固定プロジェクトのJWKSからES256／RS256を検証する。issuerは `SUPABASE_URL + /auth/v1`、audienceは `authenticated`。exp／iat／sub／role／session_id／is_anonymousを必須とする。JWTなし・不正・期限切れは401、設定不備・JWKS取得障害は503。HS256は使わない。
 - 本人のID・匿名状態は検証済みclaimから取得し、本文やユーザーメタデータで上書きしない。公開プロフィールは任意認証で、提示したJWTが不正なら401。
@@ -67,6 +67,15 @@ Custom providerの識別子は `custom:google`、要求scopeは `openid email` �
 - 他人の栞の変更、第三者の非公開栞、削除済みは404。詳細GETのJWTは任意だが、提示時は必ず検証する。全5操作でno-store。
 - 本人一覧は公開・非公開を新しい順で取得。Issue #10と同じ署名・期限なしのBase64URLカーソルとDB日時精度を維持し、毎回SQLで認可する。いいね・未削除返信は返却ID集合で一括集計する。
 - 論理削除後もFK参照・関連行は残り、本棚削除の409 HAS_BOOKMARKSは維持する。新規インデックス・マイグレーション・レート制限は追加していない。
+
+### 栞の流れ（Issue #12）
+
+`GET /users/{userId}/books/{bookId}/bookmarks` を実装。詳細は [栞の流れ設計書](bookmark-flow-design.md) を参照。
+
+- JWTは任意で、提示時は必ず検証。本人には公開・非公開、第三者には公開のみを返し、削除済みは全員から除外する。対象本棚・公開範囲・未削除の条件はSQLに適用する。
+- 投稿日時・IDの昇順、既定15件・最大30件。既存のBase64URLカーソルとマイクロ秒精度を再利用する。
+- プロフィールまたは書籍の不存在は404。組み合わせや閲覧可能な栞がなければ公開ヘッダー付きの空結果を200で返す。itemsにはauthor・bookや本棚の私有項目を含めない。
+- `withCounts<T extends { id: string }>` を既存カードと軽量itemsに共用し、いいね・未削除返信を一括集計する。成功・失敗ともno-store。DB構造・依存・モック基盤の追加はない。
 
 ## 1. 共通ルール
 
@@ -355,10 +364,10 @@ MVPでは日本語検索を `ILIKE` 等の簡易検索で開始。データ量�
 - **全体／フォロー中フィード**：`ORDER BY created_at DESC, id DESC`。次ページは `(created_at, id) < (lastCreatedAt, lastId)`。
 - **栞の流れ**：`ORDER BY created_at ASC, id ASC`。次ページは `(created_at, id) > (lastCreatedAt, lastId)`。
 - **返信**：[暫定] `created_at ASC, id ASC` とする。
-- 本棚と公開本一覧（Issue #10）・本人栞一覧（Issue #11）は `created_at DESC, id DESC` のkeyset方式。日時・IDのJSONをBase64URL化し、署名・有効期限は設けない。日時はDBから小数6桁のUTC文字列で取得し、ミリ秒へ切り捨てずSQLへ渡す。カーソルは認可に使用せず、所有者・公開条件をSQLで毎回確認する。他の未実装一覧のカーソル方式は各Issueで確定する。
+- 本棚と公開本一覧（Issue #10）・本人栞一覧（Issue #11）は `created_at DESC, id DESC`、栞の流れ（Issue #12）は `created_at ASC, id ASC` のkeyset方式。日時・IDのJSONをBase64URL化し、署名・有効期限は設けない。日時はDBから小数6桁のUTC文字列で取得し、ミリ秒へ切り捨てずSQLへ渡す。カーソルは認可に使用せず、所有者・公開条件をSQLで毎回確認する。他の未実装一覧のカーソル方式は各Issueで確定する。
 - `limit=15`のときDBでは最大16件取り、返すのは15件。16件目があれば `nextCursor` を返す。ない場合はnull。
 - 新しい投稿が途中に追加されても、カーソルで既存の続きが取得できる。編集・削除で結果が変わる可能性は許容し、重要な変更時は先頭から再取得。
-- 不正なcursorは400 `INVALID_CURSOR` とし、UIで一覧を再取得できるようにする。空のcursorは入力スキーマで400 `VALIDATION_ERROR`。本棚・公開本一覧・本人栞一覧のcursorに有効期限はない。
+- 不正なcursorは400 `INVALID_CURSOR` とし、UIで一覧を再取得できるようにする。空のcursorは入力スキーマで400 `VALIDATION_ERROR`。本棚・公開本一覧・本人栞一覧・栞の流れのcursorに有効期限はない。
 
 ## 4. 認証と例外フロー
 

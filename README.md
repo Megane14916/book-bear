@@ -31,15 +31,17 @@ WebのAPI接続先は `apps/web/.env.example` を参考に `apps/web/.env.local`
 
 栞CRUD・本人一覧の認可とトランザクションは [栞CRUD API設計書](docs/bookmarks-design.md) を参照してください。作成は所有者確認から応答取得まで同一トランザクションで行い、匿名の公開操作と第三者による非公開栞の取得を拒否します。
 
+投稿順で読む栞の流れは [栞の流れAPI設計書](docs/bookmark-flow-design.md) を参照してください。本人には公開・非公開、第三者には公開のみを返し、author・bookはヘッダーに1回だけ含めます。
+
 ## OpenAPI契約
 
 `pnpm generate:openapi` はAPIのHono/Zod定義から `contracts/openapi.json` を生成し、続けてWeb用の型を生成します。生成物はコミットし、変更後は `pnpm check:openapi` で差分がないことを確認します。APIは同じ仕様を `/openapi.json` でも公開します。
 
 生成契約にはプロフィール、書籍・本棚、栞、フィード、フォロー・いいね・返信、検索の34操作と2種類のhealthが含まれます。各操作の **`x-implementation-status`** を確認してください。
 
-- `implemented`：health、DB接続確認、プロフィール／設定6操作、書籍・本棚9操作（検索・取得・import・manual・本棚CRUD・公開栞のある本一覧）、栞CRUD・本人一覧5操作。DB・認証の設定が必要です。
+- `implemented`：health、DB接続確認、プロフィール／設定6操作、書籍・本棚9操作（検索・取得・import・manual・本棚CRUD・公開栞のある本一覧）、栞CRUD・本人一覧5操作、栞の流れ1操作。DB・認証の設定が必要です。
 - `planned`：Zodで契約を定義済み、ハンドラーは未実装。実APIは現在404を返します。先行するUI開発では生成型とMSWを利用してください。
 
-スキーマは `apps/api/src/modules/*/schemas.ts`、共通項目は `src/shared/schemas.ts`、未実装操作は `src/contracts/routes.ts`、実装済み操作は `src/modules/{users,books,library,bookmarks}/routes.ts` にあります。本棚・公開本一覧・自分の栞一覧は日時・IDのBase64URLカーソルを使い、日時のマイクロ秒精度を維持します。署名・期限は設けず、認可はSQL条件で毎回確認します。栞の流れ・フィード・SNS操作は後続実装です。`contracts/openapi-draft.yaml` は初期設計の履歴として残し、生成には利用しません。詳しくは [API設計書](docs/api.md) を参照してください。
+スキーマは `apps/api/src/modules/*/schemas.ts`、共通項目は `src/shared/schemas.ts`、未実装操作は `src/contracts/routes.ts`、実装済み操作は `src/modules/{users,books,library,bookmarks}/routes.ts` にあります。本棚・公開本一覧・自分の栞一覧・栞の流れは日時・IDのBase64URLカーソルを使い、日時のマイクロ秒精度を維持します。署名・期限は設けず、認可はSQL条件で毎回確認します。フィード・SNS操作は後続実装です。`contracts/openapi-draft.yaml` は初期設計の履歴として残し、生成には利用しません。詳しくは [API設計書](docs/api.md) を参照してください。
 
 `pnpm test` でVitestによるスキーマ境界値・契約・実APIへの未登録の検証を実行します。GitHub Actionsでも型チェック・テスト・契約整合性・ビルドを確認します。現在lintスクリプトは未導入です。

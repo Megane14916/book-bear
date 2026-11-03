@@ -1,28 +1,28 @@
-import { and, desc, eq, exists, inArray, isNull, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, exists, inArray, isNull, or, sql } from 'drizzle-orm'
 import type { z } from '@hono/zod-openapi'
 import type { Database } from '../../db/client'
 import { bookmarkLikes, bookmarkReplies, bookmarks, books, profiles, userBooks } from '../../db/schema'
 import type { Identity } from '../../middleware/auth'
-import { decodeCursor, encodeCursor, olderThan, preciseTimestamp } from '../../shared/cursor'
+import { decodeCursor, encodeCursor, newerThan, olderThan, preciseTimestamp } from '../../shared/cursor'
 import { ApiError, notFound } from '../../shared/errors'
 import { bookSummaryFields, requireProfile } from '../books/service'
 import type { CreateBookmarkRequest, PatchBookmarkRequest } from './schemas'
 
-const fields = {
+const bookmarkFields = {
   id: bookmarks.id, content: bookmarks.content, visibility: bookmarks.visibility, pageNumber: bookmarks.pageNumber, isSpoiler: bookmarks.isSpoiler,
   createdAt: preciseTimestamp(bookmarks.createdAt), updatedAt: preciseTimestamp(bookmarks.updatedAt),
-  author: { id: profiles.id, displayName: profiles.displayName, avatarUrl: profiles.avatarUrl }, book: bookSummaryFields,
 }
+const authorFields = { id: profiles.id, displayName: profiles.displayName, avatarUrl: profiles.avatarUrl }
+const fields = { ...bookmarkFields, author: authorFields, book: bookSummaryFields }
 const cardQuery = (db: Database) => db.select(fields).from(bookmarks)
   .innerJoin(userBooks, eq(userBooks.id, bookmarks.userBookId))
   .innerJoin(profiles, eq(profiles.id, userBooks.userId)).innerJoin(books, eq(books.id, userBooks.bookId))
-type Card = Awaited<ReturnType<typeof cardQuery>>[number]
 const owned = (db: Database, viewer: Identity) => exists(db.select({ id: userBooks.id }).from(userBooks)
   .where(and(eq(userBooks.id, bookmarks.userBookId), eq(userBooks.userId, viewer.id))))
 const canRead = (db: Database, viewer?: Identity) => and(isNull(bookmarks.deletedAt),
   viewer ? or(eq(bookmarks.visibility, 'public'), owned(db, viewer)) : eq(bookmarks.visibility, 'public'))
 
-async function withCounts(db: Database, cards: Card[], viewer?: Identity) {
+async function withCounts<T extends { id: string }>(db: Database, cards: T[], viewer?: Identity) {
   if (!cards.length) return []
   const ids = cards.map((card) => card.id)
   const likes = await db.select({ id: bookmarkLikes.bookmarkId, count: sql<number>`count(*)::int`,
@@ -52,6 +52,23 @@ export async function listBookmarks(db: Database, viewer: Identity, query: { lim
     .orderBy(desc(bookmarks.createdAt), desc(bookmarks.id))
   const cards = rows.slice(0, query.limit), last = cards.at(-1)
   return { items: await withCounts(db, cards, viewer), nextCursor: rows.length > query.limit && last ? encodeCursor({ createdAt: last.createdAt, id: last.id }) : null }
+}
+export async function getBookmarkFlow(db: Database, userId: string, bookId: string, query: { limit: number; cursor?: string }, viewer?: Identity) {
+  const boundary = decodeCursor(query.cursor)
+  const [author] = await db.select(authorFields).from(profiles).where(eq(profiles.id, userId))
+  const [book] = await db.select(bookSummaryFields).from(books).where(eq(books.id, bookId))
+  if (!author || !book) throw notFound()
+  const [shelf] = await db.select({ id: userBooks.id }).from(userBooks)
+    .where(and(eq(userBooks.userId, userId), eq(userBooks.bookId, bookId)))
+  if (!shelf) return { author, book, items: [], nextCursor: null }
+  const rows = await db.select(bookmarkFields).from(bookmarks).where(and(
+    eq(bookmarks.userBookId, shelf.id), isNull(bookmarks.deletedAt),
+    viewer?.id === userId ? undefined : eq(bookmarks.visibility, 'public'),
+    newerThan(bookmarks.createdAt, bookmarks.id, boundary),
+  )).orderBy(asc(bookmarks.createdAt), asc(bookmarks.id)).limit(query.limit + 1)
+  const items = rows.slice(0, query.limit), last = items.at(-1)
+  return { author, book, items: await withCounts(db, items, viewer),
+    nextCursor: rows.length > query.limit && last ? encodeCursor({ createdAt: last.createdAt, id: last.id }) : null }
 }
 function requirePublishPermission(viewer: Identity, visibility: 'public' | 'private') {
   if (viewer.isAnonymous && visibility === 'public') throw new ApiError(403, 'REGISTRATION_REQUIRED', '正式登録が必要です')

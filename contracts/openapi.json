@@ -626,6 +626,35 @@
           "updatedAt"
         ]
       },
+      "BookmarkFlowPage": {
+        "type": "object",
+        "properties": {
+          "author": {
+            "$ref": "#/components/schemas/UserSummary"
+          },
+          "book": {
+            "$ref": "#/components/schemas/BookSummary"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BookmarkFlowItem"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true,
+            "minLength": 1,
+            "description": "不透明なカーソル。内容を解析せず次回の同じ条件のリクエストに渡す。不正・期限切れは400 INVALID_CURSOR。"
+          }
+        },
+        "required": [
+          "author",
+          "book",
+          "items",
+          "nextCursor"
+        ]
+      },
       "BookmarkCard": {
         "allOf": [
           {
@@ -753,35 +782,6 @@
           }
         },
         "required": [
-          "items",
-          "nextCursor"
-        ]
-      },
-      "BookmarkFlowPage": {
-        "type": "object",
-        "properties": {
-          "author": {
-            "$ref": "#/components/schemas/UserSummary"
-          },
-          "book": {
-            "$ref": "#/components/schemas/BookSummary"
-          },
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/BookmarkFlowItem"
-            }
-          },
-          "nextCursor": {
-            "type": "string",
-            "nullable": true,
-            "minLength": 1,
-            "description": "不透明なカーソル。内容を解析せず次回の同じ条件のリクエストに渡す。不正・期限切れは400 INVALID_CURSOR。"
-          }
-        },
-        "required": [
-          "author",
-          "book",
           "items",
           "nextCursor"
         ]
@@ -2275,6 +2275,127 @@
         }
       }
     },
+    "/api/v1/users/{userId}/books/{bookId}/bookmarks": {
+      "get": {
+        "tags": [
+          "Bookmarks"
+        ],
+        "security": [
+          {},
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-implementation-status": "implemented",
+        "x-auth": "OptionalAuth",
+        "operationId": "getUsersUseridBooksBookidBookmarks",
+        "summary": "栞の流れ",
+        "description": "JWT任意。提示時は必ず検証。本人は公開・非公開、それ以外は公開のみ。削除済みは除外。created_at ASC, id ASC（ページ番号順ではない）。limit既定15・最大30、limit+1件で続きを判定。日時はDBの小数6桁を保持。組み合わせや閲覧可能な栞がなければitems=[]。authorとbookはルートに1回だけ。",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "userId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "bookId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "日時・IDのBase64URLカーソル。署名・有効期限なし。不正形式は400 INVALID_CURSOR。SQLで対象本棚・公開範囲・未削除条件を毎回確認。"
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 30,
+              "default": 15
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookmarkFlowPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHORIZED: 提示されたJWTが無効・期限切れ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND: 対象プロフィールまたは書籍が存在しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_ERROR: 内部情報を含めないエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "INTERNAL_ERROR: 認証設定不備・JWKS取得失敗",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/bookmarks": {
       "post": {
         "tags": [
@@ -2909,127 +3030,6 @@
           },
           "400": {
             "description": "VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "NOT_FOUND: 対象なし。第三者の非公開栞・削除済み栞も存在を明かさず404",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "RATE_LIMITED: 操作回数制限",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "INTERNAL_ERROR: 内部情報を含めないサーバーエラー",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/users/{userId}/books/{bookId}/bookmarks": {
-      "get": {
-        "operationId": "getUsersUseridBooksBookidBookmarks",
-        "tags": [
-          "Bookmarks"
-        ],
-        "summary": "栞の流れ",
-        "description": "【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。JWTは任意。送信されたJWTは検証し、無効なら401。 limitは既定15・最大30。SQLはlimit+1件取得し、続きがなければnextCursor=null。カーソルの署名または対象・条件の厳格照合が必要。 created_at ASC, id ASC（ページ番号順ではない）。 本人は公開・非公開、それ以外は公開のみ。ユーザー・本が存在しても組み合わせや公開栞がなければitems=[]。authorとbookはルートに1回だけ。",
-        "security": [
-          {},
-          {
-            "bearerAuth": []
-          }
-        ],
-        "x-implementation-status": "planned",
-        "x-auth": "OptionalAuth",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "userId",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "bookId",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "description": "不透明なカーソル。内容を解析せず次回の同じ条件のリクエストに渡す。不正・期限切れは400 INVALID_CURSOR。"
-            },
-            "required": false,
-            "name": "cursor",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 30,
-              "default": 15
-            },
-            "required": false,
-            "name": "limit",
-            "in": "query"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BookmarkFlowPage"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "UNAUTHORIZED: 必須JWTがない、または送信されたJWTが無効・期限切れ",
             "content": {
               "application/json": {
                 "schema": {

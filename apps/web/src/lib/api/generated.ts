@@ -248,6 +248,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/users/{userId}/books/{bookId}/bookmarks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 栞の流れ
+         * @description JWT任意。提示時は必ず検証。本人は公開・非公開、それ以外は公開のみ。削除済みは除外。created_at ASC, id ASC（ページ番号順ではない）。limit既定15・最大30、limit+1件で続きを判定。日時はDBの小数6桁を保持。組み合わせや閲覧可能な栞がなければitems=[]。authorとbookはルートに1回だけ。
+         */
+        get: operations["getUsersUseridBooksBookidBookmarks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/bookmarks": {
         parameters: {
             query?: never;
@@ -348,26 +368,6 @@ export interface paths {
          * @description 【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。認証なしで利用可能。 limitは既定15・最大30。SQLはlimit+1件取得し、続きがなければnextCursor=null。カーソルの署名または対象・条件の厳格照合が必要。
          */
         get: operations["getUsersUseridFollowing"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/users/{userId}/books/{bookId}/bookmarks": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * 栞の流れ
-         * @description 【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。JWTは任意。送信されたJWTは検証し、無効なら401。 limitは既定15・最大30。SQLはlimit+1件取得し、続きがなければnextCursor=null。カーソルの署名または対象・条件の厳格照合が必要。 created_at ASC, id ASC（ページ番号順ではない）。 本人は公開・非公開、それ以外は公開のみ。ユーザー・本が存在しても組み合わせや公開栞がなければitems=[]。authorとbookはルートに1回だけ。
-         */
-        get: operations["getUsersUseridBooksBookidBookmarks"];
         put?: never;
         post?: never;
         delete?: never;
@@ -687,6 +687,13 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
+        BookmarkFlowPage: {
+            author: components["schemas"]["UserSummary"];
+            book: components["schemas"]["BookSummary"];
+            items: components["schemas"]["BookmarkFlowItem"][];
+            /** @description 不透明なカーソル。内容を解析せず次回の同じ条件のリクエストに渡す。不正・期限切れは400 INVALID_CURSOR。 */
+            nextCursor: string | null;
+        };
         BookmarkCard: components["schemas"]["BookmarkFlowItem"] & {
             author: components["schemas"]["UserSummary"];
             book: components["schemas"]["BookSummary"];
@@ -718,13 +725,6 @@ export interface components {
         };
         UserPage: {
             items: components["schemas"]["UserSummary"][];
-            /** @description 不透明なカーソル。内容を解析せず次回の同じ条件のリクエストに渡す。不正・期限切れは400 INVALID_CURSOR。 */
-            nextCursor: string | null;
-        };
-        BookmarkFlowPage: {
-            author: components["schemas"]["UserSummary"];
-            book: components["schemas"]["BookSummary"];
-            items: components["schemas"]["BookmarkFlowItem"][];
             /** @description 不透明なカーソル。内容を解析せず次回の同じ条件のリクエストに渡す。不正・期限切れは400 INVALID_CURSOR。 */
             nextCursor: string | null;
         };
@@ -1824,6 +1824,77 @@ export interface operations {
             };
         };
     };
+    getUsersUseridBooksBookidBookmarks: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                userId: string;
+                bookId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookmarkFlowPage"];
+                };
+            };
+            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description UNAUTHORIZED: 提示されたJWTが無効・期限切れ */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description NOT_FOUND: 対象プロフィールまたは書籍が存在しない */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description INTERNAL_ERROR: 内部情報を含めないエラー */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description INTERNAL_ERROR: 認証設定不備・JWKS取得失敗 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     postBookmarks: {
         parameters: {
             query?: never;
@@ -2268,77 +2339,6 @@ export interface operations {
             };
             /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル */
             400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description NOT_FOUND: 対象なし。第三者の非公開栞・削除済み栞も存在を明かさず404 */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description RATE_LIMITED: 操作回数制限 */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description INTERNAL_ERROR: 内部情報を含めないサーバーエラー */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    getUsersUseridBooksBookidBookmarks: {
-        parameters: {
-            query?: {
-                cursor?: string;
-                limit?: number;
-            };
-            header?: never;
-            path: {
-                userId: string;
-                bookId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BookmarkFlowPage"];
-                };
-            };
-            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description UNAUTHORIZED: 必須JWTがない、または送信されたJWTが無効・期限切れ */
-            401: {
                 headers: {
                     [name: string]: unknown;
                 };

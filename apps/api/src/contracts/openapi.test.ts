@@ -15,7 +15,7 @@ const operations = Object.values(document.paths).flatMap((path) => Object.values
 
 describe('OpenAPI契約と稼働APIの区別', () => {
   it('主要34操作・healthが一意のoperationIdを持ち、全未実装操作を明示する', () => {
-    expect(plannedRoutes).toHaveLength(14)
+    expect(plannedRoutes).toHaveLength(13)
     expect(operations).toHaveLength(36)
     expect(new Set(operations.map((operation) => operation.operationId)).size).toBe(36)
     for (const route of plannedRoutes) {
@@ -48,7 +48,7 @@ describe('OpenAPI契約と稼働APIの区別', () => {
     expect(document.components?.securitySchemes?.bearerAuth).toMatchObject({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' })
     expect(paths['/api/v1/me']?.get?.security).toEqual([{ bearerAuth: [] }])
     expect(paths['/api/v1/books/search']?.get?.security).toEqual([])
-    for (const path of ['/api/v1/feed', '/api/v1/bookmarks/{bookmarkId}', '/api/v1/users/{userId}', '/api/v1/bookmarks/{bookmarkId}/replies', '/api/v1/search/posts']) {
+    for (const path of ['/api/v1/feed', '/api/v1/bookmarks/{bookmarkId}', '/api/v1/users/{userId}', '/api/v1/users/{userId}/books/{bookId}/bookmarks', '/api/v1/bookmarks/{bookmarkId}/replies', '/api/v1/search/posts']) {
       expect(paths[path]?.get?.security).toEqual([{}, { bearerAuth: [] }])
       expect(paths[path]?.get?.responses[401]).toBeDefined()
     }

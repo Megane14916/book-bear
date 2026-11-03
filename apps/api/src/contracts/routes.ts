@@ -1,10 +1,10 @@
 import { createRoute, type RouteConfig, z } from '@hono/zod-openapi'
 import {
-  BookmarkFlowParams, BookmarkIdParams, ErrorSchema, PaginationQuery,
+  BookmarkIdParams, ErrorSchema, PaginationQuery,
   ReplyIdParams, SearchQuery, UserIdParams, nonEmptyText,
 } from '../shared/schemas'
 import { UserPage } from '../modules/users/schemas'
-import { BookmarkFlowPage, FeedPage } from '../modules/bookmarks/schemas'
+import { FeedPage } from '../modules/bookmarks/schemas'
 import { FeedQuery } from '../modules/feed/schemas'
 import { CreateReplyRequest, PatchReplyRequest, Reply, ReplyPage } from '../modules/replies/schemas'
 
@@ -66,9 +66,6 @@ export const plannedRoutes: PlannedRoute[] = [
     tags: ['Social'], summary: `${kind}一覧`, description: descPagination,
     request: { params: UserIdParams, query: PaginationQuery }, responses: { 200: json(UserPage) },
   }, 'Public', [404])),
-  planned({ method: 'get', path: '/api/v1/users/{userId}/books/{bookId}/bookmarks', operationId: 'getUsersUseridBooksBookidBookmarks', tags: ['Bookmarks'], summary: '栞の流れ',
-    description: `${descOldest} 本人は公開・非公開、それ以外は公開のみ。ユーザー・本が存在しても組み合わせや公開栞がなければitems=[]。authorとbookはルートに1回だけ。`,
-    request: { params: BookmarkFlowParams, query: PaginationQuery }, responses: { 200: json(BookmarkFlowPage) } }, 'OptionalAuth', [404]),
   planned({ method: 'get', path: '/api/v1/feed', operationId: 'getFeed', tags: ['Feed'], summary: '公開タイムライン',
     description: `${descNewest} ${publicBookmark} scope=followingは正式ユーザーのみ（未認証401、匿名403 REGISTRATION_REQUIRED）。allはJWT任意。未認証のlikedByMeはfalse。`,
     request: { query: FeedQuery }, responses: { 200: json(FeedPage) } }, 'OptionalAuth', [403]),
