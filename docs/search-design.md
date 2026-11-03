@@ -1,10 +1,10 @@
 # 投稿検索・ユーザー検索API 設計書（Issue #25）
 
-状態: 設計レビュー待ち・API未実装。基準: main `bb46743`（PR #24マージ後）／2026-11-03（日本時間）。
+状態: 実装済み。設計の基準: main `bb46743`（PR #24マージ後）／2026-11-03（日本時間）。実装は [検索HTTP処理](../apps/api/src/modules/search/http.ts)、[栞取得処理](../apps/api/src/modules/bookmarks/service.ts)、[ユーザー検索処理](../apps/api/src/modules/users/service.ts)、検証は [検索APIテスト](../apps/api/tests/search.test.ts) を参照。
 
 関連: [Issue #25](https://github.com/Megane14916/book-bear/issues/25)、[要件書（F-17）](requirements.md)、[API設計書・検索](api.md#26-検索)、[DB設計書](database.md)、[認証設計](auth-design.md#7-honoのjwt検証と認可)、[全体フィード設計](feed-design.md)。
 
-入力の正本は [既存の検索ルート定義](../apps/api/src/contracts/routes.ts) と [共通Zodスキーマ](../apps/api/src/shared/schemas.ts)。投稿検索の応答は [FeedPage／BookmarkCard](../apps/api/src/modules/bookmarks/schemas.ts) を維持し、ユーザー検索の応答は [usersのスキーマ](../apps/api/src/modules/users/schemas.ts) に検索専用のSearchUserItem／SearchUserPageを追加する。現行契約のUserPageからの差分は第5節に整理する。
+入力の正本は [検索ルート定義](../apps/api/src/modules/search/routes.ts) と [共通Zodスキーマ](../apps/api/src/shared/schemas.ts)。投稿検索の応答は [FeedPage／BookmarkCard](../apps/api/src/modules/bookmarks/schemas.ts) を維持し、ユーザー検索の応答は [usersのスキーマ](../apps/api/src/modules/users/schemas.ts) に検索専用のSearchUserItem／SearchUserPageを追加した。当初契約のUserPageからの差分は第5節に整理する。
 
 ## 1. 目的・範囲
 
@@ -99,7 +99,7 @@ no-storeを設定するルート固有ミドルウェア → SearchQueryによ�
 
 ### 検索専用スキーマの配置
 
-実装時は既存 `modules/users/schemas.ts` に次の2スキーマを追加する。同ファイル内の既存handle定義（trim後3〜30文字、小文字英数字・`_`、nullable）をそのまま再利用する。DBのprofiles.handleはnullable TEXT・UNIQUEであり、文字種・長さは既存API側の検証を踏襲し、DB制約やマイグレーションは追加しない。
+既存 `modules/users/schemas.ts` に次の2スキーマを追加した。同ファイル内の既存handle定義（trim後3〜30文字、小文字英数字・`_`、nullable）をそのまま再利用する。DBのprofiles.handleはnullable TEXT・UNIQUEであり、文字種・長さは既存API側の検証を踏襲し、DB制約やマイグレーションは追加しない。
 
 ```ts
 export const SearchUserItem = UserSummary.extend({ handle }).openapi('SearchUserItem')
@@ -108,29 +108,29 @@ export const SearchUserPage = cursorPage('SearchUserPage', SearchUserItem)
 
 UserSummary・UserPage自体は変更しない。SearchUserPageはユーザー検索だけで使用し、既存の公開プロフィール・フォロー一覧・投稿カードの参照先・レスポンス型を維持する。cursorPageのstring | nullという外形を使い、ユーザー検索の実際のnextCursorは常にnullであることをルート説明とテストで保証する。
 
-### 既存Issue・契約との差分と実装時の更新先
+### 当初のIssue・契約との差分と更新先
 
-実装時は2定義をplannedRoutesからsearch/routesへ移し、index.tsからHTTP登録する。plannedは2→0になるため、使用先を確認して不要になった旧契約専用ファイル・レジストリ登録を整理する。将来用の未実装基盤は残すためだけに拡張しない。
+2定義をplannedRoutesからsearch/routesへ移し、index.tsからHTTP登録した。plannedは2→0となり、不要になった旧契約専用ファイル・レジストリ登録を削除した。将来用の未実装基盤は追加しない。
 
 変更する成功レスポンスのJSON契約はGET /search/usersのみで、UserPageから新設SearchUserPageへ切り替え、itemsへnullableなhandleを追加する。GET /search/postsのFeedPage／BookmarkCard、既存UserSummary／UserPageと他APIのJSON契約は変更しない。両検索のパス・operationId・Zod入力・既定値を維持する。
 
 OpenAPIはimplemented、OptionalAuth／Publicの区別、400/401/500/503の適用範囲、同一検索語での投稿ページング、ユーザー検索の登録確認済み条件・handle返却・nextCursor=nullを実動作へ合わせる。投稿検索は400/401/500/503、ユーザー検索は400/500とする。共有カーソル説明の古い「期限切れ」や旧ルートの「署名または厳格照合」は実際の署名・期限なしの方式へ修正し、検証自体は緩めない。
 
-| 更新先 | 実装時に反映する差分 |
+| 更新先 | 反映した差分 |
 |---|---|
-| Issue #25「ユーザー検索」 | UserPage／UserSummaryのみを返す記載をSearchUserPage／SearchUserItemの4項目へ変更。検索対象をregistration_confirmed_at非NULLに限定し、未確認の正式ユーザーもPUT /meまでは対象外と明記。現行本文には登録確認による対象制限がないため、その追加も仕様差分として記録する |
+| Issue #25「ユーザー検索」 | UserPage／UserSummaryのみを返す記載をSearchUserPage／SearchUserItemの4項目へ変更。検索対象をregistration_confirmed_at非NULLに限定し、未確認の正式ユーザーもPUT /meまでは対象外と明記。当初本文には登録確認による対象制限がなかったため、その追加も仕様差分として記録 |
 | Issue #25「テスト・完了条件」 | 返却フィールドを既存UserSummaryに限定する条件と、JSON契約をすべて維持する条件を修正。ユーザー検索の成功レスポンスだけを変更する例外、登録確認前後・handle返却・31件以上一致の検証を追加する |
 | API設計書「現在の契約と実装状況」 | ユーザー検索のUserPage維持という説明をSearchUserPageへ変更し、入力維持・nextCursor=nullを明記。未実装件数の現在形を更新する |
 | API設計書「2.6 検索」 | ユーザー検索の登録確認条件・4項目・取得上限超過時の制限を追記。投稿検索のPublic表記をOptionalAuthへ合わせる |
 | OpenAPI・Web生成型 | users/schemasの新規2コンポーネントとgetSearchUsersの200レスポンス参照を生成。Webのitems型にhandle: string | nullが増えるため、利用側・型検証を確認する。既存UserSummary／UserPage・投稿検索の応答型に差分がないことを比較する |
 
-Issue #25の現行本文・生成契約は旧仕様のため、この設計との差分を上表に記録する。Issue本文・API設計書・スキーマ・生成物の変更は実装時にまとめて反映する。
+当初のIssue本文・生成契約から変更したのはユーザー検索の対象条件と成功レスポンスであり、上表の資料・生成物へ合わせて反映する。既存の共有JSONスキーマと他APIの応答は比較して維持を確認する。
 
-OpenAPI・Web生成型は実装時に既存コマンドで再生成する。[契約テスト](../apps/api/src/contracts/openapi.test.ts) はplanned件数・未登録404前提を実装済み2操作へ合わせつつ、全36操作のoperationId一意性・初期ドラフト34操作の網羅・認証・JSON契約の検証を維持する。[Web生成型検証](../apps/web/src/lib/api/generated.type-test.ts) も維持し、検索専用型と既存共有型への影響を確認する。READMEなどの未実装件数の現在形も更新する。MSWは未導入なので新規モック基盤は作らない。
+OpenAPI・Web生成型は既存コマンドで再生成した。[契約テスト](../apps/api/src/contracts/openapi.test.ts) はplanned件数・未登録404前提を実装済み2操作へ合わせつつ、全36操作のoperationId一意性・初期ドラフト34操作の網羅・認証・JSON契約の検証を維持する。[Web生成型検証](../apps/web/src/lib/api/generated.type-test.ts) も維持し、検索専用型と既存共有型への影響を確認する。READMEなどの未実装件数の現在形も更新した。MSWは未導入なので新規モック基盤は作らない。
 
 既存の公開フィード用部分インデックスが本文の部分一致を高速化する保証はない。プロフィールのhandleのUNIQUE索引も前方ワイルドカード検索に最適とは限らない。データ量と遅延を確認し、必要時にEXPLAIN (ANALYZE, BUFFERS)で検証して専門索引等を検討する。今回は新規索引・マイグレーションを追加しない。
 
-## 6. 検証方針・実装前の確認点
+## 6. 検証方針・将来変更するときの確認点
 
 [createTestDatabase()](../apps/api/tests/helpers/database.ts) と署名済みJWT、アプリ専用DBロールを用いてHTTPから確認する。既存の [フィードテスト](../apps/api/tests/feed.test.ts) の構成を踏襲し、新しい共通テスト基盤は作らない。
 
@@ -151,4 +151,4 @@ OpenAPI・Web生成型は実装時に既存コマンドで再生成する。[契
 
 CIのPostgreSQLは他テストのデータが残り、既存テストコマンドはファイル並列なしでも同じDBへの別プロセスの書き込みまで防がない。必要なら一致する既存行を含む基準集合を取得するが、並行書き込み後まで不変とは扱わない。自テストの追加・変更は日時と実行順を制御し、無関係な並行追加を固有検索語で分離する。他テストの行を削除・書き換えない。
 
-実装前には、上記のPublicとOptionalAuthの登録範囲、listPublicBookmarksの任意qが既存フィードへ影響しないこと、登録確認と部分一致のAND条件、検索専用スキーマの参照先、Issue本文との明示的な差分、planned専用コードの参照箇所、共有カーソル説明の生成物への影響を再確認する。検索語の長さ制限・高度な日本語検索・ユーザー検索の次ページ・レート制限は将来変更時に契約と性能を検討する事項とし、今回の仕組みへ先回りして組み込まない。
+変更時はPublicとOptionalAuthの登録範囲、listPublicBookmarksの任意qが既存フィードへ影響しないこと、登録確認と部分一致のAND条件、検索専用スキーマの参照先、共有カーソル説明の生成物への影響を再確認する。検索語の長さ制限・高度な日本語検索・ユーザー検索の次ページ・レート制限は将来変更時に契約と性能を検討する事項とし、今回の仕組みへ先回りして組み込まない。

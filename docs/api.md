@@ -6,10 +6,9 @@
 
 ### 現在の契約と実装状況（Issue #7）
 
-`apps/api/src/modules/*/schemas.ts` と `src/contracts/routes.ts` を正本として、主要34操作の `contracts/openapi.json` とWebの `src/lib/api/generated.ts` を生成する。`GET /openapi.json` も同一仕様を返す。手書きの初期ドラフトは履歴資料とし、以降の変更はZod定義・生成物・本書に反映する。
+`apps/api/src/modules/*/schemas.ts` と各モジュールの `routes.ts` を正本として、主要34操作の `contracts/openapi.json` とWebの `src/lib/api/generated.ts` を生成する。`GET /openapi.json` も同一仕様を返す。手書きの初期ドラフトは履歴資料とし、以降の変更はZod定義・生成物・本書に反映する。
 
-- 操作単位の `x-implementation-status: implemented` は実装済み（health・DB接続確認、プロフィール／設定6操作、書籍・本棚9操作、栞CRUD・本人一覧5操作、栞の流れ1操作、all／followingフィード1操作、フォロー・いいね・返信10操作）。未実装は投稿／ユーザー検索の2操作。
-- `x-implementation-status: planned` は契約のみ。OpenAPIレジストリに登録するが、HonoのHTTPハンドラーには登録しないため、実APIは現在404となる。記載した成功・認証エラーは今後の実装の契約であり、認証や認可が稼働している意味ではない。
+- 操作単位の `x-implementation-status: implemented` は実装済み（health・DB接続確認、プロフィール／設定6操作、書籍・本棚9操作、栞CRUD・本人一覧5操作、栞の流れ1操作、all／followingフィード1操作、フォロー・いいね・返信10操作、投稿／ユーザー検索2操作）。全36操作が実装済み。
 - `x-auth` は `Public / OptionalAuth / AnyAuth / Owner / Registered`。`OptionalAuth` はJWTなしでも閲覧可、送信時は必ず検証して無効なら401。`Registered` は匿名ユーザーに403。公開化・followingフィードなどの条件付き制限は各操作の説明と403レスポンスに記載する。
 - `followedByMe`・`likedByMe` を返す公開GETと、本人の非公開情報を返し得るGETは任意認証。初期ドラフトの公開プロフィール・返信一覧・投稿検索の認証記載を補完した。
 - 入力はUUID、UTC日時、列挙値、本文長、整数範囲をZodで検証。JSONの数値・booleanは文字列から変換しない。クエリのlimitは数値化し、1〜30（既定15、書籍・ユーザー検索は20）とする。
@@ -18,11 +17,11 @@
 - Webの型生成は `--default-non-nullable false` を指定し、既定値を持つ省略可能な入力をTypeScriptでも省略可能に保つ。
 - PATCHは対応フィールドを1つ以上必要とし、空オブジェクト・未知のフィールドを拒否。省略は変更なし、nullはnullable項目の解除。所有者・作成日時・栞の所属先は入力で変更できない。
 - ISBN-13は978/979の接頭辞、13桁、チェックディジットを検証。openBDのproviderIdもISBN-13。手動登録はISBN・作成者IDを受け付けない。DBにない検索候補はproviderとproviderIdを必ず持つ。こうした項目間条件やtrimの処理はOpenAPIだけでは完全に表せないためZod側でも検証する。
-- ユーザー検索は初期ドラフトの `UserPage` を維持し、カーソル入力がないため `nextCursor` はnullとする。
+- ユーザー検索は検索専用 `SearchUserPage`／`SearchUserItem` でid・displayName・avatarUrl・nullableなhandleを返す。既存UserSummary／UserPageは変更しない。SearchQueryの入力を維持し、カーソル入力なし・nextCursorは常にnull。
 
 契約の更新・確認：`pnpm generate:openapi` → `pnpm check:openapi` → `pnpm typecheck` → `pnpm test` → `pnpm build`。MSWはまだリポジトリに存在しないため、本Issueではモックを追加・更新しない。導入時には生成型を使い、認証シナリオ・403/404・空データ・カーソルを再現する。
 
-後続で操作を実装するときは対応する定義を `plannedRoutes` から取り出し、スキーマを再利用して `app.openapi()` に登録する。認証・認可と成功／異常系テストを追加してから、操作の状態を `implemented` に変更し、重複登録を避ける。DBスキーマ・マイグレーションの変更は本Issueには含まれない。
+Issue #25で最後の検索2操作を `app.openapi()` へ登録し、旧plannedRoutesと契約専用登録を削除した。全36操作の一意性・初期ドラフト34操作の網羅・認証とJSON契約を引き続き検証する。
 
 ### DB接続確認（Issue #8）
 
@@ -30,7 +29,7 @@
 
 ### 認証・プロフィール（Issue #9）
 
-`GET/PUT/PATCH /me`、`GET/PATCH /me/preferences`、`GET /users/{userId}` の6操作を実装した。定義は `modules/users/routes.ts`、HTTP処理は `http.ts`、DB操作は `service.ts`。Issue #9完了時点では34操作のうち28操作がplannedだった。Issue #10後19、#11後14、#12後13、#13後12、#14後2操作がplanned。
+`GET/PUT/PATCH /me`、`GET/PATCH /me/preferences`、`GET /users/{userId}` の6操作を実装した。定義は `modules/users/routes.ts`、HTTP処理は `http.ts`、DB操作は `service.ts`。Issue #9完了時点では34操作のうち28操作がplannedだった。Issue #10後19、#11後14、#12後13、#13後12、#14後2、#25後0操作がplanned。
 
 - `middleware/auth.ts` で固定プロジェクトのJWKSからES256／RS256を検証する。issuerは `SUPABASE_URL + /auth/v1`、audienceは `authenticated`。exp／iat／sub／role／session_id／is_anonymousを必須とする。JWTなし・不正・期限切れは401、設定不備・JWKS取得障害は503。HS256は使わない。
 - 本人のID・匿名状態は検証済みclaimから取得し、本文やユーザーメタデータで上書きしない。公開プロフィールは任意認証で、提示したJWTが不正なら401。
@@ -365,11 +364,17 @@ export type CursorPage<T> = {
 
 | Method | Path | 権限 | 内容 |
 |---|---|---|---|
-| GET | `/search/posts?q=&cursor=&limit=15` | Public | 公開栞本文を検索（ネタバレの本文抜粋はUIで隠す） |
-| GET | `/search/users?q=&limit=20` | Public | 表示名・handleの検索 |
+| GET | `/search/posts?q=&cursor=&limit=15` | OptionalAuth | 公開・未削除の栞本文を検索（本人の非公開も除外、ネタバレの初期非表示はUI） |
+| GET | `/search/users?q=&limit=20` | Public | 登録確認済みプロフィールの表示名・handleを検索 |
 | GET | `/books/search?q=&limit=20` | Public | 書名・著者・ISBN（外部APIも） |
 
 MVPでは日本語検索を `ILIKE` 等の簡易検索で開始。データ量が増えたらPGroonga等の専用インデックスを検討。実際の検索速度を見て決める。
+
+Issue #25で2操作を実装。詳細は [検索API設計書](search-design.md)。qはtrimし、`%`・`_`・バックスラッシュは文字として検索する。投稿検索は既存FeedPage・高精度カーソル・一括集計を使い、提示JWTは入力検証前に検証する。未認証のlikedByMeはfalse。
+
+ユーザー検索はSQLで `registration_confirmed_at IS NOT NULL` を必須とし、正式JWTでPUT /meを実行するまで正式ユーザーも検索対象外。確認日時は登録日そのものではなく内部の初回確認履歴で、応答には含めない。SearchUserPageのitemsはid・displayName・avatarUrl・handle（未設定null）の4項目。既存UserSummary・UserPage・公開プロフィール・フォロー一覧の権限と応答は変更しない。PublicのためAuthorizationは検証しない。
+
+ユーザー検索は表示名ASC・ID ASC、既定20・最大30件。31件以上一致しても最大30件でnextCursorは常にnull、上限を超える候補は追加取得できない。これはMVPでSearchQueryの入力を維持する意図的な仕様。両検索とも一致0件は200空配列、全応答no-store。DB構造・索引・マイグレーションは変更しない。
 
 ### 2.7 外部共有（API不要）
 
@@ -380,7 +385,7 @@ MVPでは日本語検索を `ILIKE` 等の簡易検索で開始。データ量�
 - **全体／フォロー中フィード**：`ORDER BY created_at DESC, id DESC`。次ページは `(created_at, id) < (lastCreatedAt, lastId)`。
 - **栞の流れ**：`ORDER BY created_at ASC, id ASC`。次ページは `(created_at, id) > (lastCreatedAt, lastId)`。
 - **返信**：[暫定] `created_at ASC, id ASC` とする。
-- 本棚と公開本一覧（Issue #10）・本人栞一覧（Issue #11）・全体フィード（Issue #13）は `created_at DESC, id DESC`、栞の流れ（Issue #12）は `created_at ASC, id ASC` のkeyset方式。日時・IDのJSONをBase64URL化し、署名・有効期限は設けない。日時はDBから小数6桁のUTC文字列で取得し、ミリ秒へ切り捨てずSQLへ渡す。カーソルは認可に使用せず、所有者・公開条件をSQLで毎回確認する。他の未実装一覧のカーソル方式は各Issueで確定する。
+- 本棚と公開本一覧（Issue #10）・本人栞一覧（Issue #11）・全体フィード（Issue #13）・投稿検索（Issue #25）は `created_at DESC, id DESC`、栞の流れ（Issue #12）は `created_at ASC, id ASC` のkeyset方式。日時・IDのJSONをBase64URL化し、署名・有効期限は設けない。日時はDBから小数6桁のUTC文字列で取得し、ミリ秒へ切り捨てずSQLへ渡す。カーソルは認可に使用せず、所有者・公開条件をSQLで毎回確認する。ユーザー検索はカーソル入力なし。
 - `limit=15`のときDBでは最大16件取り、返すのは15件。16件目があれば `nextCursor` を返す。ない場合はnull。
 - 新しい投稿が途中に追加されても、カーソルで既存の続きが取得できる。編集・削除で結果が変わる可能性は許容し、重要な変更時は先頭から再取得。
 - 不正なcursorは400 `INVALID_CURSOR`、空のcursorは400 `VALIDATION_ERROR`。実装済み一覧は署名・有効期限なしの同じ形式を使う。関係一覧は関係日時・相手IDの降順、返信は返信日時・IDの昇順。followingの未認証／匿名ガードはカーソル内容検証より優先する。

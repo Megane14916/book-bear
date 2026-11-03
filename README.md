@@ -37,15 +37,16 @@ WebのAPI接続先は `apps/web/.env.example` を参考に `apps/web/.env.local`
 
 フォロー・いいね・返信の認可と登録確認の移行は [SNS API設計書](docs/social-design.md) を参照してください。DBの登録確認列マイグレーション適用後、ログイン・匿名昇格後にも新しい正式JWTでPUT /meを呼ぶことが必要です。既存ユーザーも実行するまでフォロー対象として未確認となります。自分の返信DELETEは元栞の非公開化・削除後も可能です。
 
+投稿・ユーザー検索は [検索API設計書](docs/search-design.md) を参照してください。投稿は本人の非公開も除く公開・未削除の本文を検索し、既存の高精度カーソルと一括集計を使います。ユーザーは正式JWTのPUT /meで登録確認済みのプロフィールのみを検索し、handle付きのSearchUserPageを返します。ユーザー検索は既定20・最大30件で、続きの取得はありません。
+
 ## OpenAPI契約
 
 `pnpm generate:openapi` はAPIのHono/Zod定義から `contracts/openapi.json` を生成し、続けてWeb用の型を生成します。生成物はコミットし、変更後は `pnpm check:openapi` で差分がないことを確認します。APIは同じ仕様を `/openapi.json` でも公開します。
 
 生成契約にはプロフィール、書籍・本棚、栞、フィード、フォロー・いいね・返信、検索の34操作と2種類のhealthが含まれます。各操作の **`x-implementation-status`** を確認してください。
 
-- `implemented`：health、DB接続確認、プロフィール／設定6操作、書籍・本棚9操作、栞CRUD・本人一覧5操作、栞の流れ1操作、all／followingフィード1操作、フォロー・いいね・返信10操作。DB・認証の設定が必要です。
-- `planned`：Zodで契約を定義済み、ハンドラーは未実装。実APIは現在404を返します。先行するUI開発では生成型とMSWを利用してください。
+- 全36操作が `implemented`：health、DB接続確認、プロフィール／設定6操作、書籍・本棚9操作、栞CRUD・本人一覧5操作、栞の流れ1操作、all／followingフィード1操作、フォロー・いいね・返信10操作、投稿／ユーザー検索2操作。DB・認証の設定が必要です。
 
-スキーマは `apps/api/src/modules/*/schemas.ts`、共通項目は `src/shared/schemas.ts`、未実装操作は `src/contracts/routes.ts`、実装済み操作は `src/modules/{users,books,library,bookmarks,feed,social,replies}/routes.ts` にあります。一覧は日時・IDのBase64URLカーソルを使い、日時のマイクロ秒精度を維持します。署名・期限は設けず、認可はSQL条件で毎回確認します。未実装は投稿／ユーザー検索の2操作です。`contracts/openapi-draft.yaml` は初期設計の履歴として残し、生成には利用しません。詳しくは [API設計書](docs/api.md) を参照してください。
+スキーマは `apps/api/src/modules/*/schemas.ts`、共通項目は `src/shared/schemas.ts`、操作は `src/modules/{users,books,library,bookmarks,feed,social,replies,search}/routes.ts` にあります。一覧は日時・IDのBase64URLカーソルを使い、日時のマイクロ秒精度を維持します。署名・期限は設けず、認可はSQL条件で毎回確認します。ユーザー検索のみカーソル入力がなく、nextCursorは常にnullです。`contracts/openapi-draft.yaml` は初期設計の履歴として残し、生成には利用しません。詳しくは [API設計書](docs/api.md) を参照してください。
 
-`pnpm test` でVitestによるスキーマ境界値・契約・実APIへの未登録の検証を実行します。GitHub Actionsでも型チェック・テスト・契約整合性・ビルドを確認します。現在lintスクリプトは未導入です。
+`pnpm test` でVitestによるスキーマ境界値・契約・実APIの認可と正常系／異常系の検証を実行します。GitHub Actionsでも型チェック・テスト・契約整合性・ビルドを確認します。現在lintスクリプトは未導入です。
