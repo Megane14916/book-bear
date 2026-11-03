@@ -29,9 +29,10 @@ afterAll(async () => { await fixture?.close() })
 describe('マイグレーション・Drizzle', () => {
   it('二度適用しても履歴・データを保持する', async () => {
     await fixture.apply()
-    expect((await fixture.client.query('SELECT count(*)::int AS count FROM drizzle.__drizzle_migrations')).rows[0].count).toBe(1)
+    expect((await fixture.client.query('SELECT count(*)::int AS count FROM drizzle.__drizzle_migrations')).rows[0].count).toBe(2)
     const db = drizzle(fixture.client)
     expect((await db.select().from(profiles).where(eq(profiles.id, userId)))[0].displayName).toBe('ゲスト')
+    expect((await db.select().from(profiles).where(eq(profiles.id, userId)))[0].registrationConfirmedAt).toBeNull()
     expect((await db.select().from(userBooks).where(eq(userBooks.id, shelfId)))[0]).toMatchObject({ currentPage: null, status: 'want_to_read' })
     const bookmark = (await db.select().from(bookmarks).where(eq(bookmarks.id, bookmarkId)))[0]
     expect(bookmark).toMatchObject({ pageNumber: null, visibility: 'private', isSpoiler: false, deletedAt: null })

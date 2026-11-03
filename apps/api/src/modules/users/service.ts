@@ -25,6 +25,9 @@ export async function initializeMe(db: Database, identity: Identity) {
     return await db.transaction(async (tx) => {
       await tx.insert(profiles).values({ id: identity.id }).onConflictDoNothing({ target: profiles.id })
       await tx.insert(userPreferences).values({ userId: identity.id }).onConflictDoNothing({ target: userPreferences.userId })
+      // Bypass Drizzle's updatedAt.$onUpdate: confirmation is not a profile edit.
+      if (!identity.isAnonymous) await tx.execute(sql`UPDATE ${profiles} SET registration_confirmed_at = now()
+        WHERE ${profiles.id} = ${identity.id}::uuid AND ${profiles.registrationConfirmedAt} IS NULL`)
       return getMe(tx, identity)
     })
   } catch (error) {
