@@ -2,7 +2,7 @@
 
 状態: 実装済み。基準: main `6063e23`（PR #23マージ後）／2026-11-03（日本時間）。実装は [social](../apps/api/src/modules/social/service.ts)・[replies](../apps/api/src/modules/replies/service.ts)、検証は [SNS・返信APIテスト](../apps/api/tests/social-replies.test.ts) を参照。
 
-関連: [Issue #14](https://github.com/Megane14916/book-bear/issues/14)、[API設計書](api.md#25-フォローいいね返信)、[要件書の認可](requirements.md#4-アカウント認可)、[DB設計書](database.md)、[認証設計](auth-design.md#8-既存apidbとの接続契約)。入力・応答の詳細は既存の [契約ルート](../apps/api/src/contracts/routes.ts)、[返信スキーマ](../apps/api/src/modules/replies/schemas.ts)、[UserPage](../apps/api/src/modules/users/schemas.ts)、[FeedQuery](../apps/api/src/modules/feed/schemas.ts)／[FeedPage](../apps/api/src/modules/bookmarks/schemas.ts) を正本とし、フィールドを複製しない。
+関連: [Issue #14](https://github.com/Megane14916/book-bear/issues/14)、[API設計書](api.md#25-フォローいいね返信)、[要件書の認可](requirements.md#4-アカウント認可)、[DB設計書](database.md)、[認証設計](auth-design.md#8-既存apidbとの接続契約)。入力・応答の詳細は既存の [フォロー・いいねの契約ルート](../apps/api/src/modules/social/routes.ts)、[返信スキーマ](../apps/api/src/modules/replies/schemas.ts)、[UserPage](../apps/api/src/modules/users/schemas.ts)、[FeedQuery](../apps/api/src/modules/feed/schemas.ts)／[FeedPage](../apps/api/src/modules/bookmarks/schemas.ts) を正本とし、フィールドを複製しない。
 
 ## 1. 目的・範囲
 

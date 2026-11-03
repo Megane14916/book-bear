@@ -15,4 +15,9 @@ export type ApiContractTypeChecks = [
   Assert<Schemas['BookmarkFlowPage']['nextCursor'] extends string | null ? true : false>,
   Assert<'author' extends keyof Schemas['BookmarkFlowItem'] ? false : true>,
   Assert<'book' extends keyof Schemas['BookmarkFlowItem'] ? false : true>,
+  Assert<Schemas['SearchUserItem']['handle'] extends string | null ? true : false>,
+  Assert<'handle' extends keyof Schemas['UserSummary'] ? false : true>,
+  Assert<'handle' extends keyof Schemas['UserPage']['items'][number] ? false : true>,
+  Assert<operations['getSearchUsers']['responses'][200]['content']['application/json'] extends Schemas['SearchUserPage'] ? true : false>,
+  Assert<operations['getSearchPosts']['responses'][200]['content']['application/json'] extends Schemas['FeedPage'] ? true : false>,
 ]

@@ -70,7 +70,7 @@ OpenAPIのGET /feedはall・followingともimplemented。フロントは正式JW
 
 ## 6. 契約と検証方針
 
-Issue #13でgetFeedを実ルートへ移し、Issue #14でfollowingへ拡張した。既存パス・operationId・入力・JSON形状を維持し、401/403/404/500/503を実挙動へ合わせる。未実装テンプレートの429は持ち込まない。全36操作の一意性・初期ドラフトの網羅と未実装操作の404検証を維持し、現時点のplannedは検索の2操作だけ。
+Issue #13でgetFeedを実ルートへ移し、Issue #14でfollowingへ拡張した。既存パス・operationId・入力・JSON形状を維持し、401/403/404/500/503を実挙動へ合わせる。未実装テンプレートの429は持ち込まない。Issue #25で検索2操作も実装し、現在は全36操作の一意性・初期ドラフトの網羅と実APIの認証・認可を検証する。listPublicBookmarksの任意qは検索だけで指定し、all／followingの取得条件は維持する。
 
 OpenAPIとWeb生成型は既存コマンドで再生成し、[契約検証](../apps/api/src/contracts/openapi.test.ts) と [生成型チェック](../apps/web/src/lib/api/generated.type-test.ts) を維持する。MSWは現時点で未導入のため、新しいモック基盤は作らない。
 

@@ -1,4 +1,4 @@
-import { sql, eq, and, isNull, exists } from 'drizzle-orm'
+import { sql, eq, and, asc, ilike, isNotNull, isNull, or, exists } from 'drizzle-orm'
 import type { z } from '@hono/zod-openapi'
 import type { Database } from '../../db/client'
 import { profiles, userPreferences, follows, bookmarks, userBooks } from '../../db/schema'
@@ -82,4 +82,12 @@ function pgError(error: unknown): { code: string; constraint?: string } | undefi
   if (!(error instanceof Error)) return
   if ('code' in error && typeof error.code === 'string') return error as Error & { code: string; constraint?: string }
   if ('cause' in error && error.cause instanceof Error && 'code' in error.cause && typeof error.cause.code === 'string') return error.cause as Error & { code: string; constraint?: string }
+}
+
+export async function searchUsers(db: Database, query: { q: string; limit: number }) {
+  const pattern = `%${query.q.replace(/[\\%_]/g, '\\$&')}%`
+  const items = await db.select({ id: profiles.id, displayName: profiles.displayName, avatarUrl: profiles.avatarUrl, handle: profiles.handle })
+    .from(profiles).where(and(isNotNull(profiles.registrationConfirmedAt), or(ilike(profiles.displayName, pattern), ilike(profiles.handle, pattern))))
+    .orderBy(asc(profiles.displayName), asc(profiles.id)).limit(query.limit)
+  return { items, nextCursor: null }
 }

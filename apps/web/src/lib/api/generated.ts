@@ -501,7 +501,7 @@ export interface paths {
         };
         /**
          * 公開栞のテキスト検索
-         * @description 【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。JWTは任意。送信されたJWTは検証し、無効なら401。 limitは既定15・最大30。SQLはlimit+1件取得し、続きがなければnextCursor=null。カーソルの署名または対象・条件の厳格照合が必要。 created_at DESC, id DESC。 公開栞のみ。他人の非公開栞および削除済み栞は返さない。 未認証のlikedByMeはfalse。
+         * @description JWTは任意、提示時は入力検証より先に必ず検証する。公開・未削除の本文をILIKEで部分一致検索し、本人の非公開も除外。%、_、バックスラッシュは文字として検索。created_at DESC, id DESC、limit既定15・最大30、limit+1で続きを判定。日時の小数6桁と既存カーソルを使い、同じ検索語で続きを取得する。いいね・未削除返信を一括集計し、未認証のlikedByMe=false。ネタバレの初期非表示はUIの責務。0件は200空配列。
          */
         get: operations["getSearchPosts"];
         put?: never;
@@ -520,8 +520,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * 表示名・handle検索
-         * @description 【未実装・契約のみ】実APIのハンドラーは未登録（現在は404）。認証なしで利用可能。 limit既定20・最大30。初期ドラフト互換のUserPageを返し、nextCursorはnull（カーソル入力なし）。
+         * 登録確認済みユーザーの表示名・handle検索
+         * @description 認証不要、Authorizationは検証しない。正式JWTによるPUT /meでregistration_confirmed_atが記録済みのプロフィールのみ。表示名またはhandleのILIKE部分一致、%、_、バックスラッシュは文字として検索。id・displayName・avatarUrl・nullableなhandleだけを返し、登録確認日時・Auth情報・私有情報は返さない。表示名ASC, ID ASC、limit既定20・最大30。MVPではカーソル入力なし、nextCursorは常にnull。上限を超える候補は追加取得できない。0件は200空配列。既存の公開プロフィール・フォロー一覧の権限や応答は変更しない。
          */
         get: operations["getSearchUsers"];
         put?: never;
@@ -645,7 +645,7 @@ export interface components {
         };
         UserBookPage: {
             items: components["schemas"]["UserBook"][];
-            /** @description 不透明なカーソル。内容を解析せず次回の同じ条件のリクエストに渡す。不正・期限切れは400 INVALID_CURSOR。 */
+            /** @description 日時・IDのBase64URLカーソル。署名・有効期限なし。同じ条件の次回リクエストへ渡す。内容不正は400 INVALID_CURSOR、空文字は400 VALIDATION_ERROR。認可条件はSQLで毎回確認する。 */
             nextCursor: string | null;
         };
         CreateUserBookRequest: {
@@ -661,7 +661,7 @@ export interface components {
         };
         PublicBookPage: {
             items: components["schemas"]["BookSummary"][];
-            /** @description 不透明なカーソル。内容を解析せず次回の同じ条件のリクエストに渡す。不正・期限切れは400 INVALID_CURSOR。 */
+            /** @description 日時・IDのBase64URLカーソル。署名・有効期限なし。同じ条件の次回リクエストへ渡す。内容不正は400 INVALID_CURSOR、空文字は400 VALIDATION_ERROR。認可条件はSQLで毎回確認する。 */
             nextCursor: string | null;
         };
         UserSummary: {
@@ -691,7 +691,7 @@ export interface components {
             author: components["schemas"]["UserSummary"];
             book: components["schemas"]["BookSummary"];
             items: components["schemas"]["BookmarkFlowItem"][];
-            /** @description 不透明なカーソル。内容を解析せず次回の同じ条件のリクエストに渡す。不正・期限切れは400 INVALID_CURSOR。 */
+            /** @description 日時・IDのBase64URLカーソル。署名・有効期限なし。同じ条件の次回リクエストへ渡す。内容不正は400 INVALID_CURSOR、空文字は400 VALIDATION_ERROR。認可条件はSQLで毎回確認する。 */
             nextCursor: string | null;
         };
         BookmarkCard: components["schemas"]["BookmarkFlowItem"] & {
@@ -713,7 +713,7 @@ export interface components {
         };
         FeedPage: {
             items: components["schemas"]["BookmarkCard"][];
-            /** @description 不透明なカーソル。内容を解析せず次回の同じ条件のリクエストに渡す。不正・期限切れは400 INVALID_CURSOR。 */
+            /** @description 日時・IDのBase64URLカーソル。署名・有効期限なし。同じ条件の次回リクエストへ渡す。内容不正は400 INVALID_CURSOR、空文字は400 VALIDATION_ERROR。認可条件はSQLで毎回確認する。 */
             nextCursor: string | null;
         };
         PatchBookmarkRequest: {
@@ -725,7 +725,7 @@ export interface components {
         };
         UserPage: {
             items: components["schemas"]["UserSummary"][];
-            /** @description 不透明なカーソル。内容を解析せず次回の同じ条件のリクエストに渡す。不正・期限切れは400 INVALID_CURSOR。 */
+            /** @description 日時・IDのBase64URLカーソル。署名・有効期限なし。同じ条件の次回リクエストへ渡す。内容不正は400 INVALID_CURSOR、空文字は400 VALIDATION_ERROR。認可条件はSQLで毎回確認する。 */
             nextCursor: string | null;
         };
         Reply: {
@@ -741,7 +741,7 @@ export interface components {
         };
         ReplyPage: {
             items: components["schemas"]["Reply"][];
-            /** @description 不透明なカーソル。内容を解析せず次回の同じ条件のリクエストに渡す。不正・期限切れは400 INVALID_CURSOR。 */
+            /** @description 日時・IDのBase64URLカーソル。署名・有効期限なし。同じ条件の次回リクエストへ渡す。内容不正は400 INVALID_CURSOR、空文字は400 VALIDATION_ERROR。認可条件はSQLで毎回確認する。 */
             nextCursor: string | null;
         };
         CreateReplyRequest: {
@@ -752,6 +752,14 @@ export interface components {
         PatchReplyRequest: {
             content?: string;
             isSpoiler?: boolean;
+        };
+        SearchUserItem: components["schemas"]["UserSummary"] & {
+            handle: string | null;
+        };
+        SearchUserPage: {
+            items: components["schemas"]["SearchUserItem"][];
+            /** @description 日時・IDのBase64URLカーソル。署名・有効期限なし。同じ条件の次回リクエストへ渡す。内容不正は400 INVALID_CURSOR、空文字は400 VALIDATION_ERROR。認可条件はSQLで毎回確認する。 */
+            nextCursor: string | null;
         };
     };
     responses: never;
@@ -3048,7 +3056,7 @@ export interface operations {
                     "application/json": components["schemas"]["FeedPage"];
                 };
             };
-            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル */
+            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正 */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -3057,7 +3065,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description UNAUTHORIZED: 必須JWTがない、または送信されたJWTが無効・期限切れ */
+            /** @description UNAUTHORIZED: 提示JWTが無効・期限切れ */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -3066,8 +3074,8 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description RATE_LIMITED: 操作回数制限 */
-            429: {
+            /** @description INTERNAL_ERROR: 内部情報を含めないエラー */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3075,8 +3083,8 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description INTERNAL_ERROR: 内部情報を含めないサーバーエラー */
-            500: {
+            /** @description INTERNAL_ERROR: 認証設定不備・JWKS取得失敗 */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3104,10 +3112,10 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["UserPage"];
+                    "application/json": components["schemas"]["SearchUserPage"];
                 };
             };
-            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力不正、または不正・期限切れのカーソル */
+            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正 */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -3116,16 +3124,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description RATE_LIMITED: 操作回数制限 */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description INTERNAL_ERROR: 内部情報を含めないサーバーエラー */
+            /** @description INTERNAL_ERROR: 内部情報を含めないエラー */
             500: {
                 headers: {
                     [name: string]: unknown;
