@@ -1,6 +1,6 @@
 # 栞の流れAPI 設計書（Issue #12）
 
-状態: 実装前の設計。
+状態: 実装済み。実装は [bookmarksモジュール](../apps/api/src/modules/bookmarks/service.ts)、検証は [栞の流れAPIテスト](../apps/api/tests/bookmark-flow.test.ts) を参照。
 
 関連: [Issue #12](https://github.com/Megane14916/book-bear/issues/12) / 基準: main `6f716d4`（PR #21マージ後） / 2026-11-03（日本時間）
 
