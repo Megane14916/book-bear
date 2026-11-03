@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
+import { createServer } from 'node:http'
+import { resolve } from 'node:path'
 import { createBookProvider } from '../src/integrations/books'
 
 const volume = { id: 'volume-1', volumeInfo: { title: '外部の本', authors: ['著者A', '著者B'], publisher: '出版社', industryIdentifiers: [{ type: 'ISBN_13', identifier: '9784780802047' }], pageCount: 123, imageLinks: { thumbnail: 'https://example.com/cover.jpg' } } }
@@ -11,7 +13,7 @@ describe('書籍providerの正規化と障害', () => {
     const url = new URL(String(fetcher.mock.calls[0][0]))
     expect(url.origin + url.pathname).toBe('https://www.googleapis.com/books/v1/volumes')
     expect(Object.fromEntries(url.searchParams)).toEqual({ key: 'test-key', q: '本 & 著者', maxResults: '20' })
-    expect(fetcher.mock.calls[0][1]).toMatchObject({ redirect: 'error', signal: expect.any(AbortSignal) })
+    expect(fetcher.mock.calls[0][1]).toMatchObject({ redirect: 'manual', signal: expect.any(AbortSignal) })
   })
   it('欠損・不正ISBN・危険な書影URL・不正ページ数はnull、タイトルなしの検索候補は除外', async () => {
     const fetcher: typeof fetch = async () => Response.json({ totalItems: 3, items: [
@@ -84,3 +86,46 @@ describe('書籍providerの正規化と障害', () => {
     await expect(createBookProvider(missing).search('本', 20)).rejects.toMatchObject({ status: 502 })
   })
 })
+
+it('実WorkersのfetchでGoogle検索・詳細・openBD取得が動作し、3xxへ追従しない', async () => {
+  let status = 200, calls = 0, redirected = 0
+  const server = createServer((request, response) => {
+    calls++
+    const path = request.url ?? ''
+    if (path.startsWith('/redirect-target')) { redirected++; response.end('{}'); return }
+    if (status !== 200) { response.writeHead(status, { Location: '/redirect-target' }); response.end(); return }
+    response.setHeader('Content-Type', 'application/json')
+    response.end(JSON.stringify(path.startsWith('/v1/get')
+      ? [{ summary: { isbn: '9784780802047', title: 'openBDの本' } }]
+      : path.startsWith('/books/v1/volumes/volume-1') ? volume : { totalItems: 1, items: [volume] }))
+  })
+  await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve) })
+  const address = server.address()
+  if (!address || typeof address === 'string') throw new Error('Test provider must use a TCP port')
+  const names = ['WRANGLER_LOG_PATH', 'WRANGLER_SEND_METRICS'] as const, previous = names.map(name => process.env[name])
+  process.env.WRANGLER_LOG_PATH = resolve('.wrangler/logs')
+  process.env.WRANGLER_SEND_METRICS = 'false'
+  const { unstable_dev } = await import('wrangler')
+  let worker: Awaited<ReturnType<typeof unstable_dev>> | undefined
+  try {
+    worker = await unstable_dev('tests/fixtures/book-provider-worker.ts', { config: 'wrangler.jsonc', local: true, ip: '127.0.0.1', port: 0, inspectorPort: 0, persist: false, logLevel: 'error',
+      vars: { TEST_PROVIDER_URL: `http://127.0.0.1:${address.port}` }, experimental: { disableExperimentalWarning: true, disableDevRegistry: true, watch: false } })
+    for (const action of ['search', 'google', 'openbd']) {
+      const response = await worker.fetch(`/${action}`)
+      expect(response.status).toBe(200)
+      const result = await response.json() as { title: string } | { title: string }[]
+      expect(Array.isArray(result) ? result[0].title : result.title).toBe(action === 'openbd' ? 'openBDの本' : '外部の本')
+    }
+    for (status of [301, 302, 303, 307, 308]) for (const action of ['search', 'google', 'openbd']) {
+      const before = calls, response = await worker.fetch(`/${action}`)
+      expect(response.status).toBe(502)
+      expect(await response.json()).toEqual({ error: { code: 'BOOK_PROVIDER_UNAVAILABLE', message: '書籍情報サービスを利用できません' } })
+      expect(calls - before).toBe(1)
+    }
+    expect(redirected).toBe(0)
+  } finally {
+    await worker?.stop()
+    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+    names.forEach((name, i) => { if (previous[i] === undefined) delete process.env[name]; else process.env[name] = previous[i] })
+  }
+}, 60000)

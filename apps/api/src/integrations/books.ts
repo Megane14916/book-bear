@@ -39,7 +39,8 @@ const OpenBdBook = z.object({ summary: z.object({ isbn: z.string(), title: z.str
 export function createBookProvider(fetcher: typeof fetch = fetch, apiKey?: string) {
   async function get(url: URL): Promise<unknown | null> {
     try {
-      const response = await fetcher(url, { redirect: 'error', signal: AbortSignal.timeout(5000) })
+      // Workers supports follow/manual only. Reject redirects via !response.ok.
+      const response = await fetcher(url, { redirect: 'manual', signal: AbortSignal.timeout(5000) })
       if (response.status === 404) return null
       if (!response.ok) throw providerUnavailable()
       return await response.json()
