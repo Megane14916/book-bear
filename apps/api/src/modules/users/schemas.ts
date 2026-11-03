@@ -18,3 +18,5 @@ export const PublicProfile = z.object({
 }).openapi('PublicProfile')
 export const PatchProfile = patchObject({ displayName, bio, handle }).openapi('PatchProfile')
 export const UserPage = cursorPage('UserPage', UserSummary)
+export const SearchUserItem = UserSummary.extend({ handle }).openapi('SearchUserItem')
+export const SearchUserPage = cursorPage('SearchUserPage', SearchUserItem)

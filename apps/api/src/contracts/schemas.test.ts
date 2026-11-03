@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { z } from '@hono/zod-openapi'
 import { BookmarkIdParams, ErrorSchema, PaginationQuery, SearchQuery } from '../shared/schemas'
-import { PatchProfile, Profile, PublicProfile } from '../modules/users/schemas'
+import { PatchProfile, Profile, PublicProfile, SearchUserItem, SearchUserPage, UserSummary } from '../modules/users/schemas'
 import { PatchPreferences } from '../modules/preferences/schemas'
 import { BookSearchItem, ImportBookRequest, Isbn13, ManualBookRequest } from '../modules/books/schemas'
 import { PatchUserBookRequest } from '../modules/library/schemas'
@@ -98,6 +98,14 @@ describe('書籍', () => {
 })
 
 describe('クエリ・共通レスポンス', () => {
+  it('検索専用handleは既存制約とnullableを維持し、共有要約には追加しない', () => {
+    const user = { id, displayName: '読者', avatarUrl: null }
+    expect(UserSummary.parse(user)).toEqual(user)
+    expect(SearchUserItem.safeParse(user).success).toBe(false)
+    for (const handle of [null, 'abc_123', 'a'.repeat(30)]) expect(SearchUserPage.parse({ items: [{ ...user, handle }], nextCursor: null }).items[0].handle).toBe(handle)
+    for (const handle of ['', 'ab', 'a'.repeat(31), 'Upper', '日本語', 'invalid-handle']) expect(SearchUserItem.safeParse({ ...user, handle }).success).toBe(false)
+    expect(SearchUserItem.parse({ ...user, handle: ' abc ' }).handle).toBe('abc')
+  })
   it('15件既定・30件上限、検索20件既定、scope=all既定', () => {
     expect(PaginationQuery.parse({})).toEqual({ limit: 15 })
     expect(PaginationQuery.parse({ limit: '30', cursor: 'opaque' })).toEqual({ limit: 30, cursor: 'opaque' })

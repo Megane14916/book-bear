@@ -6,7 +6,7 @@ export const count = z.number().int().nonnegative()
 export const positivePage = z.number().int().positive()
 export const nonEmptyText = () => z.string().trim().min(1)
 export const cursor = z.string().min(1).openapi({
-  description: '不透明なカーソル。内容を解析せず次回の同じ条件のリクエストに渡す。不正・期限切れは400 INVALID_CURSOR。',
+  description: '日時・IDのBase64URLカーソル。署名・有効期限なし。同じ条件の次回リクエストへ渡す。内容不正は400 INVALID_CURSOR、空文字は400 VALIDATION_ERROR。認可条件はSQLで毎回確認する。',
 })
 
 export const errorCodes = [

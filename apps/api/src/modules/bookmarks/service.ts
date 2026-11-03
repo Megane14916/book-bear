@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, exists, inArray, isNull, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, exists, ilike, inArray, isNull, or, sql } from 'drizzle-orm'
 import type { z } from '@hono/zod-openapi'
 import type { Database } from '../../db/client'
 import { bookmarkLikes, bookmarkReplies, bookmarks, books, follows, profiles, userBooks } from '../../db/schema'
@@ -53,11 +53,12 @@ export async function listBookmarks(db: Database, viewer: Identity, query: { lim
   const cards = rows.slice(0, query.limit), last = cards.at(-1)
   return { items: await withCounts(db, cards, viewer), nextCursor: rows.length > query.limit && last ? encodeCursor({ createdAt: last.createdAt, id: last.id }) : null }
 }
-export async function listPublicBookmarks(db: Database, query: { limit: number; boundary?: ReturnType<typeof decodeCursor>; followingUserId?: string }, viewer?: Identity) {
+export async function listPublicBookmarks(db: Database, query: { limit: number; boundary?: ReturnType<typeof decodeCursor>; followingUserId?: string; q?: string }, viewer?: Identity) {
   const followed = query.followingUserId ? exists(db.select({ id: userBooks.id }).from(userBooks)
     .innerJoin(follows, eq(follows.followingId, userBooks.userId))
     .where(and(eq(userBooks.id, bookmarks.userBookId), eq(follows.followerId, query.followingUserId)))) : undefined
-  const publicOnly = and(eq(bookmarks.visibility, 'public'), isNull(bookmarks.deletedAt), followed)
+  const matching = query.q === undefined ? undefined : ilike(bookmarks.content, `%${query.q.replace(/[\\%_]/g, '\\$&')}%`)
+  const publicOnly = and(eq(bookmarks.visibility, 'public'), isNull(bookmarks.deletedAt), followed, matching)
   const page = db.$with('feed_page').as(db.select({ id: bookmarks.id }).from(bookmarks)
     .where(and(publicOnly, olderThan(bookmarks.createdAt, bookmarks.id, query.boundary)))
     .orderBy(desc(bookmarks.createdAt), desc(bookmarks.id)).limit(query.limit + 1))

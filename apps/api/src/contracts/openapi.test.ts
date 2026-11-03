@@ -2,7 +2,6 @@ import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 import { OpenAPIHono, z } from '@hono/zod-openapi'
 import app, { openApiConfig } from '../index'
-import { plannedRoutes } from './routes'
 import { profileRoutes } from '../modules/users/routes'
 import { bookRoutes } from '../modules/books/routes'
 import { libraryRoutes } from '../modules/library/routes'
@@ -10,28 +9,22 @@ import { bookmarkRoutes } from '../modules/bookmarks/routes'
 import { feedRoutes } from '../modules/feed/routes'
 import { socialRoutes } from '../modules/social/routes'
 import { replyRoutes } from '../modules/replies/routes'
+import { searchRoutes } from '../modules/search/routes'
 import { CreateBookmarkRequest } from '../modules/bookmarks/schemas'
 import { ErrorSchema } from '../shared/schemas'
 
 const document = app.getOpenAPIDocument(openApiConfig)
 const operations = Object.values(document.paths).flatMap((path) => Object.values(path ?? {}))
+const routes = [...Object.values(profileRoutes), ...Object.values(bookRoutes), ...Object.values(libraryRoutes), ...Object.values(bookmarkRoutes), ...Object.values(feedRoutes), ...Object.values(socialRoutes), ...Object.values(replyRoutes), ...Object.values(searchRoutes)]
 
-describe('OpenAPI契約と稼働APIの区別', () => {
-  it('主要34操作・healthが一意のoperationIdを持ち、全未実装操作を明示する', () => {
-    expect(plannedRoutes).toHaveLength(2)
+describe('OpenAPI契約と稼働APIの整合性', () => {
+  it('主要34操作・healthが一意のoperationIdを持ち、全操作が実装済み', () => {
+    expect(routes).toHaveLength(34)
     expect(operations).toHaveLength(36)
     expect(new Set(operations.map((operation) => operation.operationId)).size).toBe(36)
-    for (const route of plannedRoutes) {
-      const operation = document.paths[route.path]?.[route.method]
-      expect(operation?.['x-implementation-status']).toBe('planned')
-      expect(operation?.description).toContain('未実装・契約のみ')
-      expect(operation?.responses[400]).toBeDefined()
-      expect(operation?.responses[429]).toBeDefined()
-      expect(operation?.responses[500]).toBeDefined()
-    }
     expect(document.paths['/api/v1/health']?.get?.['x-implementation-status']).toBe('implemented')
     expect(document.paths['/api/v1/health/db']?.get?.['x-implementation-status']).toBe('implemented')
-    for (const route of [...Object.values(profileRoutes), ...Object.values(bookRoutes), ...Object.values(libraryRoutes), ...Object.values(bookmarkRoutes), ...Object.values(feedRoutes), ...Object.values(socialRoutes), ...Object.values(replyRoutes)]) {
+    for (const route of routes) {
       const operation = document.paths[route.path]?.[route.method]
       expect(operation?.['x-implementation-status']).toBe('implemented')
       expect(operation?.description ?? '').not.toContain('未実装・契約のみ')
@@ -43,7 +36,7 @@ describe('OpenAPI契約と稼働APIの区別', () => {
     const draft = await readFile(new URL('../../../../contracts/openapi-draft.yaml', import.meta.url), 'utf8')
     const ids = [...draft.matchAll(/operationId: (\S+)/g)].map((match) => match[1])
     expect(ids).toHaveLength(34)
-    expect([...plannedRoutes, ...Object.values(profileRoutes), ...Object.values(bookRoutes), ...Object.values(libraryRoutes), ...Object.values(bookmarkRoutes), ...Object.values(feedRoutes), ...Object.values(socialRoutes), ...Object.values(replyRoutes)].map((route) => route.operationId).sort()).toEqual(ids.sort())
+    expect(routes.map((route) => route.operationId).sort()).toEqual(ids.sort())
   })
 
   it('followingと自分の返信DELETEの実際の認可を契約に明記する', () => {
@@ -97,15 +90,32 @@ describe('OpenAPI契約と稼働APIの区別', () => {
     expect(schemas?.BookmarkFlowItem).not.toHaveProperty('properties.book')
   })
 
-  it('healthと公開仕様を配信し、契約のみの操作に成功レスポンスを返さない', async () => {
+  it('healthと公開仕様を配信する', async () => {
     expect(await (await app.request('/api/v1/health')).json()).toEqual({ status: 'ok' })
     const response = await app.request('/openapi.json')
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual(document)
-    for (const route of plannedRoutes) {
-      const url = route.path.replace(/\{\w+\}/g, 'a0000000-0000-4000-8000-000000000001')
-      expect((await app.request(url, { method: route.method.toUpperCase() })).status).toBe(404)
-    }
+  })
+
+  it('検索専用応答とPublic／OptionalAuthを区別し、既存共有型を維持する', () => {
+    const posts = document.paths['/api/v1/search/posts']?.get, users = document.paths['/api/v1/search/users']?.get
+    expect(users?.security).toEqual([])
+    expect(users?.responses[200]).toMatchObject({ content: { 'application/json': { schema: { $ref: '#/components/schemas/SearchUserPage' } } } })
+    expect(posts?.responses[200]).toMatchObject({ content: { 'application/json': { schema: { $ref: '#/components/schemas/FeedPage' } } } })
+    expect(users?.description).toContain('registration_confirmed_at')
+    expect(users?.description).toContain('上限を超える候補は追加取得できない')
+    expect(users?.responses[401]).toBeUndefined()
+    expect(users?.responses[503]).toBeUndefined()
+    expect(posts?.responses[401]).toBeDefined()
+    expect(posts?.responses[503]).toBeDefined()
+    for (const operation of [users, posts]) for (const code of [403, 404, 429]) expect(operation?.responses[code]).toBeUndefined()
+    const schemas = document.components?.schemas
+    expect(schemas?.UserSummary).not.toHaveProperty('properties.handle')
+    expect(schemas?.UserPage).toMatchObject({ properties: { items: { items: { $ref: '#/components/schemas/UserSummary' } } } })
+    expect(schemas?.SearchUserItem).toBeDefined()
+    expect(schemas?.SearchUserPage).toMatchObject({ properties: { items: { items: { $ref: '#/components/schemas/SearchUserItem' } } } })
+    expect(users?.parameters?.map((param) => 'name' in param && param.name)).toEqual(['q', 'limit'])
+    expect(posts?.parameters?.find((param) => 'name' in param && param.name === 'cursor')).toMatchObject({ schema: { description: expect.stringContaining('署名・有効期限なし') } })
   })
 
   it('DB未設定は接続情報を返さず503、キャッシュを禁止する', async () => {
