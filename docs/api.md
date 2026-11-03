@@ -8,7 +8,7 @@
 
 `apps/api/src/modules/*/schemas.ts` と `src/contracts/routes.ts` を正本として、主要34操作の `contracts/openapi.json` とWebの `src/lib/api/generated.ts` を生成する。`GET /openapi.json` も同一仕様を返す。手書きの初期ドラフトは履歴資料とし、以降の変更はZod定義・生成物・本書に反映する。
 
-- 操作単位の `x-implementation-status: implemented` は実装済み（health・DB接続確認と、Issue #9のプロフィール／設定6操作、Issue #10の書籍・本棚9操作、Issue #11の栞CRUD・本人一覧5操作、Issue #12の栞の流れ1操作）。
+- 操作単位の `x-implementation-status: implemented` は実装済み（health・DB接続確認と、Issue #9のプロフィール／設定6操作、Issue #10の書籍・本棚9操作、Issue #11の栞CRUD・本人一覧5操作、Issue #12の栞の流れ1操作、Issue #13の全体フィード1操作）。GET /feedはscope=allのみ実装済みで、followingはIssue #14まで未実装。
 - `x-implementation-status: planned` は契約のみ。OpenAPIレジストリに登録するが、HonoのHTTPハンドラーには登録しないため、実APIは現在404となる。記載した成功・認証エラーは今後の実装の契約であり、認証や認可が稼働している意味ではない。
 - `x-auth` は `Public / OptionalAuth / AnyAuth / Owner / Registered`。`OptionalAuth` はJWTなしでも閲覧可、送信時は必ず検証して無効なら401。`Registered` は匿名ユーザーに403。公開化・followingフィードなどの条件付き制限は各操作の説明と403レスポンスに記載する。
 - `followedByMe`・`likedByMe` を返す公開GETと、本人の非公開情報を返し得るGETは任意認証。初期ドラフトの公開プロフィール・返信一覧・投稿検索の認証記載を補完した。
@@ -30,7 +30,7 @@
 
 ### 認証・プロフィール（Issue #9）
 
-`GET/PUT/PATCH /me`、`GET/PATCH /me/preferences`、`GET /users/{userId}` の6操作を実装した。定義は `modules/users/routes.ts`、HTTP処理は `http.ts`、DB操作は `service.ts`。Issue #9完了時点では34操作のうち28操作がplannedだった。Issue #10完了後は19操作、Issue #11完了後は14操作、Issue #12完了後は13操作がplanned。
+`GET/PUT/PATCH /me`、`GET/PATCH /me/preferences`、`GET /users/{userId}` の6操作を実装した。定義は `modules/users/routes.ts`、HTTP処理は `http.ts`、DB操作は `service.ts`。Issue #9完了時点では34操作のうち28操作がplannedだった。Issue #10完了後は19操作、Issue #11完了後は14操作、Issue #12完了後は13操作、Issue #13完了後は12操作がplanned（followingの実装待ちはgetFeedの説明に記載）。
 
 - `middleware/auth.ts` で固定プロジェクトのJWKSからES256／RS256を検証する。issuerは `SUPABASE_URL + /auth/v1`、audienceは `authenticated`。exp／iat／sub／role／session_id／is_anonymousを必須とする。JWTなし・不正・期限切れは401、設定不備・JWKS取得障害は503。HS256は使わない。
 - 本人のID・匿名状態は検証済みclaimから取得し、本文やユーザーメタデータで上書きしない。公開プロフィールは任意認証で、提示したJWTが不正なら401。
@@ -76,6 +76,14 @@ Custom providerの識別子は `custom:google`、要求scopeは `openid email` �
 - 投稿日時・IDの昇順、既定15件・最大30件。既存のBase64URLカーソルとマイクロ秒精度を再利用する。
 - プロフィールまたは書籍の不存在は404。組み合わせや閲覧可能な栞がなければ公開ヘッダー付きの空結果を200で返す。itemsにはauthor・bookや本棚の私有項目を含めない。
 - `withCounts<T extends { id: string }>` を既存カードと軽量itemsに共用し、いいね・未削除返信を一括集計する。成功・失敗ともno-store。DB構造・依存・モック基盤の追加はない。
+
+### 全体フィード（Issue #13）
+
+`GET /feed` のscope省略時・scope=allを実装。公開・未削除のみを投稿日時・IDの降順で返し、本人の非公開も含めない。既存カーソルと高精度日時、カード射影・withCountsの一括集計を再利用する。認可・入力検証の順序とテストデータ管理は [全体フィード設計書](feed-design.md) を参照。
+
+GET /feed全体の実装状態はimplementedだが、scope=followingはIssue #14まで未実装。JWT検証→Zod入力検証→followingガードの順で、未認証401／匿名403／正式JWT404を返し、DBへ接続しない。正式JWTへの404はフォロー対象なしを意味しない一時的な未実装応答。followingでは非空カーソルの内容検証を行わず、空カーソル・不正scope・不正limitはZodで400にする。フロントはIssue #14完了までフォロー中フィードを利用可能扱いしない。
+
+allの閲覧にプロフィール初期化は不要。提示JWTは必ず検証し、likedByMeは検証済みUIDから算出する。全応答no-store。DB構造・依存・レート制限・モック基盤の追加はない。
 
 ## 1. 共通ルール
 
@@ -284,7 +292,7 @@ export type CursorPage<T> = {
 | Method | Path | 権限 | 内容 |
 |---|---|---|---|
 | GET | `/feed?scope=all&limit=15&cursor=` | Public | 全体公開栞を新着順に取得 |
-| GET | `/feed?scope=following&limit=15&cursor=` | Registered | フォロー中の公開栞を新着順に取得 |
+| GET | `/feed?scope=following&limit=15&cursor=` | Registered | Issue #14まで未実装。未認証401／匿名403／正式JWTは暫定404 |
 
 レスポンス：`CursorPage<BookmarkCard>`。`content` は公開本文を含める。`isSpoiler` と閲覧設定はフロントの表示判定に使う。
 
@@ -364,10 +372,10 @@ MVPでは日本語検索を `ILIKE` 等の簡易検索で開始。データ量�
 - **全体／フォロー中フィード**：`ORDER BY created_at DESC, id DESC`。次ページは `(created_at, id) < (lastCreatedAt, lastId)`。
 - **栞の流れ**：`ORDER BY created_at ASC, id ASC`。次ページは `(created_at, id) > (lastCreatedAt, lastId)`。
 - **返信**：[暫定] `created_at ASC, id ASC` とする。
-- 本棚と公開本一覧（Issue #10）・本人栞一覧（Issue #11）は `created_at DESC, id DESC`、栞の流れ（Issue #12）は `created_at ASC, id ASC` のkeyset方式。日時・IDのJSONをBase64URL化し、署名・有効期限は設けない。日時はDBから小数6桁のUTC文字列で取得し、ミリ秒へ切り捨てずSQLへ渡す。カーソルは認可に使用せず、所有者・公開条件をSQLで毎回確認する。他の未実装一覧のカーソル方式は各Issueで確定する。
+- 本棚と公開本一覧（Issue #10）・本人栞一覧（Issue #11）・全体フィード（Issue #13）は `created_at DESC, id DESC`、栞の流れ（Issue #12）は `created_at ASC, id ASC` のkeyset方式。日時・IDのJSONをBase64URL化し、署名・有効期限は設けない。日時はDBから小数6桁のUTC文字列で取得し、ミリ秒へ切り捨てずSQLへ渡す。カーソルは認可に使用せず、所有者・公開条件をSQLで毎回確認する。他の未実装一覧のカーソル方式は各Issueで確定する。
 - `limit=15`のときDBでは最大16件取り、返すのは15件。16件目があれば `nextCursor` を返す。ない場合はnull。
 - 新しい投稿が途中に追加されても、カーソルで既存の続きが取得できる。編集・削除で結果が変わる可能性は許容し、重要な変更時は先頭から再取得。
-- 不正なcursorは400 `INVALID_CURSOR` とし、UIで一覧を再取得できるようにする。空のcursorは入力スキーマで400 `VALIDATION_ERROR`。本棚・公開本一覧・本人栞一覧・栞の流れのcursorに有効期限はない。
+- 不正なcursorは400 `INVALID_CURSOR` とし、UIで一覧を再取得できるようにする。空のcursorは入力スキーマで400 `VALIDATION_ERROR`。本棚・公開本一覧・本人栞一覧・栞の流れ・全体フィードのcursorに有効期限はない。followingの暫定ガードはカーソル内容検証より優先する。
 
 ## 4. 認証と例外フロー
 
@@ -388,7 +396,7 @@ MVPでは日本語検索を `ILIKE` 等の簡易検索で開始。データ量�
 
 ## 6. 非機能・性能上の注意
 
-- フィード：最初に条件を満たす投稿を最大16件に絞る。その後15件の投稿について書籍・ユーザー情報を取得し、いいね／返信数を**一括集計**。返信本文は一覧APIに含めない。
+- フィード：最初に条件を満たす投稿を最大limit+1件（既定16件）に絞ってから書籍・ユーザー情報をJOINする。先読み1件を除く返却分（既定15件）についていいね／返信数を**一括集計**。返信本文は一覧APIに含めない。
 - 栞の流れ：最初に `(user_id, book_id)` の `user_books.id` を特定し、専用インデックスを使って15件取得。共通の書籍・投稿者情報はルートに1回だけ返す。
 - 自分のいいね状態はアクセス中ユーザーのIDから一括検索する。集計時にlikesとrepliesを無条件に多重JOINして件数が膨らまないよう注意。
 - CORS許可元はWebフロントのドメインに限定。認証トークン／秘密鍵・内部SQLエラーはログに残さない。
