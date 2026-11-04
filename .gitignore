@@ -8,8 +8,10 @@ dist/
 !.env.deploy.example
 !.env.auth.example
 !.env.local.example
+!.env.cloud-test.example
 .dev.vars*
 !.dev.vars.example
 *.tsbuildinfo
 .local-db/
 /apps/api/wrangler.remote.*.json
+/apps/api/.cloud-test-results/
