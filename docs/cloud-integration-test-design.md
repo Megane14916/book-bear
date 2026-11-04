@@ -1,6 +1,6 @@
 # 開発用クラウド結合テスト 設計書（Issue #29）
 
-状態: CLI・ローカルテストを実装済み。実クラウド検証は未実施。[実行手順・検証記録](cloud-integration-test.md) を参照。
+状態: CLI・ローカルテストを実装済み。2026-11-04に利用者が実クラウドの接続・書籍／本棚操作・DB照合・本棚削除を確認し、実行記録の全15段階が成功。[実行手順・検証記録](cloud-integration-test.md) を参照。
 
 関連: [Issue #29](https://github.com/Megane14916/book-bear/issues/29) / 基準: main `1fd8c1b` / 更新: 2026-11-04（日本時間）
 
