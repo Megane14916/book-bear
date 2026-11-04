@@ -2,122 +2,110 @@
 
 状態: 設計のみ。実装・実クラウド検証は未着手。
 
-関連: [Issue #29](https://github.com/Megane14916/book-bear/issues/29) / 基準: main `1fd8c1b` / 2026-11-04（日本時間）
+関連: [Issue #29](https://github.com/Megane14916/book-bear/issues/29) / 基準: main `1fd8c1b` / 更新: 2026-11-04（日本時間）
 
-## 1. 目的・変更範囲
+## 1. 目的と対象範囲
 
-開発用の配信済みWorkersへHTTP要求を送り、実際の **Workers → HYPERDRIVE binding → Hyperdrive → Supabase PostgreSQL** を通す結合テストを追加する。既存のローカルWorkers・PGlite・CI PostgreSQLテストを補完する。
+開発用の配信済み **Cloudflare Workers → 実Hyperdrive → Supabase PostgreSQL** の接続と、既存APIによる書籍作成・取得、本棚の作成・更新・取得・削除がDBへ正しく反映されることを確認する。
 
-README、既存の `docs/` 全16文書、CA証明書のREADMEを確認した。仕様の正本は [生成OpenAPI](../contracts/openapi.json) と既存Hono/Zod定義、DBはDrizzleスキーマ・マイグレーションとする。初期OpenAPIドラフトは履歴資料として扱う。
+正式な専用ユーザー1人と、実行ごとに作るISBNなし書籍1冊・本棚1件を使い、第4節の手順だけを実施する。書籍は共有データとして保持され、本棚から削除した後も残ることを正常とする。栞は作成しないため、本棚は通常のDELETE APIで削除できる前提とする。
 
-追加対象は明示実行のTypeScript CLI、秘密値を含まない設定例、実行・調査手順、結果記録。API・Web・DBスキーマ・マイグレーション・認可・Workerの権限は変更しない。通常の `pnpm test` とPR CIに実サービス依存を追加しない。
+仕様は [生成OpenAPI](../contracts/openapi.json)、[書籍・本棚API設計](books-library-design.md)、[DB・Hyperdrive設定](database-setup.md) に従う。既存のローカル・CIテストを網羅し直さず、通常の `pnpm test`・PR CIに実サービス依存を追加しない。API・Web・DBスキーマ・マイグレーション・認可設定の変更は不要。今回の作業は本設計書の修正のみとする。
 
-## 2. 実行条件・認証データ
+## 2. 実行前の環境確認
 
-### 環境確認
+実行者は**毎回、書き込み開始前に**Cloudflare DashboardとSupabase Dashboardで以下の実配信構成を確認する。確認日時・確認者・承認した対象・配信バージョンを、秘密値を含まない手元の確認メモに残す。
 
-テスト前に設定担当者がCloudflare／Supabaseの管理画面または読み取り専用CLIで次を確認し、確認日時と証跡の参照先を記録する。CLIはその記録と指定した対象の一致を確認してから書き込む。
-
-- 開発用Workerの名前・HTTPS origin・配信バージョン・ソースcommit、実際に配信された `HYPERDRIVE` bindingのID。
-- そのHyperdriveの接続先が対象SupabaseのDirect connectionで、DBユーザーが既存の `book_bear_api`、`caching.disabled=true` であること。生の設定出力は接続情報を含み得るため保存・転載しない。
-- Workerの `SUPABASE_URL` と認証用プロジェクトの一致、Data API無効、既存RLS・権限の維持。
-- `0000_initial_schema.sql` と `0001_registration_confirmation.sql` の適用履歴。管理画面で履歴のhashをリポジトリと照合し、結果だけを記録する。アプリロールへ履歴／Authの読み取り権限を追加しない。
-
-環境記録はGit対象外のローカルファイルへ置き、実行ごとに確認する。HTTPS originの完全一致を要求し、loopback、任意のURLへの転送、設定不足・不一致では実行しない。既存の `dev:remote` も実Hyperdriveを通るが、今回の標準対象は配信済みWorkerとする。ローカルの `pnpm dev:api` による直接DB接続は別結果にする。
-
-`/health/db` の200だけではbindingのID・接続先・全マイグレーションを証明できない。配信設定の確認と、後述のHTTP書き込み／DB照合を組み合わせて経路を記録する。設定証跡がなければ「実Hyperdrive経由を確認済み」としない。[Cloudflareのローカル／リモート接続仕様](https://developers.cloudflare.com/hyperdrive/configuration/local-development/)
-
-### テストユーザー
-
-| 主体 | 用途・準備 |
+| 確認対象 | 手動で確認する内容 |
 |---|---|
-| 正式ユーザーA・B | 専用の異なる2アカウント。通常のGoogle Custom OIDCログインでSupabaseセッションを取得する |
-| 匿名ユーザーC | 通常の匿名サインインで取得した専用セッション。匿名の非公開CRUD・公開操作拒否に使う |
-| JWTなし／不正JWT | 未認証閲覧・保護操作401、実JWTの署名部分を改変したトークンの拒否に使う |
+| Worker | テスト対象として承認した開発用Workerの名前・HTTPS origin・配信バージョン。実際の配信設定の `HYPERDRIVE` bindingのIDと `SUPABASE_URL` |
+| Hyperdrive | bindingと同じIDであり、接続先が開発用SupabaseのDirect connection、DBロールが既存の `book_bear_api`、`caching.disabled=true` であること |
+| Supabase | 承認した開発用project refとWorkerの認証先・Hyperdriveの接続先の対応。DB照合用接続のホスト・ポート・DB名・ユーザー名も同じプロジェクトのConnect表示と照合 |
+| 移行・権限 | `0000_initial_schema.sql`・`0001_registration_confirmation.sql` と既存アプリロールの必要な権限の適用を管理画面で確認。CLIへ管理者接続やAuth・移行履歴の読み取り権限を追加しない |
 
-固定した期待UIDと、A・B・Cの有効なaccess tokenを入力する。Supabase Authの通常の `/auth/v1/user` とHonoの応答でUID・匿名状態・プロジェクトを照合し、単なるJWT decodeで本人を確定しない。A・Bは異なる正式UID、Cは匿名であることを必須にする。匿名Cのセッションを失った場合は新規の専用ユーザーとして登録し直し、旧データを引き継がない。
+`run` 開始時には、今回の実配信構成を手動確認済みであることの明示確認と、確認メモの承認済みWorker origin・project refの入力を求め、ローカル設定との完全一致を確認する。本番、未承認、確認不能、不一致、設定不足の場合は書き込まず終了する。HTTPのリダイレクトは追従しない。
 
-AuthユーザーをSQLや管理APIで作らず、service_role・Secret key・自作署名JWTを使用しない。認証準備手順には通常フローによるトークン取得、CAPTCHAが必要な場合の入力、期限切れ時の再取得を記載する。既存の [Google OIDC手順](google-oidc-setup.md) とCLIの認証部品を参考にし、トークン表示・scope追加・認可迂回は行わない。
+`CLOUD_TEST_ENVIRONMENT=development` という指定や、ローカル設定と確認メモの一致だけでは、実配信構成の検証済みとは扱わない。Dashboardでの確認を必須の手動前提とする。healthの200だけでもbinding・接続先・移行・権限は確定できない。管理API連携や環境作成・デプロイ・設定変更をCLIに追加しない。
 
-設定は新設の `apps/api/.env.cloud-test.example` とGit対象外の `.env.cloud-test.local` で管理する。主な入力は `CLOUD_TEST_ENVIRONMENT=development`、API origin、Supabase URL・Publishable key、期待UID・access token、環境記録のパス、DB照合専用の `CLOUD_TEST_DATABASE_URL`。接続URLはアプリロールとTLS検証を必須とし、管理用URLや `TEST_DATABASE_URL` を流用しない。Workerへこれらを転送しない。実装時に `.gitignore` へ設定例だけの追跡許可と台帳ディレクトリの除外を追加する。
+## 3. テストユーザーと設定
 
-## 3. 処理の流れ・対象シナリオ
+通常のSupabase Authの認証フローで発行された、正式なテスト専用ユーザー1人の有効なaccess tokenを使用する。AuthユーザーをSQLで作成せず、`service_role`・管理者権限を使用しない。専用ユーザーは実行中に他の操作へ使用しない。
 
-1. 設定・環境証跡・認証を確認し、health 2操作とDB照合接続を確認する。前提不足ならfixture作成前に終了する。
-2. 実行ごとにUUIDのrun IDを発行。A・B・Cで `PUT /me` → `GET /me` を行い、再PUTの冪等性と既存プロフィール・設定の保持を確認する。正式PUTによる登録確認後にSNS・ユーザー検索へ進む。
-3. 専用の書籍・本棚・栞をAPI経由で準備し、以下を直列実行する。返却IDと操作段階を都度ローカル台帳へ保存する。
-4. 各変更をHTTP再取得と対象IDに限定したDBのSELECTで照合する。
-5. 成否にかかわらず後片付けを試み、シナリオ結果と片付け結果を別々に記録する。
+CLI用のGit対象外ファイル `apps/api/.env.cloud-test.local` に、必要な設定だけを保持する。
 
-| 対象 | 操作・期待結果 |
+| 設定 | 用途 |
 |---|---|
-| 接続 | `GET /health`・`GET /health/db` が200、`status=ok`。後者のno-storeも確認 |
-| 書籍・本棚 | run ID付きのISBNなし手動書籍を201で登録し詳細取得。本棚を201で作成、再登録200で同じID・値を保持。一覧取得・進捗PATCH・栞なしの別本棚DELETE 204を確認。栞あり／論理削除済み栞ありの本棚DELETEは409 `HAS_BOOKMARKS`。共有books行は保持 |
-| 栞CRUD | Aの公開／非公開、Cの非公開を作成・取得・編集・論理削除。内容・既定値・createdAt保持・本人一覧を照合。削除後は本人もGET／PATCH／再DELETEが404 |
-| 所有者 | Bの本棚一覧にAの本棚が混ざらず、BによるAの本棚PATCH／DELETE・その本棚への栞作成、Aの栞PATCH／DELETEは404。B・JWTなしにはAの非公開／削除済み栞の詳細404。拒否後も対象行が不変 |
-| 匿名・JWT | Cの公開栞作成・非公開→公開、フォロー・いいね・返信POST・following取得は妥当な入力で403。JWTなしの保護操作、不正JWTの保護／OptionalAuth操作は401。Public操作には不正JWT拒否を要求しない |
-| フォロー・いいね・返信 | B→Aのフォローと重複PUT、followingへの出現、解除。Aの公開栞へBがいいね・重複PUT・解除し件数／likedByMeを確認。返信POST・一覧・PATCH・DELETEと件数を確認 |
-| 検索・栞の流れ | 固有語で公開栞を検索し非公開を除外。A・Bの表示名へ一時的な固有語を設定し、登録確認済み検索・handleを含む4項目だけの応答を確認後、元へ戻す。栞の流れは本人と第三者の公開範囲、ページ番号に依存しない投稿順を確認 |
+| `CLOUD_TEST_ENVIRONMENT` | `development` のみ許可。手動確認と組み合わせる補助条件 |
+| `CLOUD_TEST_API_ORIGIN` | 承認した配信済みWorkerのHTTPS origin。loopback・資格情報・path・query・fragmentを許可しない |
+| `SUPABASE_URL`・`CLOUD_TEST_SUPABASE_PROJECT_REF` | 認証先と承認プロジェクトの一致確認 |
+| `SUPABASE_PUBLISHABLE_KEY` | Supabase Authの通常のユーザー確認に使用 |
+| `CLOUD_TEST_USER_ID`・`CLOUD_TEST_ACCESS_TOKEN` | 期待する専用UIDと実JWT |
+| `CLOUD_TEST_DATABASE_URL` | 同じ開発用DBへアプリ専用ロールで接続する照合専用URL |
 
-パスは `/api/v1` 以下。成功・エラーのHTTP status、共通error code、既存Zodの応答スキーマ、私有項目の非露出、契約上必要なno-storeを検証する。全APIの境界値や並行ロック試験は既存テストに委ね、クラウドでは代表シナリオを検証する。
+`run` は書き込み前に、設定したSupabaseの通常の `GET /auth/v1/user` でJWTが受理され、期待UID・正式ユーザーであることを確認する。JWT decodeだけで本人を確定しない。DB照合接続も先に確立し、承認済み接続先との一致、`current_user=book_bear_api`、TLS証明書検証、読み取り可能なことを確認する。
 
-### 公開変更直後の非露出（必須）
+JWT・DBパスワード・接続文字列はログやGitへ出さず、コマンド引数・Workerへも渡さない。`TEST_DATABASE_URL` と管理用URLは流用せず、既存の `tests/helpers/database.ts` も利用しない。
 
-Aの公開栞を異なる専用書籍に1件ずつ用意し、B・JWTなしの双方で詳細、allフィード、投稿検索、公開本一覧、栞の流れから取得できることを先に確認する。BはAをフォローし、followingも取得する。その後、1件を非公開化、もう1件を公開のまま論理削除する。
+## 4. 接続確認とCRUDテストの手順
 
-各変更の成功応答後、待機・成功待ちリトライ・キャッシュ破棄・cache-busterなしで、**変更前と同じURL・クエリ・閲覧者**で再取得する。詳細404、栞一覧に対象栞IDなし、公開本一覧に対象bookIdなし、非公開は本人のみ可読、削除済みは本人にも不可を確認する。非公開化後の返信GET／PATCHはBに404、B自身の返信DELETEは204も確認する。いいねは変更前に解除する。
+環境・JWT・DB接続の事前確認後、次を直列実行する。health確認に失敗した場合も書き込みは開始しない。実行ごとに新しいUUIDのrun IDを使い、書籍タイトルを `cloud-test-<run ID>` とする。
 
-一覧は固有語・対象ユーザー／本で分離し、必要な全ページを確認する。全体フィードには他人の投稿が混在するため固定件数や先頭1ページだけで不在を判定しない。追跡上限・同じカーソルの反復等で確認しきれなければ未検証とする。ページングには小さいlimitを指定し、重複なしと順序も確認する。
+最初にWorkerの `GET /api/v1/health` と `GET /api/v1/health/db` がともに200・`status=ok` を返すことを確認する。その後、同じJWTで以下を実行する。
 
-キャッシュ設定の確認と挙動検証は両方必要。Hyperdriveのクエリキャッシュは書き込みによる無効化を前提にせず、無効を維持する。[Cloudflareのキャッシュ仕様](https://developers.cloudflare.com/hyperdrive/concepts/query-caching/)
+| 順序 | 操作 | 確認内容 |
+|---|---|---|
+| 1 | 実Supabase AuthのJWTを使用 | 第3節で確認した専用ユーザーのJWTをBearerで送る |
+| 2 | `PUT /api/v1/me` | 200。返却UIDが専用UIDと一致し、プロフィールが初期化される |
+| 3 | `POST /api/v1/books/manual` | run ID付きタイトルのISBNなし書籍を作成。201と `bookId` を記録 |
+| 4 | `GET /api/v1/books/{bookId}` | 200。作成したID・タイトル・`isbn13=null` が一致 |
+| 5 | `POST /api/v1/me/books` | 作成したbookIdを登録。201と `userBookId`、専用UID・bookIdの対応を確認 |
+| 6 | `PATCH /api/v1/me/books/{userBookId}` | 例として `status=reading`・`currentPage=10` を送信し、200と更新値を確認 |
+| 7 | `GET /api/v1/me/books` | 対象userBookIdがあり、bookId・状態・現在ページが更新結果と一致 |
+| 8 | `DELETE /api/v1/me/books/{userBookId}` | 204。本実行で作成した本棚だけを削除 |
+| 9 | `GET /api/v1/me/books` | 対象userBookIdが取得されないことを確認 |
 
-### DB反映と外部書籍サービス
+各APIのHTTP statusと必要な応答項目を既存契約に照らして確認する。本棚一覧は対象IDで判定し、既存データの固定件数に依存しない。DB照合で保存・削除の実体も確認するため、一覧の不在だけで削除成功とは判断しない。
 
-DB照合は別の `pg` 接続で `BEGIN READ ONLY` を使い、専用ユーザー・台帳のIDをパラメーター化してSELECTする。接続ロールが `book_bear_api` で強い権限を持たないこと、対象プロジェクトとの対応も確認する。プロフィール／設定、本棚、栞のvisibility・deleted_at、フォロー／いいねの一意性、返信の更新・論理削除を照合し、拒否操作の前後も比較する。Authテーブル・移行履歴は読まない。この直接接続は結果照合専用で、APIのHyperdrive通過の証拠と混同しない。
+## 5. DB照合と後片付け
 
-主要シナリオは手動書籍で完結させる。Google Books／openBDの検索・importは `--providers` を付けた別グループで実行し、取得可能な候補の契約・保存／ISBN再利用を確認する。外部0件は正常応答として記録し、import未実施を合格にしない。502・制限等は外部グループの失敗／未検証として分け、クラウドDB経路の結果を上書きしない。
+DB照合はAPI処理と別の `pg` 接続で `BEGIN READ ONLY` を使い、IDをパラメーター化したSELECTだけで行う。既存アプリロールとTLS証明書検証を維持する。対象環境のCAを使用し、`sslmode=verify-full` とCA指定は [共有CAの手順](../apps/api/certs/README.md) に従う。Authテーブル・マイグレーション履歴は読まない。
 
-## 4. fixture・再実行・後片付け
+| 照合時点 | Supabase PostgreSQLで確認する内容 |
+|---|---|
+| 書籍・本棚の作成後 | bookIdに対応する書籍のタイトル・ISBNと、userBookIdに対応する本棚の専用UID・bookIdが一致 |
+| 本棚の更新後 | 同じuserBookIdの状態・現在ページがAPIで指定した値に更新されている |
+| 本棚の削除後 | 同じuserBookIdの行がなく、bookIdの書籍行は残っている |
 
-- 専用UIDの許可リストとrun ID付きのタイトル／本文、APIが返したfixture IDで識別する。更新・削除はその実行で作ったIDだけに限定し、名前検索から他人のデータを削除しない。既存プロフィールは一時更新前の値を保存して復元する。
-- ローカル台帳はGit対象外に保存し、対象環境・UID・生成ID・処理段階・復元対象値を保持する。JWT・接続文字列・Auth応答は保存しない。台帳の改変・環境／UID不一致・所有確認失敗では片付けを拒否する。
-- 後片付けは公開中のいいね解除 → 自分の返信を論理削除 → フォロー解除 → 自分の栞を論理削除 → 栞の参照がない本棚だけ削除 → プロフィール復元の順。隠れた元栞へのいいね解除404や、論理削除済み栞を持つ本棚の409は残存データとして記録する。
-- books、論理削除済み栞・返信、FKで削除できない本棚、専用プロフィール・Authユーザーは残る。通常APIに物理削除を追加せず、管理SQLによる自動掃除やAuthユーザー自動削除もしない。残存ID・理由・量を記録し、必要な物理整理は別の運用作業とする。
-- 再実行は新しいrun IDを使う。片付けだけの再実行は台帳を読み、既に削除済みの対象をDBの読み取りで確認して継続する。通信断でPOST結果が不明なら自動再POSTせず、固有語と専用UIDで照合する。IDを回収できなければ「結果不明・要調査」と記録する。
+照合ごとに短い読み取り専用トランザクションを開始・終了し、API書き込みの間は保持しない。**WorkersからHyperdrive経由で行うAPI操作**と、**確認用の直接DB接続**は結果に分けて記録する。直接接続の成功をHyperdrive通過の証拠にはしない。
 
-## 5. 実装構成・例外処理・結果記録
+生成されたbookId・userBookIdは、run ID・対象環境・専用UID・最後に完了した操作とともに、小さなGit対象外の実行記録へ都度保存する。トークンや接続文字列は保存しない。途中失敗時も記録したIDと所有者・bookIdをDBで照合し、本実行の本棚と確認できる場合だけ既存DELETE APIによる後片付けを試みる。
 
-`apps/api/scripts/cloud-test.ts` を入口とし、設定・HTTP／DB照合・シナリオを必要な小さいファイルへ分ける。既存Zodと `pg`、標準fetchを利用し、新しいテストランナーは導入しない。`tests/helpers/database.ts` はimportせず、Auth stub作成やマイグレーション適用を実行しない。
+書籍、専用プロフィール・Authユーザーは保持する。本棚削除に失敗した場合は、残存ID・失敗段階・秘密値を除いた原因を記録する。書籍を削除するAPIや管理SQLによる自動削除は追加しない。他人のデータや過去のrunのデータを更新・削除しない。
 
-追加予定のコマンド（リポジトリルートで実行）:
+再実行は新しいrun IDで開始する。POSTの応答が途絶えて生成IDが不明なら自動再送せず、専用UID・run ID付きタイトル・関連IDを読み取りで確認する。一意に特定できなければ自動削除せず、結果不明・要確認として記録する。残存本棚を手動で片付ける場合も、対象環境・UID・IDを確認して既存APIを使う。
+
+## 6. CLIの構成
+
+操作は次の2つだけとし、リポジトリルートから明示実行する。
 
 ```sh
 pnpm --filter api test:cloud check
 pnpm --filter api test:cloud run
-pnpm --filter api test:cloud run --providers
-pnpm --filter api test:cloud cleanup --run-id <UUID>
 ```
 
-`check` は設定形式だけを確認し、ネットワーク・書き込みなし。`run` は開発用指定と全前提確認を必須にする。Workerのデプロイ、環境作成、マイグレーション・権限変更は自動実行しない。
+- `check`: ローカル設定の必須項目・形式・URL間の整合性だけを検査する。ネットワーク接続・DB書き込みは行わず、実環境確認済みとは表示しない。
+- `run`: 手動確認の入力 → 設定・JWT・DB接続・healthの確認 → 第4節の操作とDB照合 → 必要な後片付け → 結果記録の順に実行する。
 
-HTTP／DBにタイムアウトを設け、自動リトライは行わない。予期しない401・403・404・409、429、500／503、スキーマ不一致、DB照合不一致は失敗とする。トークン期限切れ・通信断も成功扱いせず、依存する後続は未実施、独立した後片付けは可能な範囲で継続する。片付け失敗で元の失敗を隠さない。全必須シナリオと片付けの確認が完了した場合のみ終了コード0とし、仕様どおりの残存行は明示して許容する。
+入口は `apps/api/scripts/cloud-test.ts` とし、既存の `pg`・標準fetchを使う小規模な構成にする。追加のサブコマンド・汎用テストフレームワーク・シナリオ管理機構は設けない。通常テストと分離することで、実サービスの資格情報や可用性をPR CIへ持ち込まずに確認できる。
 
-ログは許可した項目（シナリオ名・status・既知のerror code・所要時間・fixture ID）だけを出し、生の例外・HTTP本文／ヘッダー・SQL・JWT・接続文字列・個人情報を出さない。HTTPはリダイレクトを追従せず、Bearerを別originへ転送しない。
+HTTP／DBの待機にはタイムアウトを設け、自動リトライは行わない。予期しない応答・DB照合不一致では後続の通常操作を止め、安全に可能な後片付けだけを試みる。失敗と片付け結果を両方残し、必要な確認が終わらなければ終了コードは非0とする。
 
-実装時に実行手順書と結果記録を追加し、実行日時（日本時間とUTC）、run ID、ソースcommit、対象環境の別名・配信バージョン、設定確認の成否、各シナリオの成功／失敗／未検証、外部グループ、片付け・残存データを記載する。実Hyperdrive ID等の環境固有値はローカル記録に保持し、Gitへは別名と照合結果を載せる。設計やローカル検証を実クラウドの合格記録に置き換えない。
+結果には実行日時、run ID、ソースcommit、対象環境・配信バージョン、手動確認結果、各操作の成否、DB照合結果、残存データだけを記録する。生のHTTP本文・ヘッダー・DB例外や接続設定は出力しない。小さな実行記録で必要なIDを追跡し、複雑な復旧機構を持たずに誤操作を避ける。
 
-調査順は、health → binding／接続先／キャッシュ → JWTのプロジェクト・期限・署名方式 → 正式PUT /me → 移行・ロール権限 → fixture ID限定のDB照合とする。環境設定不足などの未検証理由も記録し、秘密値の提示を求めない。
+## 7. 完了条件
 
-## 6. 設計判断・実装後の確認
-
-| 判断 | 理由・他の選択肢との比較 |
-|---|---|
-| 通常テストから独立した明示実行CLI | 外部障害・認証・共有データに依存するため。PR CIに組み込む方式では再現性と通常開発を損なう |
-| 配信設定の証跡＋HTTP＋読み取り専用DB照合 | healthだけでは実Hyperdrive経路と保存結果を確定できない。診断API新設やWorkerへの管理者接続は不要 |
-| 正式2ユーザー＋匿名1ユーザー | 所有者／第三者と匿名公開禁止を実JWTで区別する。claim偽装やAuthテーブル直接作成では認証経路を検証できない |
-| APIでfixture作成・可能な範囲の片付け | 本物の認可と制約を通す。全件初期化・物理削除なら本棚FKや論理削除の仕様を隠してしまう |
-| 外部書籍APIを別グループ化 | Hyperdrive・DB経路の不具合と、Google Books／openBDの可用性・収録差を分けて判断できる |
-
-CLIの誤環境拒否・ログへの秘密値非露出・片付け対象の限定・失敗時の終了コードはモックHTTP等で通常テストに追加し、実サービスなしで検証する。実装後は `pnpm typecheck`、`pnpm test`、`pnpm check:openapi`、`pnpm build` を実行する。lintは未導入。実クラウドの必須シナリオと証跡が揃うまでIssue完了とはしない。
-
-作業ブランチは `feat/api-cloud-integration-issue-29`。設計をコミットした時点で中断する。実装再開後はCLI・テスト・実行手順／検証記録を意味のある単位でコミットし、検証後にpush・PR作成する。PRには目的・変更点・確認結果・未検証範囲・関連Issue・API／DB変更なしを記載し、レビューリクエストは送らない。
+- 承認済み開発環境について、実配信Worker・Hyperdrive・Supabaseの対応、キャッシュ無効、必要な移行・権限を手動確認し、記録している。
+- health 2操作と第4節の操作が成功し、作成・更新・削除がSupabase PostgreSQLへ反映され、共有書籍が保持されることをDBで確認している。
+- 本実行の本棚の削除と残存データを記録し、秘密値の露出や他人のデータへの更新・削除がない。
+- `check` と `run` の設定・手動前提・実行方法を再現でき、未実施・確認不能な項目を成功扱いしていない。
+- 実装時の既存の型チェック・テスト・OpenAPI整合性チェック・ビルドを維持する。今回の設計修正時点では実装・実サービス実行を行わず、検証済みとは記載しない。
