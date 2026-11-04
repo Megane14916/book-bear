@@ -1,6 +1,6 @@
 # 開発用クラウド結合テスト 設計書（Issue #29）
 
-状態: 設計のみ。実装・実クラウド検証は未着手。
+状態: 実装中。実クラウド検証は未実施。
 
 関連: [Issue #29](https://github.com/Megane14916/book-bear/issues/29) / 基準: main `1fd8c1b` / 更新: 2026-11-04（日本時間）
 
@@ -10,7 +10,7 @@
 
 正式な専用ユーザー1人と、実行ごとに作るISBNなし書籍1冊・本棚1件を使い、第4節の手順だけを実施する。書籍は共有データとして保持され、本棚から削除した後も残ることを正常とする。栞は作成しないため、本棚は通常のDELETE APIで削除できる前提とする。
 
-仕様は [生成OpenAPI](../contracts/openapi.json)、[書籍・本棚API設計](books-library-design.md)、[DB・Hyperdrive設定](database-setup.md) に従う。既存のローカル・CIテストを網羅し直さず、通常の `pnpm test`・PR CIに実サービス依存を追加しない。API・Web・DBスキーマ・マイグレーション・認可設定の変更は不要。今回の作業は本設計書の修正のみとする。
+仕様は [生成OpenAPI](../contracts/openapi.json)、[書籍・本棚API設計](books-library-design.md)、[DB・Hyperdrive設定](database-setup.md) に従う。既存のローカル・CIテストを網羅し直さず、通常の `pnpm test`・PR CIに実サービス依存を追加しない。API・Web・DBスキーマ・マイグレーション・認可設定の変更は不要。
 
 ## 2. 実行前の環境確認
 
@@ -60,11 +60,11 @@ JWT・DBパスワード・接続文字列はログやGitへ出さず、コマン
 | 4 | `GET /api/v1/books/{bookId}` | 200。作成したID・タイトル・`isbn13=null` が一致 |
 | 5 | `POST /api/v1/me/books` | 作成したbookIdを登録。201と `userBookId`、専用UID・bookIdの対応を確認 |
 | 6 | `PATCH /api/v1/me/books/{userBookId}` | 例として `status=reading`・`currentPage=10` を送信し、200と更新値を確認 |
-| 7 | `GET /api/v1/me/books` | 対象userBookIdがあり、bookId・状態・現在ページが更新結果と一致 |
+| 7 | `GET /api/v1/me/books` | 対象userBookIdが見つかるまでnextCursorで必要なページを取得し、`item.book.id`・状態・現在ページが更新結果と一致 |
 | 8 | `DELETE /api/v1/me/books/{userBookId}` | 204。本実行で作成した本棚だけを削除 |
-| 9 | `GET /api/v1/me/books` | 対象userBookIdが取得されないことを確認 |
+| 9 | `GET /api/v1/me/books` | nextCursor=nullまで取得し、全ページに対象userBookIdがないことを確認 |
 
-各APIのHTTP statusと必要な応答項目を既存契約に照らして確認する。本棚一覧は対象IDで判定し、既存データの固定件数に依存しない。DB照合で保存・削除の実体も確認するため、一覧の不在だけで削除成功とは判断しない。
+各APIのHTTP statusと必要な応答項目を既存契約に照らして確認する。本棚一覧は既定15件で先頭から読み、nextCursorをそのまま次の要求へ渡す。書籍IDは `item.book.id` で照合する。存在確認で末尾まで見つからない場合、不在確認で対象が現れた場合、同じカーソルの反復や取得失敗は失敗とし、確認できたことにしない。ページングは対象IDを追跡するためだけに使用し、境界値・並行更新の試験は追加しない。最終的な削除はDBのSELECTでも確認する。
 
 ## 5. DB照合と後片付け
 
@@ -108,4 +108,4 @@ HTTP／DBの待機にはタイムアウトを設け、自動リトライは行�
 - health 2操作と第4節の操作が成功し、作成・更新・削除がSupabase PostgreSQLへ反映され、共有書籍が保持されることをDBで確認している。
 - 本実行の本棚の削除と残存データを記録し、秘密値の露出や他人のデータへの更新・削除がない。
 - `check` と `run` の設定・手動前提・実行方法を再現でき、未実施・確認不能な項目を成功扱いしていない。
-- 実装時の既存の型チェック・テスト・OpenAPI整合性チェック・ビルドを維持する。今回の設計修正時点では実装・実サービス実行を行わず、検証済みとは記載しない。
+- 既存の型チェック・テスト・OpenAPI整合性チェック・ビルドを維持する。実サービス未実施の場合は未検証と記録する。
