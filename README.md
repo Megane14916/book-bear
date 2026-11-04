@@ -17,6 +17,8 @@ pnpm build
 
 DBを使う場合は [Supabase・Hyperdrive初期設定](docs/database-setup.md) を参照してください。外部サービスの作成前でも `pnpm --filter api db:local` と `pnpm --filter api db:migrate` でローカル確認できます。
 
+配信済み開発用Worker・実Hyperdrive・Supabaseの接続と書籍／本棚の基本操作は、[クラウド結合テスト手順](docs/cloud-integration-test.md) の `pnpm --filter api test:cloud check`／`run` で明示確認できます。実行前にDashboardで開発環境の対応を確認し、正式な専用ユーザーのJWTを用意します。通常テスト・PR CIから実サービスへは接続しません。
+
 開発用SupabaseへローカルAPIから接続する場合は、`apps/api/.env.local.example` を `.env.local`、`.dev.vars.example` を `.dev.vars` にコピーして設定し、`pnpm dev:api` を実行します。既存ファイルは上書きしないでください。公開CAは `apps/api/certs/prod-ca-2021.crt` を共有し、接続文字列には `sslrootcert=certs/prod-ca-2021.crt` を指定します。Cloudflareへのログインは不要です。
 
 実際のHyperdrive IDは `apps/api/.env.deploy.local` の `HYPERDRIVE_ID` で管理し、`wrangler.jsonc` には書き込みません。リモートでの接続確認は `pnpm --filter api dev:remote`、デプロイは `pnpm --filter api deploy:worker` を使用します。設定例は `apps/api/.env.deploy.example` にあります。
