@@ -2,6 +2,8 @@
 
 公開のダミー栞をもとに、日本語書籍の候補生成と順位付けを調べる開発用CLI。Book Bearの既存の推薦APIや画面とは独立している。実験でBook Bearの登録状態を確認する場合も、DB操作はローカルの書籍テーブルへのSELECTだけ。
 
+[実Workers AIで評価した3ユーザーの推薦順位・理由・処理時間](external-recommendation-results.md)を参照。
+
 ## Google Booksの利用条件と実験範囲
 
 2026-11-06確認。Google Books APIの個別条件に加え、Google APIs共通条件が適用される。共通条件§5(a)・(e)では、権利者の許諾や法令による根拠がないAPIコンテンツの利用、第三者への提供、改変・二次利用、恒久コピーやキャッシュ期限超過に制約がある。Booksのブランディング指針は、Googleへの帰属表示・書籍へのリンクを求め、検索結果の並べ替えや改変を制限する。[Books API利用規約](https://developers.google.com/books/terms)・[Google APIs共通規約](https://developers.google.com/terms#section_5_content)・[Booksブランディング指針](https://developers.google.com/books/branding)
