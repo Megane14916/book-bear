@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { performance } from 'node:perf_hooks'
 import { z } from 'zod'
 import { withDatabase } from '../src/db/client'
-import { type AiBinding, embeddingModel, languageModel, workersAi } from '../src/integrations/workers-ai'
+import { type AiBinding, AiUnavailable, embeddingModel, languageModel, workersAi } from '../src/integrations/workers-ai'
 import { loadRecommendationInput, noteLength, rankRecommendations } from '../src/modules/recommendations/service'
 import { check, loadDataset, SeedError } from './seed/dataset'
 
@@ -15,6 +15,7 @@ const casesSchema = z.object({
 })
 const local = { HYPERDRIVE: { connectionString: 'postgres://postgres:postgres@127.0.0.1:5433/postgres' } }
 const k = 3
+let currentCase: string | undefined
 
 function bigrams(text: string) {
   const chars = [...text.normalize('NFKC').replace(/[\s\p{P}]/gu, '')]
@@ -43,8 +44,9 @@ try {
       method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(input), signal: AbortSignal.timeout(10000), redirect: 'error',
     })
+    if (!response.ok) throw new AiUnavailable(`Workers AI REST request failed (HTTP ${response.status})`)
     const payload = z.object({ success: z.literal(true), result: z.unknown() }).safeParse(await response.json())
-    check(response.ok && payload.success, 'Workers AI REST request failed')
+    if (!payload.success) throw new AiUnavailable('Workers AI REST response was unsuccessful or invalid')
     return payload.data.result
   } }
   const embedModel = process.env.RECOMMENDATION_EMBEDDING_MODEL ?? embeddingModel
@@ -52,6 +54,7 @@ try {
   const ai = workersAi({ AI, RECOMMENDATION_EMBEDDING_MODEL: embedModel, RECOMMENDATION_LLM_MODEL: llmModel })
   const results = []
   for (const fixture of evaluation.cases) {
+    currentCase = fixture.user
     const uid = users.get(fixture.user)
     check(uid, `Unknown user: ${fixture.user}`)
     const candidateIds = new Set(fixture.candidates.map((book) => books.get(book)))
@@ -88,6 +91,8 @@ try {
   console.log(JSON.stringify({ version: evaluation.version, mode, k, models: mode === 'lexical' ? [] : mode === 'llm' ? [llmModel, embedModel] : [embedModel],
     calls, inputChars, results }, null, 2))
 } catch (error) {
-  console.error(error instanceof SeedError ? error.message : 'Evaluation failed. Check the local seed and Workers AI settings.')
+  const detail = error instanceof SeedError || error instanceof AiUnavailable
+    ? error.message : 'Check the local seed and Workers AI settings.'
+  console.error(`Evaluation failed${currentCase ? ` for ${currentCase}` : ''}. ${detail}`)
   process.exitCode = 1
 }
