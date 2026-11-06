@@ -1,13 +1,14 @@
 import { createMiddleware } from 'hono/factory'
 import { createRemoteJWKSet, customFetch, errors, jwtVerify, type JWTPayload } from 'jose'
 import type { DatabaseBindings } from '../db/client'
+import type { AiBindings } from '../integrations/workers-ai'
 import { ApiError, authUnavailable, unauthorized } from '../shared/errors'
 import { uuid } from '../shared/schemas'
 
 export type Identity = { id: string; isAnonymous: boolean }
 export type AuthBindings = { SUPABASE_URL?: string }
 export type AppEnv = {
-  Bindings: DatabaseBindings & AuthBindings & { CORS_ORIGIN?: string; GOOGLE_BOOKS_API_KEY?: string }
+  Bindings: DatabaseBindings & AuthBindings & AiBindings & { CORS_ORIGIN?: string; GOOGLE_BOOKS_API_KEY?: string }
   Variables: { identity: Identity | undefined }
 }
 export type TokenVerifier = (token: string, env: AuthBindings) => Promise<Identity>

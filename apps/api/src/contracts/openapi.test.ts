@@ -18,12 +18,15 @@ const operations = Object.values(document.paths).flatMap((path) => Object.values
 const routes = [...Object.values(profileRoutes), ...Object.values(bookRoutes), ...Object.values(libraryRoutes), ...Object.values(bookmarkRoutes), ...Object.values(feedRoutes), ...Object.values(socialRoutes), ...Object.values(replyRoutes), ...Object.values(searchRoutes)]
 
 describe('OpenAPI契約と稼働APIの整合性', () => {
-  it('主要34操作・healthが一意のoperationIdを持ち、全操作が実装済み', () => {
+  it('主要操作とhealthが一意のoperationIdを持ち、全操作が実装済み', () => {
     expect(routes).toHaveLength(34)
-    expect(operations).toHaveLength(36)
-    expect(new Set(operations.map((operation) => operation.operationId)).size).toBe(36)
+    expect(operations).toHaveLength(37)
+    expect(new Set(operations.map((operation) => operation.operationId)).size).toBe(37)
     expect(document.paths['/api/v1/health']?.get?.['x-implementation-status']).toBe('implemented')
     expect(document.paths['/api/v1/health/db']?.get?.['x-implementation-status']).toBe('implemented')
+    const recommendation = document.paths['/api/v1/me/recommendations']?.get
+    expect(recommendation).toMatchObject({ 'x-implementation-status': 'implemented', 'x-auth': 'Registered', security: [{ bearerAuth: [] }] })
+    expect(recommendation?.responses[503]).toBeDefined()
     for (const route of routes) {
       const operation = document.paths[route.path]?.[route.method]
       expect(operation?.['x-implementation-status']).toBe('implemented')
