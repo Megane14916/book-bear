@@ -9,6 +9,7 @@
     "db:migrate": "tsx --env-file-if-exists=.env.db.local scripts/migrate.ts",
     "db:seed": "tsx --env-file-if-exists=.env.seed.local scripts/seed.ts",
     "recommendations:evaluate": "tsx --env-file-if-exists=.env.recommendations.local scripts/evaluate-recommendations.ts",
+    "recommendations:external": "tsx --env-file-if-exists=.env.external-recommendations.local scripts/external-recommendations.ts",
     "auth:google": "tsx --env-file-if-exists=.env.auth.local scripts/check-google-auth.ts",
     "test:cloud": "tsx --env-file-if-exists=.env.cloud-test.local scripts/cloud-test.ts",
     "test": "vitest run --no-file-parallelism",

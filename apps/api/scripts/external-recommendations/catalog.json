@@ -1,0 +1,15 @@
+[
+  {"id":"d-zaka","title":"Ｄ坂の殺人事件","author":"江戸川乱歩","kind":"fiction","tags":["探偵小説","密室","目撃証言"],"description":"古本屋で起きた事件を、向かいの喫茶店から見た状況と近隣の証言を手掛かりに調べる。部屋からの出入りが見えなかった理由を考える探偵小説。","sourceUrl":"https://www.aozora.gr.jp/cards/001779/card56650.html"},
+  {"id":"shinri","title":"心理試験","author":"江戸川乱歩","kind":"fiction","tags":["探偵小説","心理","犯人の計画"],"description":"犯行の準備をした学生が、心理試験で疑いを逃れる計画を立てる。探偵は試験の受け答えだけでは説明できない行動に着目する。","sourceUrl":"https://www.aozora.gr.jp/cards/001779/card56646.html"},
+  {"id":"attic","title":"屋根裏の散歩者","author":"江戸川乱歩","kind":"fiction","tags":["探偵小説","見取り図","下宿"],"description":"下宿の屋根裏を歩き回れると知った男が、その通路を利用する。建物の構造が仕掛けになり、下宿人の行動が捜査の手掛かりになる。","sourceUrl":"https://www.aozora.gr.jp/cards/001779/card56649.html"},
+  {"id":"panorama","title":"パノラマ島綺譚","author":"江戸川乱歩","kind":"fiction","tags":["探偵小説","人工の島","成り代わり"],"description":"他人に成り代わった男が、資産を使って島を大がかりな見世物に変える。夢想と犯罪がつながる物語。","sourceUrl":"https://www.aozora.gr.jp/cards/001779/card56651.html"},
+  {"id":"yabu","title":"藪の中","author":"芥川龍之介","kind":"fiction","tags":["証言","謎","短編小説"],"description":"林で起きた死をめぐり、当事者や目撃者が異なる経緯を語る。食い違う証言を比較しても、一つの説明に収束しない構成。","sourceUrl":"https://www.aozora.gr.jp/cards/000879/card179.html"},
+  {"id":"rashomon","title":"羅生門","author":"芥川龍之介","kind":"fiction","tags":["短編小説","心理","選択"],"description":"仕事を失った男が荒れた門の楼上で老婆に出会う。相手の行為を裁こうとする気持ちが、自分の生き延び方を選ぶ場面で変化する。","sourceUrl":"https://www.aozora.gr.jp/cards/000879/card127.html"},
+  {"id":"kokoro","title":"こころ","author":"夏目漱石","kind":"fiction","tags":["心理小説","友情","罪悪感"],"description":"若者が先生と呼ぶ人物に近づき、先生の過去を知る。親友との関係や言い出せなかった選択が、後の孤立につながる。","sourceUrl":"https://www.aozora.gr.jp/cards/000148/card773.html"},
+  {"id":"dreams","title":"夢十夜","author":"夏目漱石","kind":"fiction","tags":["夢","短編小説","文章表現"],"description":"十の夢を短い場面として並べた作品。時間や距離の感覚が変わり、説明を抑えた描写が不安や待つ気持ちを残す。","sourceUrl":"https://www.aozora.gr.jp/cards/000148/card799.html"},
+  {"id":"galaxy","title":"銀河鉄道の夜","author":"宮沢賢治","kind":"fiction","tags":["幻想","鉄道","友情"],"description":"少年たちが銀河を走る列車で旅をする。次々と出会う人物や景色を通じて、友情や他者の幸いを考える物語。","sourceUrl":"https://www.aozora.gr.jp/cards/000081/card456.html"},
+  {"id":"restaurant","title":"注文の多い料理店","author":"宮沢賢治","kind":"fiction","tags":["短編小説","仕掛け","不穏"],"description":"山の料理店で、客が扉を開けるたびに新しい指示を読む。指示の意味が変わって見えると、それまでの出来事にも別の説明がつく。","sourceUrl":"https://www.aozora.gr.jp/cards/000081/card1927.html"},
+  {"id":"melos","title":"走れメロス","author":"太宰治","kind":"fiction","tags":["短編小説","友情","約束"],"description":"王と交わした約束を守るため、男が友人を残して旅立つ。戻る期限が迫るなか、他人を信頼することと自分の弱さが描かれる。","sourceUrl":"https://www.aozora.gr.jp/cards/000035/card1567.html"},
+  {"id":"cat","title":"吾輩は猫である","author":"夏目漱石","kind":"fiction","tags":["小説","観察","風刺"],"sourceUrl":"https://www.aozora.gr.jp/cards/000148/card789.html"},
+  {"id":"criticism","title":"探偵小説壇の諸傾向","author":"平林初之輔","kind":"nonfiction","tags":["探偵小説","文学評論","作家論"],"description":"同時代の探偵小説と作家の特徴を論じる評論。個々の事件の解決を追う小説とは異なり、作品や手法の傾向を整理する。","sourceUrl":"https://www.aozora.gr.jp/cards/000221/card48118.html"}
+]

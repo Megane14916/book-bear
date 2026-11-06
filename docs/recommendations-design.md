@@ -2,6 +2,8 @@
 
 [Issue #30](https://github.com/Megane14916/book-bear/issues/30) の初期実装。評価には [Issue #33 の固定データ](seed.md) を使う。
 
+未登録の実在書籍の検索と順位付けは、[外部書籍推薦の実験CLI](external-recommendations.md) で確認できる。
+
 ## APIとデータ利用
 
 - `GET /api/v1/me/recommendations` は正式JWTを要求する。limitは1〜10、既定5。プロフィール未初期化は404、匿名JWTは403、本人の公開栞または候補がなければ200で `{ items: [] }` を返す。応答は推薦順の `BookSummary` とし、本文・ベクトル・利用者識別子は返さない。AI障害・タイムアウト・利用制限は503とする。
