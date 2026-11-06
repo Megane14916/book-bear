@@ -7,7 +7,9 @@ export type ProviderBook = {
   provider: z.infer<typeof BookProvider>; providerId: string; isbn13: string | null
   title: string; author: string | null; publisher: string | null; coverUrl: string | null; totalPages: number | null
 }
-export type JapaneseSearchBook = ProviderBook & { isbn10: string | null; language: string | null; categories: string[] }
+export type JapaneseSearchBook = ProviderBook & {
+  isbn10: string | null; language: string | null; categories: string[]; publishedDate: string | null; authors: string[]
+}
 export const providerUnavailable = () => new ApiError(502, 'BOOK_PROVIDER_UNAVAILABLE', '書籍情報サービスを利用できません')
 const text = (value: unknown) => typeof value === 'string' && value.trim() ? value.trim() : null
 const pages = (value: unknown) => typeof value === 'number' && Number.isInteger(value) && value > 0 && value <= 2147483647 ? value : null
@@ -22,7 +24,7 @@ const GoogleVolume = z.object({
   }),
 })
 const JapaneseGoogleVolume = GoogleVolume.extend({ volumeInfo: GoogleVolume.shape.volumeInfo.extend({
-  language: z.string().optional(), categories: z.array(z.string()).optional(),
+  language: z.string().optional(), categories: z.array(z.string()).optional(), publishedDate: z.string().optional(),
 }) })
 function mapGoogleBook({ id, volumeInfo: info }: z.infer<typeof GoogleVolume>): ProviderBook {
   return {
@@ -62,7 +64,7 @@ export function createBookProvider(fetcher: typeof fetch = fetch, apiKey?: strin
       url.searchParams.set('langRestrict', 'ja')
       url.searchParams.set('printType', 'books')
       url.searchParams.set('orderBy', 'relevance')
-      url.searchParams.set('fields', 'totalItems,items(id,volumeInfo(title,authors,publisher,industryIdentifiers,pageCount,imageLinks,language,categories))')
+      url.searchParams.set('fields', 'totalItems,items(id,volumeInfo(title,authors,publisher,industryIdentifiers,pageCount,imageLinks,language,categories,publishedDate))')
     }
     const result = await get(url)
     const parsed = z.object({ totalItems: z.number().int().nonnegative(), items: z.array(z.unknown()).optional() }).safeParse(result)
@@ -95,7 +97,7 @@ export function createBookProvider(fetcher: typeof fetch = fetch, apiKey?: strin
         const legacy = info.industryIdentifiers?.filter(({ type }) => type === 'ISBN_10')
           .map(({ identifier }) => isbn10(identifier)).find(Boolean) ?? null
         return { ...book, isbn13: book.isbn13 ?? (legacy ? convertIsbn10(legacy) : null), isbn10: legacy,
-          language: info.language ?? null, categories: info.categories ?? [] }
+          language: info.language ?? null, categories: info.categories ?? [], publishedDate: info.publishedDate ?? null, authors: info.authors ?? [] }
       })
     },
     async search(q: string, limit: number, isbn13?: string): Promise<ProviderBook[]> {

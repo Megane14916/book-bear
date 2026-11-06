@@ -1,27 +1,17 @@
-import { createHash } from 'node:crypto'
 import { performance } from 'node:perf_hooks'
-import { z } from 'zod'
 import { ciniiLimits, CiniiProviderError, type CiniiBook, type createCiniiProvider } from '../../src/integrations/cinii'
 import type { lookupOpenBd } from '../../src/integrations/openbd-batch'
 import type { workersAi } from '../../src/integrations/workers-ai'
 import { embeddingBatchLimit } from '../../src/modules/recommendations/service'
 import { similarity, titleAuthor, type Identity, type Plan, type Registered } from './experiment'
+import { evidenceChars, evidencePermissions, selectEvidence, type EmbeddingSource, type EvidencePermissions } from './evidence'
 
-export const ciniiEvidenceChars = 600
+export const ciniiEvidenceChars = evidenceChars
+export const ciniiPermissions = evidencePermissions
 const top = 10
 const popularityCap = 1000
 const semanticFloor = 0.60
 const semanticWindow = 0.15
-const evidence = z.string().trim().min(1).max(500)
-const permissionEntry = z.object({
-  openBdDescription: z.object({
-    sha256: z.string().regex(/^[a-f0-9]{64}$/), evidence, embedding: z.literal(true), workersAi: z.literal(true),
-  }).strict().optional(),
-  ownContent: z.object({ text: z.string().trim().min(1).max(ciniiEvidenceChars), evidence, workersAi: z.literal(true) }).strict().optional(),
-}).strict().refine((entry) => entry.openBdDescription || entry.ownContent)
-export const ciniiPermissions = z.record(z.string().regex(/^(?:97[89]\d{10}|[A-Z]{2}\d{7}[\dX])$/), permissionEntry)
-type Permissions = z.infer<typeof ciniiPermissions>
-type EmbeddingSource = 'licensed_description' | 'bibliographic_metadata' | 'own_content' | 'none'
 
 const identity = (book: CiniiBook, isbn13 = book.isbn13): Identity => ({
   volumeId: null, isbn13, title: book.title, author: book.author,
@@ -54,26 +44,6 @@ export function deduplicateCinii(books: CiniiBook[]) {
   return groups.map(({ book, identifiers }) => ({ book, aliases: [...identifiers].filter((id) => /^97[89]\d{10}$/.test(id)) }))
 }
 
-type OpenBdRecord = Awaited<ReturnType<typeof lookupOpenBd>>['records'] extends Map<string, infer T> ? T : never
-function chooseText(book: CiniiBook, openBd: OpenBdRecord | undefined, permissions: Permissions) {
-  const description = openBd?.description
-  const digest = description ? createHash('sha256').update(description).digest('hex') : null
-  // An ISBN-bound digest ensures a changed publisher description is reviewed again.
-  const descriptionPermissionConfirmed = Boolean(digest && book.isbn13
-    && permissions[book.isbn13]?.openBdDescription?.sha256 === digest)
-  if (description && descriptionPermissionConfirmed && description.length <= ciniiEvidenceChars) {
-    return { input: description, embeddingSource: 'licensed_description' as const, descriptionPermissionConfirmed }
-  }
-  const own = (book.isbn13 ? permissions[book.isbn13]?.ownContent : undefined)
-    ?? (book.ncid ? permissions[book.ncid]?.ownContent : undefined)
-  if (own) return { input: own.text, embeddingSource: 'own_content' as const, descriptionPermissionConfirmed }
-  if (book.nacsisMetadata) return {
-    input: [book.title, book.author, ...book.subjects].filter(Boolean).join('。').slice(0, ciniiEvidenceChars),
-    embeddingSource: 'bibliographic_metadata' as const, descriptionPermissionConfirmed,
-  }
-  return { input: null, embeddingSource: 'none' as const, descriptionPermissionConfirmed }
-}
-
 type Recommendation = {
   isbn13: string | null; ncid: string | null; title: string; author: string | null; sourceUrl: string; year: number | null
   publisher: string | null; coverUrl: string | null; ownerCount: number | null; descriptionAvailable: boolean
@@ -100,7 +70,7 @@ const ratio = (value: number, total: number) => total ? value / total : null
 
 export async function runCiniiExperiment(plan: Plan, options: {
   cinii: ReturnType<typeof createCiniiProvider>; openBd: typeof lookupOpenBd; ai: ReturnType<typeof workersAi>;
-  registered: Registered; permissions: Permissions;
+  registered: Registered; permissions: EvidencePermissions;
 }) {
   let started = performance.now()
   const searches = []
@@ -125,7 +95,10 @@ export async function runCiniiExperiment(plan: Plan, options: {
   const openBdMs = elapsed(started)
   const candidates = remaining.map((book) => {
     const supplemental = book.isbn13 ? openBd.records.get(book.isbn13) : undefined
-    const selected = chooseText(book, supplemental, options.permissions)
+    const selected = selectEvidence(book.isbn13, supplemental?.description, options.permissions, {
+      key: book.ncid ?? undefined,
+      metadata: book.nacsisMetadata ? [book.title, book.author, ...book.subjects].filter(Boolean).join('。') : undefined,
+    })
     return { book, supplemental, ...selected, descriptionAvailable: Boolean(supplemental?.description) }
   })
 

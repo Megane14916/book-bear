@@ -23,3 +23,11 @@ export function normalizeIsbn(value: string) {
   const legacy = isbn10(digits)
   return isbn13(digits) ?? (legacy ? convertIsbn10(legacy) : null)
 }
+
+export function toIsbn10(value: string) {
+  const canonical = isbn13(value)
+  if (!canonical?.startsWith('978')) return null
+  const body = canonical.slice(3, 12)
+  const check = (11 - [...body].reduce((sum, digit, index) => sum + Number(digit) * (10 - index), 0) % 11) % 11
+  return body + (check === 10 ? 'X' : String(check))
+}
