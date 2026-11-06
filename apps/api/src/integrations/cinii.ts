@@ -18,7 +18,9 @@ const item = z.object({
 const count = z.union([z.number(), z.string().regex(/^\d+$/).transform(Number)])
   .pipe(z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER))
 const searchResults = z.object({ 'opensearch:totalResults': count, items: z.array(z.unknown()).optional() })
-const holdingsResults = z.object({ 'opensearch:totalResults': count })
+const holdingsResults = z.object({
+  '@graph': z.tuple([z.object({ '@type': z.literal('channel'), 'opensearch:totalResults': count })]),
+})
 const ncidPattern = /^[A-Z]{2}\d{7}[\dX]$/
 export const ciniiLimits = { queries: 3, perQuery: 30, holdings: 20, holdingsConcurrency: 2, searchTimeoutMs: 5000, holdingsTimeoutMs: 3000 }
 
@@ -91,7 +93,7 @@ export function createCiniiProvider(appId: string, fetcher: typeof fetch = fetch
       if (!ncidPattern.test(ncid)) throw new CiniiProviderError('Invalid NCID')
       const parsed = holdingsResults.safeParse(await get('/opensearch/holder', { ncid }, ciniiLimits.holdingsTimeoutMs))
       if (!parsed.success) throw new CiniiProviderError('Invalid CiNii holdings response')
-      return parsed.data['opensearch:totalResults']
+      return parsed.data['@graph'][0]['opensearch:totalResults']
     },
   }
 }

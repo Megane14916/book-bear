@@ -29,7 +29,9 @@ export function createCiniiMock(catalog: Work[]) {
     if (url.hostname === 'cir.nii.ac.jp' && url.pathname.endsWith('/holder')) {
       const index = rows.findIndex(({ ncid }) => ncid === url.searchParams.get('ncid'))
       const total = ownerCounts[index]
-      return total == null ? new Response(null, { status: 503 }) : Response.json({ 'opensearch:totalResults': String(total) })
+      return total == null ? new Response(null, { status: 503 }) : Response.json({
+        '@graph': [{ '@type': 'channel', 'opensearch:totalResults': String(total) }],
+      })
     }
     if (url.hostname === 'api.openbd.jp') {
       const requested = url.searchParams.get('isbn')?.split(',') ?? []
