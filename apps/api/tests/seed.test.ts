@@ -15,6 +15,8 @@ describe('development seed', () => {
     const first = await writeSeed(database.client, data, target)
     expect(first['public.books'].added).toBe(30)
     expect(first['public.bookmarks'].added).toBeGreaterThanOrEqual(150)
+    expect(data.books.filter(({ coverUrl }) => coverUrl !== null).length).toBeGreaterThan(0)
+    expect(data.bookmarks.some(({ content }) => content.length >= 150)).toBe(true)
     const second = await writeSeed(database.client, data, target)
     expect(Object.values(second).every((value) => value.added === 0)).toBe(true)
     expect(second['public.bookmarks'].skipped).toBe(data.bookmarks.length)

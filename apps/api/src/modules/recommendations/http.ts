@@ -35,7 +35,7 @@ export function registerRecommendationRoutes(app: OpenAPIHono<AppEnv>, database:
     const { history, candidates } = await database(env, (db) => loadRecommendationInput(db, viewer.id))
     try {
       const { limit } = c.req.valid('query')
-      return c.json({ items: await rankRecommendations(history, candidates, workersAi(env).embed, limit) }, 200)
+      return c.json({ items: await rankRecommendations(history, candidates, workersAi(env).embed, limit, 'mean') }, 200)
     } catch (error) {
       if (error instanceof AiUnavailable) throw new ApiError(503, 'INTERNAL_ERROR', '推薦サービスを利用できません')
       throw error
