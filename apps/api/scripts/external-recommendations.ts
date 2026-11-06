@@ -1,33 +1,37 @@
 import { readFile } from 'node:fs/promises'
 import { performance } from 'node:perf_hooks'
-import { inArray, and, eq, or } from 'drizzle-orm'
+import { inArray, and, eq, exists, or } from 'drizzle-orm'
 import { z } from 'zod'
 import { withDatabase } from '../src/db/client'
-import { books } from '../src/db/schema'
+import { books, userBooks } from '../src/db/schema'
 import { createBookProvider } from '../src/integrations/books'
+import { ciniiLimits, CiniiProviderError, createCiniiProvider } from '../src/integrations/cinii'
+import { lookupOpenBd } from '../src/integrations/openbd-batch'
 import { AiUnavailable, embeddingModel, languageModel, workersAi, type AiBinding } from '../src/integrations/workers-ai'
 import { loadDataset, check, SeedError } from './seed/dataset'
 import { catalogSchema, compareCatalog, inspectGoogleSearch, limits, planSearch, titleAuthor, type Registered } from './external-recommendations/experiment'
+import { ciniiPermissions, runCiniiExperiment } from './external-recommendations/cinii-experiment'
+import { createCiniiMock } from './external-recommendations/cinii-mock'
 
 const loopback = { HYPERDRIVE: { connectionString: 'postgres://postgres:postgres@127.0.0.1:5433/postgres' } }
-const maxInputChars = 20_000
 const usageSchema = z.object({ usage: z.object({
   prompt_tokens: z.number().nonnegative().optional(), completion_tokens: z.number().nonnegative().optional(),
   neurons: z.number().nonnegative().optional(),
 }) })
 
-const registered: Registered = async (items) => {
+const registered = (ownerId?: string): Registered => async (items) => {
   if (!items.length) return new Set()
-  const ids = items.flatMap(({ volumeId }) => volumeId ?? [])
-  const isbns = items.flatMap(({ isbn13 }) => isbn13 ?? [])
+  const ids = [...new Set(items.flatMap(({ volumeId }) => volumeId ?? []))]
+  const isbns = [...new Set(items.flatMap(({ isbn13 }) => isbn13 ?? []))]
   const titles = [...new Set(items.flatMap(({ title }) => [title, title.normalize('NFKC')]))]
   const rows = await withDatabase(loopback, (db) => db.select({
     isbn13: books.isbn13, volumeId: books.sourceId, source: books.source, title: books.title, author: books.author,
-  }).from(books).where(or(
+  }).from(books).where(and(or(
     ids.length ? and(eq(books.source, 'google_books'), inArray(books.sourceId, ids)) : undefined,
     isbns.length ? inArray(books.isbn13, isbns) : undefined,
     inArray(books.title, titles),
-  )))
+  ), ownerId ? exists(db.select({ id: userBooks.id }).from(userBooks)
+    .where(and(eq(userBooks.userId, ownerId), eq(userBooks.bookId, books.id)))) : undefined)))
   return new Set(items.filter((book) => rows.some((row) =>
     (book.volumeId && row.source === 'google_books' && book.volumeId === row.volumeId)
     || (book.isbn13 && book.isbn13 === row.isbn13)
@@ -52,29 +56,39 @@ function mockRun(input: Record<string, unknown>) {
 
 try {
   const [mode, user, flag, ...extra] = process.argv.slice(2)
-  check(user && !extra.length && ((mode === 'mock' && flag === undefined)
-    || ((mode === 'catalog' || mode === 'google') && flag === '--execute')),
-  'Use mock <seed-user> or catalog|google <seed-user> --execute')
+  const simulated = mode === 'mock' || mode === 'cinii-mock'
+  const ciniiMode = mode === 'cinii' || mode === 'cinii-mock'
+  check(user && !extra.length && ((simulated && flag === undefined)
+    || ((mode === 'catalog' || mode === 'google' || mode === 'cinii') && flag === '--execute')),
+  'Use mock|cinii-mock <seed-user> or catalog|google|cinii <seed-user> --execute')
   const dataset = await loadDataset()
-  check(dataset.users.some((row) => row.key === user && !row.anonymous), 'Select a registered seed user')
+  const reader = dataset.users.find((row) => row.key === user && !row.anonymous)
+  check(reader, 'Select a registered seed user')
   const shelfIds = new Set(dataset.shelves.filter((shelf) => shelf.user === user).map((shelf) => shelf.key))
   const notes = dataset.bookmarks.filter((note) => shelfIds.has(note.shelf) && note.visibility === 'public')
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id))
     .slice(0, limits.notes).map(({ content }) => content)
   check(notes.length, 'No public seed bookmarks for this user')
-  const catalog = mode === 'google' ? [] : catalogSchema.parse(JSON.parse(
+  const catalog = mode === 'google' || mode === 'cinii' ? [] : catalogSchema.parse(JSON.parse(
     await readFile(new URL('external-recommendations/catalog.json', import.meta.url), 'utf8'),
   ))
 
   const account = process.env.CLOUDFLARE_ACCOUNT_ID
   const token = process.env.CLOUDFLARE_API_TOKEN
   const booksKey = process.env.GOOGLE_BOOKS_API_KEY?.trim()
-  if (mode !== 'mock') {
+  const appId = process.env.CINII_APP_ID?.trim()
+  if (mode === 'cinii') check(appId, 'Set the application ID from CiNii API registration in CINII_APP_ID')
+  const permissionsFile = process.env.CINII_EXPERIMENT_PERMISSIONS_FILE
+  const permissions = mode === 'cinii' && permissionsFile ? ciniiPermissions.parse(
+    JSON.parse(await readFile(permissionsFile, 'utf8')),
+  ) : {}
+  if (!simulated) {
     check(account && /^[a-f0-9]{32}$/i.test(account) && token, 'Approved Workers AI account ID and API token are required')
     if (mode === 'google') check(booksKey, 'An approved Google Books API key is required')
     // Fail before spending quota if the read-only Book Bear registry is unavailable.
     await withDatabase(loopback, (db) => db.select({ id: books.id }).from(books).limit(1))
   }
+  const maxInputChars = ciniiMode ? 70_000 : 20_000
   const maxCalls = mode === 'google' ? 1 : 3
   const usage = { calls: 0, inputChars: 0, reportedPromptTokens: 0, reportedCompletionTokens: 0,
     reportedNeurons: 0, tokenMeteredCalls: 0, neuronMeteredCalls: 0 }
@@ -83,7 +97,7 @@ try {
     if (usage.calls >= maxCalls || usage.inputChars + chars > maxInputChars) throw new AiUnavailable('Experiment AI budget exhausted')
     usage.calls++
     usage.inputChars += chars
-    if (mode === 'mock') return mockRun(input)
+    if (simulated) return mockRun(input)
     const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}/ai/run/${model}`, {
       method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(input), signal: AbortSignal.timeout(15000), redirect: 'error',
@@ -104,22 +118,38 @@ try {
   } }
   const ai = workersAi({ AI: binding }, 15000)
   const start = performance.now()
-  const plan = await planSearch(ai, notes)
+  const plan = await planSearch(ai, notes, ciniiMode ? 'cinii' : undefined)
   const planMs = Math.round(performance.now() - start)
+  const seedBookKeys = new Set(dataset.shelves.filter((shelf) => shelf.user === user).map((shelf) => shelf.book))
+  const seedOwned = new Set(dataset.books.filter(({ key }) => seedBookKeys.has(key))
+    .map(({ title, author }) => titleAuthor({ title, author, volumeId: null, isbn13: null })).filter(Boolean))
+  const readerShelf: Registered = async (items) => {
+    const existing = await registered(reader.localUid)(items)
+    for (const item of items) if (seedOwned.has(titleAuthor(item))) existing.add(item)
+    return existing
+  }
+  const ciniiOptions = mode === 'cinii-mock' ? createCiniiMock(catalog) : mode === 'cinii' ? {
+    cinii: createCiniiProvider(appId!), openBd: lookupOpenBd, permissions, registered: readerShelf,
+  } : null
   const outcome = mode === 'google'
-    ? await inspectGoogleSearch(plan, createBookProvider(fetch, booksKey).searchJapanese, registered)
-    : await compareCatalog(plan, catalog, ai, mode === 'mock' ? async () => new Set() : registered)
-  console.log(JSON.stringify({ reportVersion: 1, mode, simulated: mode === 'mock', seedVersion: dataset.version, user,
-    models: mode === 'mock' ? [] : mode === 'google' ? [languageModel] : [languageModel, embeddingModel],
-    attribution: mode === 'google' ? 'Google Books search results — https://books.google.com/' : '青空文庫の書誌を参照した独立カタログ',
-    limits: { ...limits, maxCalls, maxInputChars }, plan, planMs, ...outcome,
+    ? await inspectGoogleSearch(plan, createBookProvider(fetch, booksKey).searchJapanese, registered())
+    : ciniiOptions ? await runCiniiExperiment(plan, { ...ciniiOptions, ai })
+      : await compareCatalog(plan, catalog, ai, simulated ? async () => new Set() : registered())
+  console.log(JSON.stringify({ reportVersion: 1, mode, simulated, seedVersion: dataset.version, user,
+    models: simulated ? [] : mode === 'google' ? [languageModel] : [languageModel, embeddingModel],
+    attribution: ciniiMode ? { cinii: '国立情報学研究所 CiNii Research / NACSIS-CAT', license: 'https://creativecommons.org/licenses/by/4.0/',
+      licenseScope: 'NACSIS-CAT由来と確認した書誌・件名のみ', openBd: 'openBD（照会・書誌補完）',
+      metadataTransform: '対象フィールドの連結・長さ制限、ISBN-13正規化' }
+      : mode === 'google' ? 'Google Books search results — https://books.google.com/' : '青空文庫の書誌を参照した独立カタログ',
+    limits: { ...limits, ...(ciniiMode ? ciniiLimits : {}), maxCalls, maxInputChars }, plan, planMs, ...outcome,
     usage: { ...usage, reportedPromptTokens: usage.tokenMeteredCalls ? usage.reportedPromptTokens : null,
       reportedCompletionTokens: usage.tokenMeteredCalls ? usage.reportedCompletionTokens : null,
       reportedNeurons: usage.neuronMeteredCalls ? usage.reportedNeurons : null },
     durationMs: Math.round(performance.now() - start),
   }, null, 2))
 } catch (error) {
-  const detail = error instanceof SeedError || error instanceof AiUnavailable ? error.message : 'Check the local registry, credentials, and provider availability.'
+  const detail = error instanceof SeedError || error instanceof AiUnavailable || error instanceof CiniiProviderError
+    ? error.message : 'Check the local registry, credentials, and provider availability.'
   console.error(`External recommendation experiment failed. ${detail}`)
   process.exitCode = 1
 }

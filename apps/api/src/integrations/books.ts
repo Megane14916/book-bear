@@ -1,6 +1,7 @@
 import { z } from '@hono/zod-openapi'
-import { Isbn13, type BookProvider } from '../modules/books/schemas'
+import type { BookProvider } from '../modules/books/schemas'
 import { ApiError } from '../shared/errors'
+import { convertIsbn10, isbn10, isbn13 as isbn } from './isbn'
 
 export type ProviderBook = {
   provider: z.infer<typeof BookProvider>; providerId: string; isbn13: string | null
@@ -9,22 +10,6 @@ export type ProviderBook = {
 export type JapaneseSearchBook = ProviderBook & { isbn10: string | null; language: string | null; categories: string[] }
 export const providerUnavailable = () => new ApiError(502, 'BOOK_PROVIDER_UNAVAILABLE', '書籍情報サービスを利用できません')
 const text = (value: unknown) => typeof value === 'string' && value.trim() ? value.trim() : null
-const isbn = (value: unknown) => {
-  const parsed = Isbn13.safeParse(typeof value === 'string' ? value.replace(/[\s-]/g, '') : value)
-  return parsed.success ? parsed.data : null
-}
-function isbn10(value: string) {
-  const digits = value.replace(/[\s-]/g, '').toUpperCase()
-  if (!/^\d{9}[\dX]$/.test(digits)) return null
-  const sum = [...digits].reduce((total, digit, index) => total + (digit === 'X' ? 10 : Number(digit)) * (10 - index), 0)
-  return sum % 11 === 0 ? digits : null
-}
-
-function convertIsbn10(value: string) {
-  const body = `978${value.slice(0, 9)}`
-  const sum = [...body].reduce((total, digit, index) => total + Number(digit) * (index % 2 ? 3 : 1), 0)
-  return `${body}${(10 - sum % 10) % 10}`
-}
 const pages = (value: unknown) => typeof value === 'number' && Number.isInteger(value) && value > 0 && value <= 2147483647 ? value : null
 const cover = (value: unknown) => {
   try { const url = new URL(String(value)); return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password ? url.href : null } catch { return null }
