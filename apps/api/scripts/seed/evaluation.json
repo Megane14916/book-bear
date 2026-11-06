@@ -1,0 +1,14 @@
+{
+  "version": "1",
+  "cases": [
+    {"user":"growth-b","candidates":["growth-3","prose-2","mystery-4","world-4"],"relevant":["growth-3"],"hardNegatives":[{"book":"prose-2","reason":"関連する題材があるが、本人が注目する観点が中心ではない。"}]},
+    {"user":"mystery-b","candidates":["mystery-3","practical-1","mystery-4","world-4"],"relevant":["mystery-3"],"hardNegatives":[{"book":"practical-1","reason":"宇宙船の空調が共通するが、解くべき事件や証言の推理がない。"}]},
+    {"user":"world-b","candidates":["world-3","practical-1","mystery-4","world-4"],"relevant":["world-3"],"hardNegatives":[{"book":"practical-1","reason":"関連する題材があるが、本人が注目する観点が中心ではない。"}]},
+    {"user":"practical-b","candidates":["practical-3","world-1","mystery-4","world-4"],"relevant":["practical-3"],"hardNegatives":[{"book":"world-1","reason":"関連する題材があるが、本人が注目する観点が中心ではない。"}]},
+    {"user":"prose-b","candidates":["prose-3","growth-2","mystery-4","world-4"],"relevant":["prose-3"],"hardNegatives":[{"book":"growth-2","reason":"関連する題材があるが、本人が注目する観点が中心ではない。"}]}
+  ],
+  "emptyHistory": [
+    "empty"
+  ],
+  "privateCandidate": {"user":"mystery-a","book":"mystery-6","bookmark":"dd952661-ab76-4e7d-89e3-f87e477f8d09"}
+}
