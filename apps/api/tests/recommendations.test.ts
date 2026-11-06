@@ -9,7 +9,7 @@ import { createTestDatabase } from './helpers/database'
 let db: Awaited<ReturnType<typeof createTestDatabase>>
 let dataset: Awaited<ReturnType<typeof loadDataset>>
 beforeAll(async () => {
-  db = await createTestDatabase()
+  db = await createTestDatabase({ isolated: true })
   dataset = await loadDataset()
   await writeSeed(db.client, dataset, await resolveSeedTarget([], dataset.users))
 }, 20000)

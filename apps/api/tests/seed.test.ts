@@ -6,7 +6,7 @@ import { createTestDatabase } from './helpers/database'
 
 describe('development seed', () => {
   let database: Awaited<ReturnType<typeof createTestDatabase>>
-  beforeAll(async () => { database = await createTestDatabase() }, 20000)
+  beforeAll(async () => { database = await createTestDatabase({ isolated: true }) }, 20000)
   afterAll(async () => { await database?.close() })
 
   it('inserts fixtures once and rolls back new rows if an existing record differs', async () => {
