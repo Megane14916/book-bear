@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "Book Bear Jost";
+  src: url("/fonts/Jost-Variable.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
 @theme {
   --color-paper: #f8f8f5;
   --color-ink: #29362f;
@@ -9,6 +17,10 @@
 }
 
 @layer components {
+  .brand-wordmark {
+    font-family: "Book Bear Jost", "Futura", "Century Gothic", sans-serif;
+  }
+
   .ui-action {
     @apply min-h-11 items-center justify-center rounded-lg py-2 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest disabled:cursor-not-allowed disabled:opacity-50;
   }
