@@ -20,9 +20,26 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); auth.userId = profile.id; aut
 
 it('shows a handle conflict in the form and reloads the saved profile', async () => {
   const saved = { ...profile, displayName: '本好き', bio: '読書中', handle: 'book_bear' }
-  vi.spyOn(api, 'GET').mockResolvedValueOnce(response(profile)).mockResolvedValueOnce(response(saved))
-  const patch = vi.spyOn(api, 'PATCH').mockRejectedValueOnce(new HttpError(409)).mockResolvedValueOnce(response(saved))
+  let current: typeof profile | typeof saved = profile
+  vi.spyOn(api, 'GET').mockImplementation(async (path) => {
+    if (path === '/api/v1/users/{userId}') return response({ ...current, publicBookmarkCount: 0, followedByMe: false })
+    if (path === '/api/v1/users/{userId}/books') return response({ items: [], nextCursor: null })
+    if (path === '/api/v1/me') return response(current)
+    throw new Error('Unexpected API path')
+  })
+  const patch = vi.spyOn(api, 'PATCH').mockRejectedValueOnce(new HttpError(409)).mockImplementationOnce(async () => {
+    current = saved
+    return response(saved)
+  })
   const view = show('/me')
+  await screen.findByRole('heading', { name: profile.displayName })
+  expect(screen.queryByText('公開プロフィール')).toBeNull()
+  expect(screen.queryByRole('button', { name: '戻る' })).toBeNull()
+  expect(screen.queryByRole('link', { name: /戻る/ })).toBeNull()
+  expect(screen.queryByLabelText('表示名')).toBeNull()
+  expect(screen.getByRole('link', { name: '設定' }).getAttribute('href')).toBe('/settings')
+  expect(screen.queryByRole('link', { name: '自分の本棚' })).toBeNull()
+  fireEvent.click(screen.getByRole('link', { name: '編集' }))
   fireEvent.change(await screen.findByLabelText('表示名'), { target: { value: '本好き' } })
   fireEvent.change(screen.getByLabelText('自己紹介'), { target: { value: '読書中' } })
   fireEvent.change(screen.getByLabelText('ハンドル（任意）'), { target: { value: 'book_bear' } })
@@ -31,9 +48,10 @@ it('shows a handle conflict in the form and reloads the saved profile', async ()
   fireEvent.click(screen.getByRole('button', { name: 'プロフィールを保存' }))
   await screen.findByText('プロフィールを保存しました。')
   expect(patch.mock.calls[1][1]).toMatchObject({ body: { displayName: '本好き', bio: '読書中', handle: 'book_bear' } })
-  expect(screen.getByRole('link', { name: '自分の本棚' }).getAttribute('href')).toBe('/library')
+  fireEvent.click(screen.getByRole('button', { name: '戻る' }))
+  await screen.findByRole('heading', { name: saved.displayName })
   view.unmount()
-  show('/me')
+  show('/me/edit')
   for (const value of ['本好き', '読書中', 'book_bear']) expect(await screen.findByDisplayValue(value)).toBeTruthy()
 })
 
@@ -52,6 +70,8 @@ it('lets guests page through public books and navigate to the reader’s flow', 
   })
   show(`/users/${profile.id}`)
   await screen.findByRole('link', { name: book.title })
+  expect(screen.queryByRole('link', { name: '編集' })).toBeNull()
+  expect(screen.queryByRole('link', { name: '設定' })).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: 'もっと見る' }))
   fireEvent.click(await screen.findByRole('link', { name: secondBook.title }))
   await screen.findByRole('heading', { name: '栞の流れ' })

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link } from 'react-router'
+import { Link, Navigate } from 'react-router'
+import { PageBack } from '../../components/PageBack'
 import { EmptyState, ErrorState, LoadingState } from '../../components/states/ScreenStates'
 import { api } from '../../lib/api/client'
 import { HttpError } from '../../lib/api/errors'
@@ -9,6 +10,7 @@ import { requireData } from '../../lib/api/result'
 import { useAuth } from '../../lib/auth/AuthProvider'
 import { GoogleAction } from '../../lib/auth/GoogleAction'
 import { queryKeys } from '../../lib/query/keys'
+import { PublicProfile } from './PublicProfilePage'
 
 type Profile = components['schemas']['Profile']
 type PatchProfile = components['schemas']['PatchProfile']
@@ -16,24 +18,31 @@ const fieldClass = 'mt-1 min-h-11 w-full rounded-lg border border-[#d6ded6] bg-w
 
 export default function MyProfilePage() {
   const auth = useAuth()
-  const me = useQuery({
-    queryKey: queryKeys.me(auth.userId), enabled: auth.canReadPrivate,
-    queryFn: ({ signal }) => requireData(() => api.GET('/api/v1/me', { signal })),
-  })
+  if (auth.canReadPrivate && auth.userId) return <PublicProfile userId={auth.userId} />
   return <section className="space-y-5">
     <h1 className="text-3xl font-bold">マイページ</h1>
-    <nav aria-label="マイページメニュー" className="flex flex-wrap gap-4 text-sm font-bold text-forest">
-      <Link to="/library" className="ui-action inline-flex underline">自分の本棚</Link>
-      <Link to="/settings" className="ui-action inline-flex underline">設定</Link>
-      {auth.canReadPrivate && <Link to={`/users/${auth.userId}`} className="ui-action inline-flex underline">公開プロフィール</Link>}
-    </nav>
+    <Link to="/settings" className="ui-action inline-flex text-sm font-bold text-forest underline">設定</Link>
     <GoogleAction />
     {auth.status === 'error' ? <ErrorState description={auth.error?.message ?? 'ログイン状態を確認できませんでした。'}
       onRetry={() => void auth.retrySession().catch(() => {})} /> :
       auth.status === 'guest' || auth.status === 'unconfigured' ? <EmptyState title="プロフィールの保存にはアカウントが必要です"
         description="本棚に本を追加すると、匿名アカウントでもプロフィールを保存できます。"
-        action={<Link to="/search" className="ui-action inline-flex text-forest underline">本を探す</Link>} /> :
-      !auth.canReadPrivate || me.isPending ? <LoadingState /> :
+        action={<Link to="/search" className="ui-action inline-flex text-forest underline">本を探す</Link>} /> : <LoadingState />}
+  </section>
+}
+
+export function EditProfilePage() {
+  const auth = useAuth()
+  const me = useQuery({
+    queryKey: queryKeys.me(auth.userId), enabled: auth.canReadPrivate,
+    queryFn: ({ signal }) => requireData(() => api.GET('/api/v1/me', { signal })),
+  })
+  if (auth.status === 'guest' || auth.status === 'unconfigured') return <Navigate to="/me" replace />
+  return <section className="space-y-5">
+    <PageBack fallback="/me" />
+    <h1 className="text-3xl font-bold">プロフィールを編集</h1>
+    {auth.status === 'error' ? <ErrorState description={auth.error?.message ?? 'ログイン状態を確認できませんでした。'}
+      onRetry={() => void auth.retrySession().catch(() => {})} /> : !auth.canReadPrivate || me.isPending ? <LoadingState /> :
       !me.data ? <ErrorState description="プロフィールを取得できませんでした。" onRetry={() => void me.refetch()} isRetrying={me.isFetching} /> :
       <ProfileForm key={me.data.id} profile={me.data} />}
   </section>

@@ -1,4 +1,4 @@
-import { Route, Routes, Link, useLocation } from 'react-router'
+import { Route, Routes, Link, matchPath, useLocation } from 'react-router'
 import BottomNav from './components/BottomNav'
 import bearPaw from './assets/bear-paw.svg'
 import BookSearchPage from './pages/BookSearchPage'
@@ -10,7 +10,7 @@ import LibraryPage from './features/library/LibraryPage'
 import BookmarkCreatePage from './features/bookmarks/BookmarkCreatePage'
 import BookmarkDetailPage from './features/bookmarks/BookmarkDetailPage'
 import BookmarkFlowPage from './features/bookmark-flow/BookmarkFlowPage'
-import MyProfilePage from './features/profile/MyProfilePage'
+import MyProfilePage, { EditProfilePage } from './features/profile/MyProfilePage'
 import PublicProfilePage from './features/profile/PublicProfilePage'
 import SettingsPage from './features/profile/SettingsPage'
 import GoogleCallbackPage from './lib/auth/GoogleCallbackPage'
@@ -20,6 +20,7 @@ import RelationshipsPage from './features/social/RelationshipsPage'
 export default function App() {
   const { pathname } = useLocation()
   const isViewportPage = pathname === '/' || pathname === '/search'
+  const isProfilePage = matchPath('/me', pathname) || matchPath('/users/:userId', pathname)
   return (
     <div className="min-h-screen bg-paper text-ink">
       <header className="flex h-[68px] items-center gap-2.5 border-b border-[#e7e9e4] bg-white px-6">
@@ -36,7 +37,7 @@ export default function App() {
 
       <main id="main-content" className={isViewportPage
         ? 'mx-auto h-[calc(100dvh-138px-env(safe-area-inset-bottom))] w-full max-w-[740px]'
-        : 'mx-auto w-full max-w-[740px] px-5 pt-8 pb-32 md:pt-12'}>
+        : `mx-auto w-full max-w-[740px] px-5 pb-32 ${isProfilePage ? 'pt-4' : 'pt-8 md:pt-12'}`}>
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route
@@ -60,6 +61,7 @@ export default function App() {
             element={<LibraryPage />}
           />
           <Route path="/me" element={<MyProfilePage />} />
+          <Route path="/me/edit" element={<EditProfilePage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path={googleCallbackPath} element={<GoogleCallbackPage />} />
           <Route path="*" element={<NotFoundPage />} />

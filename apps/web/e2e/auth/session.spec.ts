@@ -48,7 +48,10 @@ test.describe.serial(live ? 'development services' : 'mock services', () => {
       })
       await context.route(`${apiOrigin}/api/v1/**`, async (route) => {
         const request = route.request()
-        if (new URL(request.url()).pathname.endsWith('/health')) return route.fulfill({ json: { status: 'ok' } })
+        const { pathname } = new URL(request.url())
+        if (pathname.endsWith('/health')) return route.fulfill({ json: { status: 'ok' } })
+        if (pathname === `/api/v1/users/${currentUser}`) return route.fulfill({ json: { ...profile(currentUser), publicBookmarkCount: 0, followedByMe: false } })
+        if (pathname === `/api/v1/users/${currentUser}/books`) return route.fulfill({ json: { items: [], nextCursor: null } })
         if (request.method() === 'PUT') initialized = true
         await route.fulfill(initialized ? { json: profile(currentUser) }
           : { status: 404, json: { error: { code: 'NOT_FOUND', message: 'プロフィールがありません。' } } })
@@ -178,7 +181,7 @@ test.describe.serial(live ? 'development services' : 'mock services', () => {
     await page.getByRole('button', { name: 'Googleアカウントを連携' }).click()
     await confirmed
     await expect(page).toHaveURL(/\/me$/)
-    await expect(page.getByLabel('表示名')).toHaveValue('ゲスト')
+    await expect(page.getByRole('heading', { name: 'ゲスト' })).toBeVisible()
     expect((await sessionSnapshot())?.uid === original.uid).toBe(true)
     expect((await sessionSnapshot())?.token === formalToken).toBe(true)
   })

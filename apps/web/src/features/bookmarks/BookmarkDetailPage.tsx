@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
+import { PageBack } from '../../components/PageBack'
 import { BookCard } from '../../components/books/BookCard'
 import { EmptyState, ErrorState, LoadingState } from '../../components/states/ScreenStates'
 import { useAuth } from '../../lib/auth/AuthProvider'
@@ -17,7 +18,10 @@ import { SocialBookmarkCard } from '../social/SocialBookmarkCard'
 
 export default function BookmarkDetailPage({ edit = false }: { edit?: boolean }) {
   const { bookmarkId = '' } = useParams()
-  return <Detail key={`${bookmarkId}:${edit}`} bookmarkId={bookmarkId} edit={edit} />
+  return <div className="space-y-5">
+    <PageBack fallback={edit && isUuid(bookmarkId) ? `/bookmarks/${bookmarkId}` : '/'} />
+    <Detail key={`${bookmarkId}:${edit}`} bookmarkId={bookmarkId} edit={edit} />
+  </div>
 }
 
 function Detail({ bookmarkId, edit }: { bookmarkId: string; edit: boolean }) {

@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import type { components } from '../../lib/api/generated'
 import { BookCard } from '../books/BookCard'
 import { BookmarkBody, type FeedContentMode } from './BookmarkBody'
+import { HeartIcon, ReplyIcon } from './ReactionIcons'
 
 type Props = ({ variant?: 'full'; bookmark: components['schemas']['BookmarkCard'] }
   | { variant: 'flow'; bookmark: components['schemas']['BookmarkFlowItem'] }) & {
@@ -12,6 +13,7 @@ type Props = ({ variant?: 'full'; bookmark: components['schemas']['BookmarkCard'
   bookHref?: string
   detailHref?: string
   likeAction?: ReactNode
+  replyAction?: ReactNode
   actions?: ReactNode
   appearance?: 'card' | 'timeline'
 }
@@ -48,10 +50,15 @@ export function BookmarkCard(props: Props) {
         <span>{bookmark.visibility === 'public' ? '公開' : '非公開'}</span>
         {bookmark.pageNumber !== null && <span>{bookmark.pageNumber}ページ</span>}
       </div>
-      <BookmarkBody bookmarkId={bookmark.id} viewerId={viewerId} mode={mode} isSpoiler={bookmark.isSpoiler} content={bookmark.content} compact={timeline} />
-      <div className={`${timeline ? 'mt-1 pt-1' : 'mt-3 pt-3'} flex flex-wrap items-center gap-4 border-t border-[#e2e7e2] text-sm text-[#526356]`}>
-        {props.likeAction ?? <span>いいね {bookmark.likeCount}{bookmark.likedByMe ? '（いいね済み）' : ''}</span>}
-        <span>返信 {bookmark.replyCount}</span>
+      <BookmarkBody bookmarkId={bookmark.id} viewerId={viewerId} mode={mode} isSpoiler={bookmark.isSpoiler} content={bookmark.content}
+        closeBelow={props.variant === 'flow'} compact={timeline} />
+      <div className={`${timeline ? 'mt-1' : 'mt-2'} flex flex-wrap items-start gap-x-3 border-t border-[#e2e7e2] pt-1 text-sm text-[#526356] tabular-nums`}>
+        {props.likeAction ?? <span className="inline-flex min-h-11 items-center gap-1.5 px-2">
+          <HeartIcon filled={bookmark.likedByMe} /><span className="sr-only">いいね </span>{bookmark.likeCount}
+        </span>}
+        {props.replyAction ?? <span className="inline-flex min-h-11 items-center gap-1.5 px-2">
+          <ReplyIcon /><span className="sr-only">返信 </span>{bookmark.replyCount}
+        </span>}
       </div>
       {actions && <div className="mt-3 flex flex-wrap gap-2">{actions}</div>}
     </article>
