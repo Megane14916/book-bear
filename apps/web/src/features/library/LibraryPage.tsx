@@ -56,14 +56,14 @@ export default function LibraryPage() {
         <h1 className="text-3xl font-bold">自分の本棚</h1></div>
       <Link className="ui-action inline-flex border border-forest px-4 text-sm font-bold text-forest" to="/search">本を探す</Link>
     </header>
-    {books.isPending ? <LoadingState /> : books.isError ?
+    {books.isPending ? <LoadingState /> : books.isError && !books.data ?
       <ErrorState description={books.error.message} onRetry={() => void books.refetch()} isRetrying={books.isFetching} /> :
       items.length === 0 ? <EmptyState title="本棚は空です" description="気になる本を探して、本棚に追加してみましょう。"
         action={<Link className="ui-action inline-flex bg-forest px-5 text-sm font-bold text-white" to="/search">本を探す</Link>} /> :
       <div className="space-y-4">{items.map((item) => <LibraryBook key={item.id} item={item} userId={userId!} />)}</div>}
     {books.hasNextPage && <button type="button" className="ui-action w-full border border-forest text-sm font-bold text-forest"
       disabled={books.isFetchingNextPage} onClick={() => void books.fetchNextPage()}>
-      {books.isFetchingNextPage ? '読み込み中…' : '続きを読み込む'}
+      {books.isFetchingNextPage ? '読み込み中…' : books.isFetchNextPageError ? '再試行' : '続きを読み込む'}
     </button>}
     {books.isFetchNextPageError && <p role="alert" className="text-sm text-red-700">続きの読み込みに失敗しました。もう一度お試しください。</p>}
   </section>
