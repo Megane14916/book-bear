@@ -9,6 +9,7 @@ import { canReadPublic } from '../../lib/auth/readable'
 import { queryKeys } from '../../lib/query/keys'
 import { useContentPreference } from '../feed/useContentPreference'
 import { SocialBookmarkCard } from '../social/SocialBookmarkCard'
+import { PublicBookPreview } from './PublicBookPreview'
 
 export function PostResults({ q }: { q: string }) {
   const auth = useAuth()
@@ -54,6 +55,7 @@ export function UserResults({ q }: { q: string }) {
         {user.avatarUrl && <img className="size-8 rounded-full object-cover" src={user.avatarUrl} alt="" />}
         <span className="[overflow-wrap:anywhere]">{user.displayName}{user.handle && <small className="ml-2 font-normal">@{user.handle}</small>}</span>
       </Link>
+      <PublicBookPreview userId={user.id} />
     </li>)}</ul>
   </div>
 }

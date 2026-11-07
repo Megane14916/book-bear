@@ -4,9 +4,10 @@ import { bookmarkError, bookmarkInput, registrationMessage, validateBookmark } f
 
 const field = 'mt-1 min-h-11 w-full rounded-lg border border-[#d6ded6] bg-white px-3 py-2 text-ink focus-visible:outline-2 focus-visible:outline-forest'
 
-export function BookmarkForm({ initial, pending, error, canPublish, canSave = true, onSave, registrationAction, children }: {
+export function BookmarkForm({ initial, pending, error, canPublish, canSave = true, onSave, registrationAction, children, submitArea, submitLabel = '栞を保存' }: {
   initial?: Bookmark; pending: boolean; error: unknown; canPublish: boolean
   onSave: (input: BookmarkInput) => void; children?: ReactNode; registrationAction?: ReactNode; canSave?: boolean
+  submitArea?: (button: ReactNode) => ReactNode; submitLabel?: string
 }) {
   const [content, setContent] = useState(initial?.content ?? '')
   const [page, setPage] = useState(initial?.pageNumber?.toString() ?? '')
@@ -20,6 +21,7 @@ export function BookmarkForm({ initial, pending, error, canPublish, canSave = tr
     setValidation(invalid)
     if (!invalid) onSave(bookmarkInput(content, page, visibility, spoiler))
   }
+  const button = <button className="ui-action bg-forest px-5 font-bold text-white" disabled={pending || !canSave}>{pending ? '保存中…' : submitLabel}</button>
   return <form onSubmit={submit} noValidate className="min-w-0 space-y-5">
     <fieldset disabled={pending} className="min-w-0 space-y-5">
       <legend className="sr-only">栞の内容</legend>
@@ -45,6 +47,6 @@ export function BookmarkForm({ initial, pending, error, canPublish, canSave = tr
       </label>
     </fieldset>
     {Boolean(validation || error) && <p role="alert" className="text-sm text-red-700">{validation ?? bookmarkError(error)}</p>}
-    <button className="ui-action bg-forest px-5 font-bold text-white" disabled={pending || !canSave}>{pending ? '保存中…' : '栞を保存'}</button>
+    {submitArea ? submitArea(button) : button}
   </form>
 }
