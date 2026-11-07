@@ -101,8 +101,9 @@ try {
   }
   const hybridPermissionsFile = hybrid && !simulated ? process.env.GOOGLE_OPENLIBRARY_PERMISSIONS_FILE : undefined
   const hybridPermissions = hybridPermissionsFile ? evidencePermissions.parse(JSON.parse(await readFile(hybridPermissionsFile, 'utf8'))) : {}
-  const maxInputChars = ciniiMode || hybrid || comparison ? 70_000 : 20_000
-  const maxCalls = mode === 'ndl' ? 6 : mode === 'llm-direct' ? 5 : mode === 'google' || mode === 'preferences' ? 1 : 3
+  const maxInputChars = mode === 'aozora' ? 90_000 : ciniiMode || hybrid || comparison ? 70_000 : 20_000
+  const maxCalls = mode === 'aozora' ? 7 : mode === 'ndl' ? 6 : mode === 'llm-direct' ? 5
+    : mode === 'google' || mode === 'preferences' ? 1 : 3
   const { ai, usage } = createExperimentAi(maxCalls, maxInputChars, simulated ? async (_model, input) => mockRun(input, hybrid ? user : undefined) : undefined,
     comparison ? 25_000 : 15_000)
   const start = performance.now()

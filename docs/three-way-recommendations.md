@@ -2,6 +2,8 @@
 
 公開seed栞からQwen3で嗜好を抽出し、同じ嗜好で3方式を個別に評価する。推薦はローカルCLIの実験結果。登録済み判定には固定seedとローカルPGliteの対象ユーザーの本棚を使う。[3ユーザーの実測とTop10](three-way-recommendation-results.md)
 
+青空文庫方式は全件索引と再ランキングに更新した。現在の索引コマンドと順位の定義は[青空文庫の全作品索引と再ランキング](aozora-recommendation-improvement.md)を参照。このページのA方式の評価条件は、旧220作品の実験を記録したもの。
+
 | 方式 | 候補を取得する先 | 順位付けの根拠 |
 | --- | --- | --- |
 | A `aozora` | 青空文庫公式の全作品CSVとSoranohaの本文アーカイブ | BGE-M3で嗜好と本文チャンクの類似度を計算 |
@@ -21,7 +23,7 @@ if (!(Test-Path -LiteralPath $archive)) {
     Invoke-WebRequest 'https://soranoha.org/bulk/soranoha-plaintext.zip' -OutFile "$archive.part"
     Move-Item -LiteralPath "$archive.part" -Destination $archive
 }
-pnpm --filter api recommendations:aozora index --limit 220 --execute
+pnpm --filter api recommendations:aozora index --limit 200 --execute
 ```
 
 `import` はローカルにCSVの取り込み済みスナップショットがあれば再利用する。更新する場合は `import --refresh`。索引は作品ごとに原子的に書き出す。中断後は同じコマンドを再実行すると、現在の書誌・前処理版・モデルに対応する保存済み作品を再利用する。保存先を変える場合は `RECOMMENDATION_EXPERIMENT_DIR` を絶対パスで設定し、本文ZIPもその場所に置く。既定のディレクトリはGitの対象外。新しいコーパスリリースで全件再計算する場合は、別の保存先に新しいスナップショットとZIPを用意する。
