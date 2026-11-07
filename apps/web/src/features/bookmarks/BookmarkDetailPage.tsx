@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
-import { BookmarkCard } from '../../components/bookmarks/BookmarkCard'
 import { BookCard } from '../../components/books/BookCard'
 import { EmptyState, ErrorState, LoadingState } from '../../components/states/ScreenStates'
 import { useAuth } from '../../lib/auth/AuthProvider'
@@ -11,6 +10,9 @@ import { BookmarkForm } from './BookmarkForm'
 import { deleteBookmark, patchBookmark, type PatchBookmark } from './api'
 import { useBookmark, useBookmarkWrite } from './queries'
 import { bookmarkError } from './validation'
+import { Replies } from '../social/Replies'
+import { ShareBookmark } from '../social/ShareBookmark'
+import { SocialBookmarkCard } from '../social/SocialBookmarkCard'
 
 export default function BookmarkDetailPage({ edit = false }: { edit?: boolean }) {
   const { bookmarkId = '' } = useParams()
@@ -49,17 +51,20 @@ function Detail({ bookmarkId, edit }: { bookmarkId: string; edit: boolean }) {
         onSave={(input) => void write.save(input)} />
       <Link className="ui-action inline-flex text-forest underline" to={`/bookmarks/${bookmarkId}`}>編集をやめる</Link>
     </> : <>
-      <BookmarkCard bookmark={bookmark} viewerId={auth.userId} mode="all" bookHref={`/books/${bookmark.book.id}`}
+      <SocialBookmarkCard bookmark={bookmark} viewerId={auth.userId} mode="all"
         actions={owner && <>
           <Link className="ui-action inline-flex border border-forest px-4 text-forest" to={`/bookmarks/${bookmarkId}/edit`}>編集</Link>
           <button className="ui-action border border-red-700 px-4 text-red-700" disabled={write.isPending} onClick={() => setConfirmDelete(true)}>削除</button>
         </>} />
+      <Link className="ui-action inline-flex text-forest underline" to={`/users/${bookmark.author.id}/books/${bookmark.book.id}/bookmarks`}>この本の栞の流れ</Link>
+      {bookmark.visibility === 'public' && <ShareBookmark bookmarkId={bookmark.id} />}
       {confirmDelete && owner && <div role="group" aria-label="栞の削除確認" className="space-y-3 rounded-lg border border-red-700 bg-white p-4">
         <p>この栞を削除しますか？削除すると元に戻せません。</p>
         <button className="ui-action border border-red-700 px-4 text-red-700" disabled={write.isPending} onClick={() => void write.save(null)}>{write.isPending ? '削除中…' : '削除する'}</button>
         <button className="ui-action ml-3 border px-4" disabled={write.isPending} onClick={() => setConfirmDelete(false)}>キャンセル</button>
       </div>}
       {write.error && <p role="alert" className="text-sm text-red-700">{bookmarkError(write.error)}</p>}
+      {bookmark.visibility === 'public' && <Replies bookmarkId={bookmark.id} />}
     </>}
   </section>
 }

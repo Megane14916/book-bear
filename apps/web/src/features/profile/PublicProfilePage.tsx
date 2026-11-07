@@ -10,6 +10,7 @@ import { useAuth } from '../../lib/auth/AuthProvider'
 import { canReadPublic } from '../../lib/auth/readable'
 import { queryKeys } from '../../lib/query/keys'
 import { isUuid } from '../book-search/validation'
+import { FollowControls } from '../social/FollowControls'
 
 export default function PublicProfilePage() {
   const { userId = '' } = useParams()
@@ -46,6 +47,7 @@ export default function PublicProfilePage() {
       {handle && <p className="text-sm text-[#526356]">@{handle}</p>}
       {bio && <p className="whitespace-pre-wrap">{bio}</p>}
       <p className="text-sm text-[#526356]">公開栞 {publicBookmarkCount}件</p>
+      <FollowControls key={`${userId}:${auth.userId}`} profile={profile.data} />
     </header>
     <h2 className="text-xl font-bold">公開栞がある本</h2>
     {books.isPending ? <LoadingState /> : !books.data ? <ErrorState description="本の一覧を取得できませんでした。"

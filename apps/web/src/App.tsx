@@ -14,6 +14,7 @@ import PublicProfilePage from './features/profile/PublicProfilePage'
 import SettingsPage from './features/profile/SettingsPage'
 import GoogleCallbackPage from './lib/auth/GoogleCallbackPage'
 import { googleCallbackPath } from './lib/auth/google'
+import RelationshipsPage from './features/social/RelationshipsPage'
 
 export default function App() {
   return (
@@ -47,6 +48,8 @@ export default function App() {
           <Route path="/bookmarks/:bookmarkId/edit" element={<BookmarkDetailPage edit />} />
           <Route path="/users/:userId/books/:bookId/bookmarks" element={<BookmarkFlowPage />} />
           <Route path="/users/:userId" element={<PublicProfilePage />} />
+          <Route path="/users/:userId/followers" element={<RelationshipsPage kind="followers" />} />
+          <Route path="/users/:userId/following" element={<RelationshipsPage kind="following" />} />
           <Route
             path="/library"
             element={<LibraryPage />}
