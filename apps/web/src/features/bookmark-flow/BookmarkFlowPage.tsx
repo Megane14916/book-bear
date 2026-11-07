@@ -43,9 +43,18 @@ function FlowContent({ userId, bookId }: { userId: string; bookId: string }) {
   const items = flow.data.pages.flatMap((page) => page.items)
   return <>
     <h1 className="text-3xl font-bold">栞の流れ</h1>
-    <header className="space-y-2 rounded-2xl border border-[#e2e7e2] bg-white p-4">
-      <Link className="ui-action inline-flex text-sm font-bold text-forest underline" to={`/users/${author.id}`}>{author.displayName}</Link>
-      <BookCard book={book} titleHref={`/books/${book.id}`} />
+    <header className="space-y-2">
+      <Link className="ui-action inline-flex gap-2.5 text-sm font-bold text-forest hover:underline" to={`/users/${author.id}`}>
+        {author.avatarUrl ? <img className="size-8 shrink-0 rounded-full object-cover" src={author.avatarUrl} alt="" /> :
+          <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-full bg-mist">
+            <svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="7" r="4" />
+              <path d="M4 21v-2a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v2" />
+            </svg>
+          </span>}
+        {author.displayName}
+      </Link>
+      <BookCard book={book} titleHref={`/books/${book.id}`} compact plain />
     </header>
     {items.length === 0 && <EmptyState title="表示できる栞はまだありません" description="この本の栞が集まると、ここに投稿順で表示されます。" action={back} />}
     {items.map((bookmark) => <SocialBookmarkCard key={bookmark.id} variant="flow" bookmark={bookmark} viewerId={auth.userId}

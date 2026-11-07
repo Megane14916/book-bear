@@ -4,6 +4,7 @@ import { Link, useLocation } from 'react-router'
 import { BookmarkBody, type FeedContentMode } from '../../components/bookmarks/BookmarkBody'
 import { LoadMore } from '../../components/states/LoadMore'
 import { ErrorState, LoadingState } from '../../components/states/ScreenStates'
+import { useAutoGrowTextarea } from '../../components/useAutoGrowTextarea'
 import { api } from '../../lib/api/client'
 import type { components } from '../../lib/api/generated'
 import { requestData, requireData } from '../../lib/api/result'
@@ -118,6 +119,7 @@ function ReplyForm({ initial, label, pending, error, onSave, onCancel }: {
   const [content, setContent] = useState(initial?.content ?? '')
   const [isSpoiler, setSpoiler] = useState(initial?.isSpoiler ?? false)
   const [invalid, setInvalid] = useState(false)
+  const textarea = useAutoGrowTextarea(content)
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (pending) return
@@ -126,12 +128,12 @@ function ReplyForm({ initial, label, pending, error, onSave, onCancel }: {
     setInvalid(false)
     onSave({ content: body, isSpoiler })
   }
-  return <form onSubmit={submit} className="mt-2 rounded-xl border border-[#e2e7e2] bg-paper p-3 sm:p-4">
+  return <form onSubmit={submit} className="mt-2">
     <fieldset disabled={pending} className="min-w-0 space-y-2">
       <label className="block">
         <span className="sr-only">返信本文（1,000文字以内）</span>
-        <textarea className="block w-full resize-y rounded-lg border border-[#d6e0d5] bg-white px-3 py-2 text-base focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-forest"
-          value={content} placeholder="返信を書く" maxLength={1_000} rows={3}
+        <textarea ref={textarea} className="block min-h-11 w-full resize-none overflow-hidden rounded-lg border border-[#d6e0d5] bg-white px-3 py-2 text-base focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-forest"
+          value={content} placeholder="返信を書く" maxLength={1_000} rows={1}
           onChange={(event) => setContent(event.target.value)} />
       </label>
       {(invalid || Boolean(error)) && <p role="alert" className="text-sm text-red-700">
