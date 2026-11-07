@@ -1,5 +1,6 @@
 import { Route, Routes, Link, useLocation } from 'react-router'
 import BottomNav from './components/BottomNav'
+import bearPaw from './assets/bear-paw.svg'
 import BookSearchPage from './pages/BookSearchPage'
 import BookDetailPage from './pages/BookDetailPage'
 import ManualBookPage from './pages/ManualBookPage'
@@ -27,8 +28,8 @@ export default function App() {
           className="flex items-center gap-2.5 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest"
           aria-label="Book Bear ホーム"
         >
-          <span className="-rotate-12 text-[22px] text-forest" aria-hidden="true">▮</span>
-          <span className="text-lg font-extrabold tracking-wide">Book Bear</span>
+          <img src={bearPaw} alt="" aria-hidden="true" className="size-7 shrink-0" />
+          <span className="brand-wordmark text-[22px] leading-none font-semibold tracking-[0.04em] text-[#493326]">Book Bear</span>
         </Link>
         <span className="ml-auto text-[11px] text-[#89938b]">読書の足あと</span>
       </header>

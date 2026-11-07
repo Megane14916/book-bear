@@ -4,7 +4,7 @@ const navigation = [
   { path: '/', label: 'ホーム', symbol: '⌂' },
   { path: '/search', label: '検索', symbol: '⌕' },
   { path: '/create', label: '投稿', symbol: '＋' },
-  { path: '/library', label: '本棚', symbol: '▤' },
+  { path: '/library', label: '本棚', symbol: null },
   { path: '/me', label: 'マイページ', symbol: '◯' },
 ]
 
@@ -28,7 +28,14 @@ export default function BottomNav() {
               ].join(' ')
             }
           >
-            <span aria-hidden="true" className="text-[25px] leading-none">{item.symbol}</span>
+            <span aria-hidden="true" className="text-[25px] leading-none">
+              {item.path === '/library'
+                ? <svg className="size-[25px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M5 3.5h13a1 1 0 0 1 1 1v16H6a3 3 0 0 1-3-3v-11a3 3 0 0 1 3-3Z" />
+                  <path d="M3 17.5a3 3 0 0 1 3-3h13M7 3.5v11M8 17.5h7" />
+                </svg>
+                : item.symbol}
+            </span>
             <span className="text-[10px]">{item.label}</span>
           </NavLink>
         ))}
