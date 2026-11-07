@@ -35,6 +35,9 @@ it('keeps like state on failure and synchronizes reply and like counts after suc
   const get = vi.spyOn(api, 'GET').mockImplementation(async (path) => {
     if (path === '/api/v1/me/preferences') return response({ feedContentMode: 'all' })
     if (path === '/api/v1/bookmarks/{bookmarkId}/replies') return response({ items: replies, nextCursor: null })
+    if (path === '/api/v1/users/{userId}/books/{bookId}/bookmarks') {
+      return response({ author: bookmark.author, book: bookmark.book, items: [bookmark], nextCursor: null })
+    }
     return response({ ...bookmark, likedByMe: liked, likeCount: Number(liked), replyCount: replies.length })
   })
   vi.spyOn(api, 'PUT').mockRejectedValueOnce(new HttpError(403)).mockImplementation(async () => { liked = true; return noContent() })
@@ -114,7 +117,7 @@ it('links an updated follower count to the public relationship list and forwards
   await screen.findByRole('link', { name: '次の読者' })
   expect(get).toHaveBeenCalledWith('/api/v1/users/{userId}/followers', expect.objectContaining({ params: { path: { userId: other.id }, query: { cursor: 'next', limit: 15 } } }))
   fireEvent.click(screen.getByRole('link', { name: 'ホーム' }))
-  click('表示範囲：全体')
+  fireEvent.click(screen.getByRole('tab', { name: 'フォロー中' }))
   await screen.findByText(bookmark.content)
   expect(get).toHaveBeenCalledWith('/api/v1/feed', expect.objectContaining({ params: { query: { scope: 'following', limit: 15, cursor: undefined } } }))
 })
@@ -124,20 +127,19 @@ it('offers Google linking to an anonymous reader and shares only the public URL'
   let current = bookmark
   vi.spyOn(api, 'GET').mockImplementation(async (path) => {
     if (path === '/api/v1/me/preferences') return response({ feedContentMode: 'tap' })
+    if (path === '/api/v1/users/{userId}/books/{bookId}/bookmarks') {
+      return response({ author: current.author, book: current.book, items: [current], nextCursor: null })
+    }
     return path === '/api/v1/bookmarks/{bookmarkId}/replies' ? response({ items: [], nextCursor: null }) : response(current)
   })
   const put = vi.spyOn(api, 'PUT')
-  const copy = vi.fn().mockResolvedValue(undefined)
-  vi.stubGlobal('navigator', { clipboard: { writeText: copy } })
   const view = show(`/bookmarks/${bookmark.id}`)
   const like = await screen.findByRole('button', { name: 'いいね（0）' })
   fireEvent.click(like)
   expect(within(like.parentElement!).getByRole('button', { name: 'Googleアカウントを連携' })).toBeTruthy()
   expect(put).not.toHaveBeenCalled()
-  click('URLをコピー')
-  await screen.findByText('URLをコピーしました。')
+  expect(screen.queryByRole('button', { name: 'URLをコピー' })).toBeNull()
   const expected = new URL(`/bookmarks/${bookmark.id}`, window.location.origin).href
-  expect(copy).toHaveBeenCalledWith(expected)
   const share = new URL(screen.getByRole('link', { name: 'Xで共有' }).getAttribute('href')!)
   expect([...share.searchParams.entries()]).toEqual([['url', expected]])
   view.unmount()

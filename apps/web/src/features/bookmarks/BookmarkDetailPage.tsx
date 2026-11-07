@@ -12,16 +12,21 @@ import { BookmarkForm } from './BookmarkForm'
 import { deleteBookmark, patchBookmark, type PatchBookmark } from './api'
 import { useBookmark, useBookmarkWrite } from './queries'
 import { bookmarkError } from './validation'
-import { Replies } from '../social/Replies'
-import { ShareBookmark } from '../social/ShareBookmark'
-import { SocialBookmarkCard } from '../social/SocialBookmarkCard'
+import { BookmarkThread } from './BookmarkThread'
 
 export default function BookmarkDetailPage({ edit = false }: { edit?: boolean }) {
   const { bookmarkId = '' } = useParams()
-  return <div className="space-y-5">
-    <PageBack fallback={edit && isUuid(bookmarkId) ? `/bookmarks/${bookmarkId}` : '/'} />
-    <Detail key={`${bookmarkId}:${edit}`} bookmarkId={bookmarkId} edit={edit} />
+  if (edit) return <div className="space-y-5">
+    <PageBack fallback={isUuid(bookmarkId) ? `/bookmarks/${bookmarkId}` : '/'} />
+    <Detail key={bookmarkId} bookmarkId={bookmarkId} edit />
   </div>
+  return <section aria-labelledby="bookmark-detail-title" className="flex h-full flex-col bg-white sm:border-x sm:border-[#edf0eb]">
+    <header className="flex shrink-0 items-center gap-3 border-b border-[#e2e7e2] px-3 py-1 sm:px-5">
+      <PageBack fallback="/" />
+      <h1 id="bookmark-detail-title" className="text-lg font-bold">栞の詳細</h1>
+    </header>
+    <Detail key={bookmarkId} bookmarkId={bookmarkId} edit={false} />
+  </section>
 }
 
 function Detail({ bookmarkId, edit }: { bookmarkId: string; edit: boolean }) {
@@ -48,29 +53,25 @@ function Detail({ bookmarkId, edit }: { bookmarkId: string; edit: boolean }) {
   const bookmark = query.data
   const owner = auth.status === 'ready' && auth.userId === bookmark.author.id
   if (edit && !owner) return <EmptyState title="この栞は編集できません" description="編集できるのは作成した本人だけです。" action={<Link className="ui-action inline-flex underline" to={`/bookmarks/${bookmarkId}`}>栞に戻る</Link>} />
-  return <section className="min-w-0 space-y-5">
-    <h1 className="text-2xl font-bold">{edit ? '栞を編集' : '栞の詳細'}</h1>
-    {edit ? <>
-      <BookCard book={bookmark.book} />
-      <BookmarkForm initial={bookmark} pending={write.isPending} error={write.error} canPublish={!auth.isAnonymous}
-        registrationAction={<GoogleAction />}
-        onSave={(input) => void write.save(input)} />
-      <Link className="ui-action inline-flex text-forest underline" to={`/bookmarks/${bookmarkId}`}>編集をやめる</Link>
-    </> : <>
-      <SocialBookmarkCard bookmark={bookmark} viewerId={auth.userId} mode={mode}
-        actions={owner && <>
-          <Link className="ui-action inline-flex border border-forest px-4 text-forest" to={`/bookmarks/${bookmarkId}/edit`}>編集</Link>
-          <button className="ui-action border border-red-700 px-4 text-red-700" disabled={write.isPending} onClick={() => setConfirmDelete(true)}>削除</button>
-        </>} />
-      <Link className="ui-action inline-flex text-forest underline" to={`/users/${bookmark.author.id}/books/${bookmark.book.id}/bookmarks`}>この本の栞の流れ</Link>
-      {bookmark.visibility === 'public' && <ShareBookmark bookmarkId={bookmark.id} />}
+  if (edit) return <section className="min-w-0 space-y-5">
+    <h1 className="text-2xl font-bold">栞を編集</h1>
+    <BookCard book={bookmark.book} />
+    <BookmarkForm initial={bookmark} pending={write.isPending} error={write.error} canPublish={!auth.isAnonymous}
+      registrationAction={<GoogleAction />}
+      onSave={(input) => void write.save(input)} />
+    <Link className="ui-action inline-flex text-forest underline" to={`/bookmarks/${bookmarkId}`}>編集をやめる</Link>
+  </section>
+  return <BookmarkThread key={auth.userId} bookmark={bookmark} viewerId={auth.userId} mode={mode}
+    actions={owner && <>
+      <Link className="ui-action inline-flex px-3 text-sm font-semibold text-forest hover:bg-mist" to={`/bookmarks/${bookmarkId}/edit`}>編集</Link>
+      <button className="ui-action px-3 text-sm font-semibold text-red-700 hover:bg-red-50" disabled={write.isPending} onClick={() => setConfirmDelete(true)}>削除</button>
+    </>}
+    feedback={((confirmDelete && owner) || write.error) && <>
       {confirmDelete && owner && <div role="group" aria-label="栞の削除確認" className="space-y-3 rounded-lg border border-red-700 bg-white p-4">
         <p>この栞を削除しますか？削除すると元に戻せません。</p>
         <button className="ui-action border border-red-700 px-4 text-red-700" disabled={write.isPending} onClick={() => void write.save(null)}>{write.isPending ? '削除中…' : '削除する'}</button>
         <button className="ui-action ml-3 border px-4" disabled={write.isPending} onClick={() => setConfirmDelete(false)}>キャンセル</button>
       </div>}
       {write.error && <p role="alert" className="text-sm text-red-700">{bookmarkError(write.error)}</p>}
-      {bookmark.visibility === 'public' && <Replies bookmarkId={bookmark.id} mode={mode} />}
-    </>}
-  </section>
+    </>} />
 }

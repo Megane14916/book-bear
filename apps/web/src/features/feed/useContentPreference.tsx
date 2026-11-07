@@ -49,24 +49,31 @@ export function useContentPreference({ enabled = true, compact = false } = {}) {
     }
   }
 
-  const control = <div className={compact ? 'min-w-0' : 'mb-4 rounded-2xl border border-[#e2e7e2] bg-white px-4 py-3'}>
+  const control = <div className={compact ? 'flex flex-col-reverse items-end gap-2' : 'mb-4 rounded-2xl border border-[#e2e7e2] bg-white px-4 py-3'}>
     <div aria-busy={update.isPending}>
       {compact ? <button type="button"
         disabled={(!isGuest && (!auth.canReadPrivate || !preferences.data)) || update.isPending}
         aria-label={`本文：${mode === 'all' ? 'すべて表示' : 'タップして表示'}`}
         title={mode === 'all' ? 'タップして表示に切り替える' : 'すべて表示に切り替える'}
-        className="ui-action flex w-full gap-2 border border-[#d6e0d5] bg-white px-3 text-xs font-bold text-forest shadow-sm hover:bg-mist"
+        className="ui-action flex gap-2 rounded-full border border-forest bg-forest px-4 text-xs font-bold text-white shadow-md hover:bg-forest-dark"
         onClick={() => changeMode(mode === 'all' ? 'tap' : 'all')}>
-        <span aria-hidden="true" className="text-base">Aa</span>
+        <svg aria-hidden="true" className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6Z" />
+          <circle cx="12" cy="12" r="2.5" />
+          {mode === 'tap' && <path d="m4 4 16 16" />}
+        </svg>
         <span>{mode === 'all' ? 'すべて表示' : 'タップして表示'}</span>
       </button> :
       <fieldset disabled={(!isGuest && (!auth.canReadPrivate || !preferences.data)) || update.isPending}>
         <ContentModeSwitch value={mode} onChange={changeMode} />
       </fieldset>}
     </div>
-    {preferences.isError && auth.canReadPrivate && <ErrorState description="表示設定を取得できませんでした。" onRetry={() => void preferences.refetch()} />}
-    {update.isError && <p role="alert" className="text-sm text-red-700">表示設定を保存できませんでした。もう一度お試しください。</p>}
-    {storageError && <p role="alert" className="text-sm text-red-700">端末に設定を保存できませんでした。</p>}
+    {(preferences.isError && auth.canReadPrivate || update.isError || storageError) &&
+      <div className={compact ? 'max-w-xs rounded-xl border border-[#e2e7e2] bg-white p-2 shadow-md' : undefined}>
+        {preferences.isError && auth.canReadPrivate && <ErrorState description="表示設定を取得できませんでした。" onRetry={() => void preferences.refetch()} />}
+        {update.isError && <p role="alert" className="text-sm text-red-700">表示設定を保存できませんでした。もう一度お試しください。</p>}
+        {storageError && <p role="alert" className="text-sm text-red-700">端末に設定を保存できませんでした。</p>}
+      </div>}
   </div>
   return { mode, control }
 }

@@ -19,10 +19,11 @@ import RelationshipsPage from './features/social/RelationshipsPage'
 
 export default function App() {
   const { pathname } = useLocation()
-  const isViewportPage = pathname === '/' || pathname === '/search'
+  const isTimelinePage = pathname === '/' || !!matchPath('/bookmarks/:bookmarkId', pathname)
+  const isViewportPage = isTimelinePage || pathname === '/search'
   const isProfilePage = matchPath('/me', pathname) || matchPath('/users/:userId', pathname)
   return (
-    <div className="min-h-screen bg-paper text-ink">
+    <div className={`min-h-screen text-ink ${isTimelinePage ? 'bg-white' : 'bg-paper'}`}>
       <header className="flex h-[68px] items-center gap-2.5 border-b border-[#e7e9e4] bg-white px-6">
         <Link
           to="/"
