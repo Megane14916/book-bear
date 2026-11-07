@@ -1,4 +1,5 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test'
+import { createHash } from 'node:crypto'
 
 // Never write storageState, HAR, traces, headers or session bodies to artifacts.
 const live = process.env.AUTH_E2E_LIVE === '1'
@@ -9,14 +10,14 @@ let signupCount = 0, putCount = 0, sequence = 0, currentUser = '', initialized =
 let firstUid = ''
 const profile = (id: string) => ({ id, displayName: 'ゲスト', avatarUrl: null, handle: null, bio: null,
   followersCount: 0, followingCount: 0, isAnonymous: true })
-function mockSession(newUser: boolean) {
+function mockSession(newUser: boolean, anonymous = true) {
   if (newUser) { currentUser = `00000000-0000-4000-8000-${String(++sequence).padStart(12, '0')}`; initialized = false }
   const now = Math.floor(Date.now() / 1000)
   const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url')
   const token = `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode({ sub: currentUser, exp: now + 3600, iat: now,
-    role: 'authenticated', aud: 'authenticated', is_anonymous: true, jti: String(++sequence) })}.dGVzdA`
+    role: 'authenticated', aud: 'authenticated', is_anonymous: anonymous, jti: String(++sequence) })}.dGVzdA`
   return { access_token: token, refresh_token: `mock-refresh-${sequence}`, token_type: 'bearer', expires_in: 3600,
-    expires_at: now + 3600, user: { id: currentUser, is_anonymous: true, aud: 'authenticated', role: 'authenticated',
+    expires_at: now + 3600, user: { id: currentUser, is_anonymous: anonymous, aud: 'authenticated', role: 'authenticated',
       app_metadata: {}, user_metadata: {}, created_at: new Date().toISOString() } }
 }
 async function sessionSnapshot() {
@@ -63,15 +64,14 @@ test.describe.serial(live ? 'development services' : 'mock services', () => {
   test.afterAll(async () => { await context?.close() })
 
   test('1 browsing does not create an anonymous user', async () => {
-    // Keep cache-count assertions isolated from the home feed's own queries.
-    // Home/feed integration is exercised by the UI and bookmark browser suites.
-    await page.goto('/me?auth-check=1')
+    // The manual form does not read app data, so cache counts cover only the harness.
+    await page.goto('/books/manual?auth-check=1')
     await expect(page.getByText(/状態：guest/)).toBeVisible()
     await page.getByRole('link', { name: '検索', exact: true }).click()
     await expect(page.getByRole('heading', { name: '本を探す' })).toBeVisible()
     expect(signupCount === 0 && putCount === 0).toBe(true)
     expect(await sessionSnapshot() === null).toBe(true)
-    await page.goto('/me?auth-check=1')
+    await page.goto('/books/manual?auth-check=1')
   })
 
   test('2 first save preparation signs in and initializes through the real client', async () => {
@@ -138,5 +138,48 @@ test.describe.serial(live ? 'development services' : 'mock services', () => {
     page.off('request', onRequest)
     await page.getByRole('button', { name: 'サインアウト', exact: true }).click()
     await expect(page.getByText(/状態：guest/)).toBeVisible()
+  })
+
+  test('7 Google linking exchanges the PKCE code and confirms registration with the original UID', async () => {
+    test.skip(live, 'Uses a simulated Google redirect and Supabase token response.')
+    await prepare()
+    const original = (await sessionSnapshot())!
+    let callback = ''
+    let challenge = ''
+    let formalToken = ''
+    await page.route(`${authUrl}/auth/v1/user/identities/authorize?**`, async (route) => {
+      const { searchParams } = new URL(route.request().url())
+      expect(searchParams.get('provider')).toBe('custom:google')
+      expect(searchParams.get('scopes')).toBe('openid email')
+      expect(searchParams.get('code_challenge_method')).toBe('s256')
+      challenge = searchParams.get('code_challenge')!
+      const redirect = new URL(searchParams.get('redirect_to')!)
+      expect(redirect.pathname).toBe('/auth/callback')
+      redirect.searchParams.set('code', 'mock-google-code')
+      callback = redirect.href
+      return route.fulfill({ json: { url: 'https://accounts.google.com/o/oauth2/v2/auth' } })
+    })
+    await page.route('https://accounts.google.com/o/oauth2/v2/auth', (route) => route.fulfill({ status: 302, headers: { location: callback } }))
+    await page.route(`${authUrl}/auth/v1/token?grant_type=pkce`, (route) => {
+      const body = route.request().postDataJSON() as { auth_code: string; code_verifier: string }
+      expect(body.auth_code).toBe('mock-google-code')
+      expect(createHash('sha256').update(body.code_verifier).digest('base64url')).toBe(challenge)
+      const session = mockSession(false, false)
+      formalToken = session.access_token
+      return route.fulfill({ json: session })
+    })
+    await page.route(`${apiOrigin}/api/v1/me`, async (route) => {
+      if (route.request().headers().authorization !== `Bearer ${formalToken}` || !formalToken) return route.fallback()
+      return route.fulfill({ json: { ...profile(original.uid), isAnonymous: false } })
+    })
+    await page.goto('/me')
+    const confirmed = page.waitForRequest((request) => request.url() === `${apiOrigin}/api/v1/me` && request.method() === 'PUT' &&
+      !!formalToken && request.headers().authorization === `Bearer ${formalToken}`)
+    await page.getByRole('button', { name: 'Googleアカウントを連携' }).click()
+    await confirmed
+    await expect(page).toHaveURL(/\/me$/)
+    await expect(page.getByLabel('表示名')).toHaveValue('ゲスト')
+    expect((await sessionSnapshot())?.uid === original.uid).toBe(true)
+    expect((await sessionSnapshot())?.token === formalToken).toBe(true)
   })
 })
