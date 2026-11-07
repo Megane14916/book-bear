@@ -14,10 +14,10 @@ import { createBookmark, type BookmarkInput } from './api'
 import { BookPicker, usePickerLibrary } from './BookPicker'
 import { BookmarkForm } from './BookmarkForm'
 import { BookmarkHistory } from './BookmarkHistory'
-import { ComposerDock } from './ComposerDock'
 import { useBookmarkWrite } from './queries'
 
-const activeStep = 'rounded-lg bg-mist px-4 py-2 text-base font-bold text-forest'
+const stepLabel = 'flex min-h-11 items-center gap-2 text-sm font-bold whitespace-nowrap'
+const stepNumber = 'grid size-7 shrink-0 place-items-center rounded-full text-xs'
 const slide = 'w-full motion-safe:transition-[left] motion-safe:duration-300 motion-safe:ease-out'
 
 export default function BookmarkCreatePage() {
@@ -38,14 +38,26 @@ export default function BookmarkCreatePage() {
   }, [composing])
 
   return <section className="min-w-0 space-y-5">
-    <ol aria-label="投稿の手順" className="flex items-center justify-center gap-2 text-sm font-bold text-[#526356] sm:gap-4">
+    <ol aria-label="投稿の手順" className="mx-auto flex max-w-sm items-center justify-center gap-3 sm:gap-5">
       <li aria-current={composing ? undefined : 'step'}>
-        {composing ? <button type="button" className="ui-action px-4 text-forest underline" onClick={() => setParams({}, { replace: true })}>本を選ぶ</button> :
-          <h1 ref={heading} tabIndex={-1} className={activeStep}>本を選ぶ</h1>}
+        {composing ? <button type="button" className={`ui-action ${stepLabel} px-1 text-forest hover:bg-mist`}
+          onClick={() => setParams({}, { replace: true })}>
+          <span aria-hidden="true" className={`${stepNumber} bg-mist text-forest`}>
+            <svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m5 12 4 4L19 6" />
+            </svg>
+          </span>本を選ぶ
+        </button> : <h1 ref={heading} tabIndex={-1} className={`${stepLabel} text-forest`}>
+          <span aria-hidden="true" className={`${stepNumber} bg-forest text-white`}>1</span>本を選ぶ
+        </h1>}
       </li>
-      <li aria-hidden="true" className="h-px w-6 bg-[#b4c6b7]" />
+      <li aria-hidden="true" className={`h-px w-10 ${composing ? 'bg-forest/40' : 'bg-[#d6ded6]'}`} />
       <li aria-current={composing ? 'step' : undefined}>
-        {composing ? <h1 ref={heading} tabIndex={-1} className={activeStep}>投稿する</h1> : <span className="px-4">投稿する</span>}
+        {composing ? <h1 ref={heading} tabIndex={-1} className={`${stepLabel} text-forest`}>
+          <span aria-hidden="true" className={`${stepNumber} bg-forest text-white`}>2</span>投稿する
+        </h1> : <span className={`${stepLabel} text-[#526356]`}>
+          <span aria-hidden="true" className={`${stepNumber} border border-[#d6ded6]`}>2</span>投稿する
+        </span>}
       </li>
     </ol>
 
@@ -111,7 +123,7 @@ function Compose({ bookId, userBookId, library }: {
       registrationAction={<GoogleAction />}
       canSave={!authBusy && (bookId ? catalogBook.isSuccess : !!selectedBook)}
       submitLabel="栞を投稿"
-      submitArea={(button) => <ComposerDock><div className="flex justify-end">{button}</div></ComposerDock>}
+      submitClassName="block w-full sm:ml-auto sm:w-auto"
       onSave={(input) => void mutation.save(input)}>
       <p className="text-sm text-[#526356]">非公開の栞は自分だけが読めます。</p>
     </BookmarkForm>

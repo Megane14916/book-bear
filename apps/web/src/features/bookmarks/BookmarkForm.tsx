@@ -4,10 +4,10 @@ import { bookmarkError, bookmarkInput, registrationMessage, validateBookmark } f
 
 const field = 'mt-1 min-h-11 w-full rounded-lg border border-[#d6ded6] bg-white px-3 py-2 text-ink focus-visible:outline-2 focus-visible:outline-forest'
 
-export function BookmarkForm({ initial, pending, error, canPublish, canSave = true, onSave, registrationAction, children, submitArea, submitLabel = '栞を保存', defaultVisibility = 'private', autoGrow = false }: {
+export function BookmarkForm({ initial, pending, error, canPublish, canSave = true, onSave, registrationAction, children, submitClassName = '', submitLabel = '栞を保存', defaultVisibility = 'private', autoGrow = false }: {
   initial?: Bookmark; pending: boolean; error: unknown; canPublish: boolean
   onSave: (input: BookmarkInput) => void; children?: ReactNode; registrationAction?: ReactNode; canSave?: boolean
-  submitArea?: (button: ReactNode) => ReactNode; submitLabel?: string
+  submitClassName?: string; submitLabel?: string
   defaultVisibility?: BookmarkInput['visibility']; autoGrow?: boolean
 }) {
   const [content, setContent] = useState(initial?.content ?? '')
@@ -36,13 +36,12 @@ export function BookmarkForm({ initial, pending, error, canPublish, canSave = tr
     setValidation(invalid)
     if (!invalid) onSave(bookmarkInput(content, page, visibility, spoiler))
   }
-  const button = <button className="ui-action bg-forest px-5 font-bold text-white" disabled={pending || !canSave}>{pending ? '保存中…' : submitLabel}</button>
   return <form onSubmit={submit} noValidate className="min-w-0 space-y-5">
     <fieldset disabled={pending} className="min-w-0 space-y-5">
       <legend className="sr-only">栞の内容</legend>
       {children}
       <label className="block text-sm font-bold">本文（必須・2,000文字以内）
-        <textarea ref={textarea} className={autoGrow ? `${field} resize-none overflow-hidden` : field} rows={autoGrow ? 3 : 7}
+        <textarea ref={textarea} className={autoGrow ? `${field} resize-none overflow-hidden focus-visible:-outline-offset-2` : field} rows={autoGrow ? 3 : 7}
           value={content} onChange={(e) => setContent(e.target.value)} aria-describedby={countId} />
       </label>
       <p id={countId} className="text-xs text-[#526356]">{content.trim().length} / 2,000文字</p>
@@ -63,6 +62,7 @@ export function BookmarkForm({ initial, pending, error, canPublish, canSave = tr
       </label>
     </fieldset>
     {Boolean(validation || error) && <p role="alert" className="text-sm text-red-700">{validation ?? bookmarkError(error)}</p>}
-    {submitArea ? submitArea(button) : button}
+    <button type="submit" className={`ui-action bg-forest px-5 font-bold text-white ${submitClassName}`}
+      disabled={pending || !canSave}>{pending ? '保存中…' : submitLabel}</button>
   </form>
 }

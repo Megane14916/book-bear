@@ -140,7 +140,8 @@ function ShelfPicker({ library, active, onSelect }: { library: Library; active: 
       library.isError && !library.data ? <ErrorState description="本棚を取得できませんでした。" onRetry={() => void library.refetch()} isRetrying={isFetching} /> :
       items.length ? <ul className="grid grid-cols-3 gap-2 sm:grid-cols-5">
         {items.map((item) => <li key={item.id}>
-          <button type="button" aria-label={`投稿する本：${item.book.title}`} className={bookClass} onClick={() => onSelect({ userBookId: item.id })}>
+          <button type="button" aria-label={`投稿する本：${item.book.title}`} className={`${bookClass} h-36 content-start`}
+            onClick={() => onSelect({ userBookId: item.id })}>
             <BookPreview book={item.book} />
           </button>
         </li>)}

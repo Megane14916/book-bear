@@ -65,7 +65,7 @@ async function setup(page: Page, options: { signedIn?: boolean; anonymous?: bool
       const hasNext = (options.paginated || options.manyBooks) && !url.searchParams.has('cursor')
       const items = options.manyBooks && hasNext ? Array.from({ length: 15 }, (_, index) => {
         const id = `00000000-0000-4000-8000-${String(index + 100).padStart(12, '0')}`
-        return { ...shelf, id, book: { ...book, id, title: `本棚の本 ${index + 1}` } }
+        return { ...shelf, id, book: { ...book, id, title: index === 0 ? '書名が長くてもカードの高さがそろう本' : `本棚の本 ${index + 1}` } }
       }) : hasNext ? [] : [shelf]
       return route.fulfill({ json: { items, nextCursor: hasNext ? 'next' : null } })
     }
@@ -282,15 +282,13 @@ test('library selection supports later pages and uses its userBookId without reg
   expect(mock.counts()).toMatchObject({ adds: 0, saves: 1, signup: 0 })
 })
 
-for (const width of [360, 1024]) test(`composer steps, history and keyboard docking at ${width}px`, async ({ page }) => {
+for (const width of [360, 1024]) test(`composer steps, history and submit placement at ${width}px`, async ({ page }) => {
   await page.setViewportSize({ width, height: 800 })
   const mock = await setup(page, { signedIn: true, manyBooks: true, history: true })
-  await page.addInitScript(() => {
-    Object.defineProperty(window, 'visualViewport', { configurable: true, value: Object.assign(new EventTarget(), { height: innerHeight, offsetTop: 0 }) })
-  })
+  await page.route(`${origin}/api/v1/me/preferences`, (route) => route.fulfill({ json: { feedContentMode: 'tap' } }))
   await page.goto('/create')
   const steps = page.getByRole('list', { name: '投稿の手順' })
-  await expect(steps.locator('[aria-current="step"]')).toHaveText('本を選ぶ')
+  await expect(steps.locator('[aria-current="step"]').getByRole('heading', { name: '本を選ぶ' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '栞を残す' })).toHaveCount(0)
   await expect(page.getByRole('textbox', { name: /本文/ })).toHaveCount(0)
   const searchBox = await page.getByRole('button', { name: '検索', exact: true }).boundingBox()
@@ -298,49 +296,51 @@ for (const width of [360, 1024]) test(`composer steps, history and keyboard dock
   expect(scanBox!.x).toBeGreaterThan(searchBox!.x)
   expect(scanBox!.y).toBe(searchBox!.y)
 
-  await page.getByRole('button', { name: '投稿する本：本棚の本 15', exact: true }).scrollIntoViewIfNeeded()
+  const lastBook = page.getByRole('button', { name: '投稿する本：本棚の本 15', exact: true })
+  await lastBook.scrollIntoViewIfNeeded()
+  const heights = await page.getByRole('region', { name: '本棚', exact: true }).getByRole('button', { name: /^投稿する本：/ })
+    .evaluateAll((books) => books.map((book) => book.getBoundingClientRect().height))
+  expect(new Set(heights).size).toBe(1)
   await page.getByRole('button', { name: `投稿する本：${book.title}`, exact: true }).click()
   await expect.poll(() => mock.counts().libraryPages).toBeGreaterThanOrEqual(2)
   await expect(page).toHaveURL(`/create?userBookId=${shelfId}`)
-  await expect(steps.locator('[aria-current="step"]')).toHaveText('投稿する')
+  await expect(steps.locator('[aria-current="step"]').getByRole('heading', { name: '投稿する' })).toBeVisible()
   await expect(page.getByRole('heading', { name: book.title })).toBeVisible()
   await expect(page.getByLabel('公開範囲')).toHaveValue('public')
 
   await expect(page.getByText('前に残した栞')).toHaveCount(0)
-  await page.getByText('しおりの流れを見る').click()
+  const history = page.locator('details')
+  const historyToggle = history.locator('summary')
+  await expect(historyToggle.locator('svg')).toBeVisible()
+  await historyToggle.click()
   await expect(page.getByText('前に残した栞')).toBeVisible()
-  await expect(page.locator('details time').first()).toHaveAttribute('datetime', initial.createdAt)
+  await expect(history.locator('time').first()).toHaveAttribute('datetime', initial.createdAt)
+  await expect(page.getByText('過去のネタバレ本文')).toBeVisible()
+  await expect(history.getByRole('button', { name: /本文を(表示|閉じる)/ })).toHaveCount(0)
+  await historyToggle.click()
   await expect(page.getByText('過去のネタバレ本文')).toHaveCount(0)
-  await page.getByText('しおりの流れを見る').click()
 
   const field = page.getByRole('textbox', { name: /本文/ })
   const originalHeight = (await field.boundingBox())!.height
+  await field.focus()
+  await expect(field).toHaveCSS('outline-offset', '-2px')
+  await expect(field).toHaveCSS('outline-width', '2px')
   await field.fill('複数行の栞を書きます。\n'.repeat(10))
   expect((await field.boundingBox())!.height).toBeGreaterThan(originalHeight)
   await expect(field).toHaveCSS('resize', 'none')
   await field.fill('短い栞')
   expect((await field.boundingBox())!.height).toBe(originalHeight)
 
-  const dock = page.getByRole('group', { name: '投稿操作' })
-  const navBox = await page.getByRole('navigation', { name: 'メインメニュー' }).boundingBox()
-  const dockBox = await dock.boundingBox()
-  expect(dockBox!.y + dockBox!.height).toBeLessThanOrEqual(navBox!.y)
-  await page.evaluate(() => {
-    Object.assign(window.visualViewport!, { height: innerHeight - 300 })
-    window.visualViewport!.dispatchEvent(new Event('resize'))
-  })
-  await expect.poll(async () => { const box = await dock.boundingBox(); return box!.y + box!.height }).toBeLessThanOrEqual(500)
-  await page.getByLabel('ページ番号（任意）').focus()
-  await expect.poll(async () => {
-    const input = await page.getByLabel('ページ番号（任意）').boundingBox()
-    const controls = await dock.boundingBox()
-    return input!.y + input!.height <= controls!.y
-  }).toBe(true)
-  await page.evaluate(() => {
-    Object.assign(window.visualViewport!, { height: innerHeight })
-    window.visualViewport!.dispatchEvent(new Event('resize'))
-  })
-  await page.getByRole('button', { name: '栞を投稿', exact: true }).click()
+  const submit = page.getByRole('button', { name: '栞を投稿', exact: true })
+  const spoiler = await page.getByLabel('ネタバレを含む').boundingBox()
+  expect((await submit.boundingBox())!.y).toBeGreaterThan(spoiler!.y + spoiler!.height)
+  expect(await submit.evaluate((button) => {
+    for (let node: Element | null = button; node; node = node.parentElement) {
+      if (['fixed', 'sticky'].includes(getComputedStyle(node).position)) return false
+    }
+    return true
+  })).toBe(true)
+  await submit.click()
   await expect(page).toHaveURL(`/bookmarks/${bookmarkId}`)
   expect(mock.counts()).toMatchObject({ saves: 1, adds: 0 })
   expect(mock.bodies[0]).toMatchObject({ content: '短い栞', visibility: 'public' })
