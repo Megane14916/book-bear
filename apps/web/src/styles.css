@@ -27,6 +27,11 @@
 }
 
 @layer base {
+  :root {
+    --app-header-height: 60px;
+    --app-nav-height: 71px;
+  }
+
   html {
     font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", system-ui, sans-serif;
     font-synthesis: none;
@@ -41,4 +46,11 @@
   button {
     cursor: pointer;
   }
+}
+
+::view-transition-group(root),
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 180ms;
+  animation-timing-function: ease-in-out;
 }

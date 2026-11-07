@@ -70,6 +70,7 @@ test.describe.serial(live ? 'development services' : 'mock services', () => {
     // The manual form does not read app data, so cache counts cover only the harness.
     await page.goto('/books/manual?auth-check=1')
     await expect(page.getByText(/状態：guest/)).toBeVisible()
+    await expect(page.getByRole('banner').getByRole('button', { name: 'ログイン', exact: true })).toBeVisible()
     await page.getByRole('link', { name: '検索', exact: true }).click()
     await expect(page.getByRole('heading', { name: '本を探す' })).toBeVisible()
     expect(signupCount === 0 && putCount === 0).toBe(true)
@@ -178,10 +179,12 @@ test.describe.serial(live ? 'development services' : 'mock services', () => {
     await page.goto('/me')
     const confirmed = page.waitForRequest((request) => request.url() === `${apiOrigin}/api/v1/me` && request.method() === 'PUT' &&
       !!formalToken && request.headers().authorization === `Bearer ${formalToken}`)
-    await page.getByRole('button', { name: 'Googleアカウントを連携' }).click()
+    const headerLogin = page.getByRole('banner').getByRole('button', { name: 'ログイン', exact: true })
+    await headerLogin.click()
     await confirmed
     await expect(page).toHaveURL(/\/me$/)
     await expect(page.getByRole('heading', { name: 'ゲスト' })).toBeVisible()
+    await expect(headerLogin).toHaveCount(0)
     expect((await sessionSnapshot())?.uid === original.uid).toBe(true)
     expect((await sessionSnapshot())?.token === formalToken).toBe(true)
   })

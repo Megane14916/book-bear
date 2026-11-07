@@ -14,6 +14,7 @@ import MyProfilePage, { EditProfilePage } from './features/profile/MyProfilePage
 import PublicProfilePage from './features/profile/PublicProfilePage'
 import SettingsPage from './features/profile/SettingsPage'
 import GoogleCallbackPage from './lib/auth/GoogleCallbackPage'
+import { GoogleAction } from './lib/auth/GoogleAction'
 import { googleCallbackPath } from './lib/auth/google'
 import RelationshipsPage from './features/social/RelationshipsPage'
 
@@ -24,20 +25,22 @@ export default function App() {
   const isProfilePage = matchPath('/me', pathname) || matchPath('/users/:userId', pathname)
   return (
     <div className={`min-h-screen text-ink ${isTimelinePage ? 'bg-white' : 'bg-paper'}`}>
-      <header className="flex h-[68px] items-center gap-2.5 border-b border-[#e7e9e4] bg-white px-6">
-        <Link
-          to="/"
-          className="flex items-center gap-2.5 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest"
-          aria-label="Book Bear ホーム"
-        >
-          <img src={bearPaw} alt="" aria-hidden="true" className="size-7 shrink-0" />
-          <span className="brand-wordmark text-[22px] leading-none font-semibold tracking-[0.04em] text-[#493326]">Book Bear</span>
-        </Link>
-        <span className="ml-auto text-[11px] text-[#89938b]">読書の足あと</span>
+      <header className="h-(--app-header-height) border-b border-[#e7e9e4] bg-white">
+        <div className="mx-auto flex h-full max-w-[740px] items-center justify-between gap-3 px-4 sm:px-5">
+          <Link
+            to="/"
+            className="flex min-h-11 items-center gap-2 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest"
+            aria-label="Book Bear ホーム"
+          >
+            <img src={bearPaw} alt="" aria-hidden="true" className="size-6 shrink-0" />
+            <span className="brand-wordmark text-xl leading-none font-semibold tracking-[0.04em] text-[#493326]">Book Bear</span>
+          </Link>
+          <GoogleAction placement="header" />
+        </div>
       </header>
 
       <main id="main-content" className={isViewportPage
-        ? 'mx-auto h-[calc(100dvh-138px-env(safe-area-inset-bottom))] w-full max-w-[740px]'
+        ? 'mx-auto h-[calc(100dvh-var(--app-header-height)-var(--app-nav-height)-env(safe-area-inset-bottom))] w-full max-w-[740px]'
         : `mx-auto w-full max-w-[740px] px-5 pb-32 ${isProfilePage ? 'pt-4' : 'pt-8 md:pt-12'}`}>
         <Routes>
           <Route path="/" element={<HomePage />} />
