@@ -1,14 +1,16 @@
 // @vitest-environment node
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const sdk = vi.hoisted(() => {
-  const auth = { getSession: vi.fn(), signInAnonymously: vi.fn(), signOut: vi.fn(), refreshSession: vi.fn(), onAuthStateChange: vi.fn() }
-  return { auth, createClient: vi.fn(() => ({ auth })) }
+  const auth = { getSession: vi.fn(), signInAnonymously: vi.fn(), signOut: vi.fn(), refreshSession: vi.fn(), onAuthStateChange: vi.fn(),
+    signInWithOAuth: vi.fn(), linkIdentity: vi.fn(), exchangeCodeForSession: vi.fn() }
+  return { auth, createClient: vi.fn((_url: string, _key: string, _options: { global: { fetch: typeof fetch } }) => ({ auth })) }
 })
 vi.mock('@supabase/supabase-js', () => ({ createClient: sdk.createClient }))
 import { createAuthAdapter } from './client'
 
 beforeEach(() => vi.clearAllMocks())
+afterEach(() => vi.unstubAllGlobals())
 
 describe('Supabase auth-only adapter', () => {
   it.each([
@@ -24,7 +26,8 @@ describe('Supabase auth-only adapter', () => {
     const adapter = createAuthAdapter('https://project.supabase.co', 'sb_publishable_test')!
     await adapter.getSession()
     expect(sdk.createClient).toHaveBeenCalledWith('https://project.supabase.co', 'sb_publishable_test', {
-      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, flowType: 'pkce' },
+      global: { fetch: expect.any(Function) },
     })
   })
 
@@ -85,5 +88,43 @@ describe('Supabase auth-only adapter', () => {
     await expect(adapter.refreshSession!()).resolves.toEqual(session)
     sdk.auth.refreshSession.mockResolvedValueOnce({ data: { session: null }, error: new Error('private') })
     await expect(adapter.refreshSession!()).rejects.toMatchObject({ stage: 'restore' })
+  })
+
+  it('uses different SDK operations for login and linking, with the same minimal scopes', async () => {
+    const adapter = createAuthAdapter('https://project.supabase.co', 'sb_publishable_test')!
+    const callback = 'http://localhost:5173/auth/callback'
+    sdk.auth.signInWithOAuth.mockResolvedValue({ data: { url: 'https://project.supabase.co/auth/v1/authorize', flowId: 'login' } })
+    sdk.auth.linkIdentity.mockResolvedValue({ data: { url: 'https://accounts.google.com/o/oauth2/v2/auth', flowId: 'link' } })
+    await expect(adapter.googleUrl!(callback, false)).resolves.toMatchObject({ flowId: 'login' })
+    await expect(adapter.googleUrl!(callback, true)).resolves.toMatchObject({ flowId: 'link' })
+    for (const method of [sdk.auth.signInWithOAuth, sdk.auth.linkIdentity]) {
+      expect(method).toHaveBeenCalledWith({ provider: 'custom:google', options: {
+        scopes: 'openid email', redirectTo: callback, skipBrowserRedirect: true, queryParams: { nonce: expect.any(String) },
+      } })
+    }
+  })
+
+  it('rejects a different or still-anonymous identity before the SDK can persist it', async () => {
+    const adapter = createAuthAdapter('https://project.supabase.co', 'sb_publishable_test')!
+    const tokenResponse = vi.fn()
+    vi.stubGlobal('fetch', tokenResponse)
+    const persisted = vi.fn()
+    sdk.auth.exchangeCodeForSession.mockImplementation(async () => {
+      const guardedFetch = sdk.createClient.mock.calls[0][2].global.fetch
+      const response = await guardedFetch('https://project.supabase.co/auth/v1/token?grant_type=pkce')
+      if (!response.ok) return { error: new Error('rejected') }
+      const session = await response.json()
+      persisted(session)
+      return { data: { session } }
+    })
+    tokenResponse.mockResolvedValueOnce(Response.json({ user: { id: 'other', is_anonymous: false } }))
+      .mockResolvedValueOnce(Response.json({ user: { id: 'owner', is_anonymous: true } }))
+      .mockResolvedValueOnce(Response.json({ user: { id: 'owner', is_anonymous: false } }))
+    await expect(adapter.exchangeGoogle!('code', 'flow', 'owner')).rejects.toMatchObject({ stage: 'oauth' })
+    await expect(adapter.exchangeGoogle!('code', 'flow', 'owner')).rejects.toMatchObject({ stage: 'oauth' })
+    expect(persisted).not.toHaveBeenCalled()
+    await expect(adapter.exchangeGoogle!('code', 'flow', 'owner')).resolves.toMatchObject({ user: { id: 'owner' } })
+    expect(persisted).toHaveBeenCalledOnce()
+    expect(sdk.auth.exchangeCodeForSession).toHaveBeenCalledWith('code', { flowId: 'flow' })
   })
 })

@@ -4,6 +4,7 @@ import { BookmarkCard } from '../../components/bookmarks/BookmarkCard'
 import { BookCard } from '../../components/books/BookCard'
 import { EmptyState, ErrorState, LoadingState } from '../../components/states/ScreenStates'
 import { useAuth } from '../../lib/auth/AuthProvider'
+import { GoogleAction } from '../../lib/auth/GoogleAction'
 import { HttpError } from '../../lib/api/errors'
 import { isUuid } from '../book-search/validation'
 import { BookmarkForm } from './BookmarkForm'
@@ -44,6 +45,7 @@ function Detail({ bookmarkId, edit }: { bookmarkId: string; edit: boolean }) {
     {edit ? <>
       <BookCard book={bookmark.book} />
       <BookmarkForm initial={bookmark} pending={write.isPending} error={write.error} canPublish={!auth.isAnonymous}
+        registrationAction={<GoogleAction />}
         onSave={(input) => void write.save(input)} />
       <Link className="ui-action inline-flex text-forest underline" to={`/bookmarks/${bookmarkId}`}>編集をやめる</Link>
     </> : <>

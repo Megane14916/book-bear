@@ -35,6 +35,7 @@ export function createAuthController(deps: {
   let profileFlight: { epoch: number; promise: Promise<void> } | undefined
   let readyEpoch: number | undefined
   let signoutFlight: Promise<void> | undefined
+  let startingGoogle = false
   let timer: ReturnType<typeof setTimeout> | undefined
 
   function publish(status: AuthState['status'], error: Error | null = null) {
@@ -261,6 +262,34 @@ export function createAuthController(deps: {
         }
         session = next
       } catch (error) { throw safeAuthError(error, 'restore') }
+    },
+    async startGoogle(redirectTo: string) {
+      const adapter = deps.auth
+      if (!adapter?.googleUrl || !active || startingGoogle || anonymousFlight ||
+        (state.status !== 'guest' && !(state.status === 'ready' && state.isAnonymous))) {
+        throw new AuthError('oauth', 'ログイン状態を確認して、もう一度お試しください。')
+      }
+      const expected = epoch, signal = scope.signal, linkedUserId = session?.user.id ?? null
+      startingGoogle = true
+      try {
+        const redirect = await adapter.googleUrl(redirectTo, linkedUserId !== null)
+        check(expected, signal)
+        return { ...redirect, linkedUserId }
+      } finally { startingGoogle = false }
+    },
+    async exchangeGoogle(code: string, flowId: string, linkedUserId: string | null) {
+      await restoration
+      const adapter = deps.auth
+      const startedLifetime = lifetime
+      if (!adapter?.exchangeGoogle || !active || blocked || restoreError || (session?.user.id ?? null) !== linkedUserId ||
+        (linkedUserId && !session?.user.is_anonymous)) {
+        throw new AuthError('oauth', 'ログイン状態が変わりました。Google認証をやり直してください。')
+      }
+      const next = await adapter.exchangeGoogle(code, flowId, linkedUserId)
+      if (!active || lifetime !== startedLifetime || blocked || next.user.is_anonymous !== false ||
+        (linkedUserId && next.user.id !== linkedUserId)) throw new AuthError('oauth', 'Google認証のアカウントを確認できませんでした。')
+      if (identity(session) !== identity(next)) accept(next)
+      return next.user.id
     },
     async runAuthenticatedWrite<T>(operation: (context: { signal: AbortSignal; userId: string }) => Promise<T>, callerSignal?: AbortSignal): Promise<T> {
       if (callerSignal) throwIfAborted(callerSignal)

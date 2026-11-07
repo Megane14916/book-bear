@@ -4,9 +4,9 @@ import { bookmarkError, bookmarkInput, registrationMessage, validateBookmark } f
 
 const field = 'mt-1 min-h-11 w-full rounded-lg border border-[#d6ded6] bg-white px-3 py-2 text-ink focus-visible:outline-2 focus-visible:outline-forest'
 
-export function BookmarkForm({ initial, pending, error, canPublish, canSave = true, onSave, children }: {
+export function BookmarkForm({ initial, pending, error, canPublish, canSave = true, onSave, registrationAction, children }: {
   initial?: Bookmark; pending: boolean; error: unknown; canPublish: boolean
-  onSave: (input: BookmarkInput) => void; children?: ReactNode; canSave?: boolean
+  onSave: (input: BookmarkInput) => void; children?: ReactNode; registrationAction?: ReactNode; canSave?: boolean
 }) {
   const [content, setContent] = useState(initial?.content ?? '')
   const [page, setPage] = useState(initial?.pageNumber?.toString() ?? '')
@@ -36,7 +36,10 @@ export function BookmarkForm({ initial, pending, error, canPublish, canSave = tr
           <option value="private">非公開（自分だけ）</option><option value="public">公開</option>
         </select>
       </label>
-      {visibility === 'public' && !canPublish && <p role="status" className="text-sm text-[#526356]">{registrationMessage}</p>}
+      {visibility === 'public' && !canPublish && <div className="space-y-2">
+        <p role="status" className="text-sm text-[#526356]">{registrationMessage}</p>
+        {registrationAction}
+      </div>}
       <label className="flex min-h-11 items-center gap-3 text-sm font-bold">
         <input type="checkbox" className="size-5 accent-forest" checked={spoiler} onChange={(e) => setSpoiler(e.target.checked)} />ネタバレを含む
       </label>

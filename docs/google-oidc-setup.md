@@ -147,6 +147,8 @@ http://127.0.0.1:8790/auth/callback
 
 このURLはSupabaseからローカルCLIへ戻るためのもの。Googleへ登録するURIではない。`localhost` ではなく `127.0.0.1` とし、portとpathを一致させる。CLIのportを変えたら許可URLも変更する。既存のWeb用Site URLを変更する必要はない。
 
+Web版を使う環境では、同じRedirect URLsにWebアプリのオリジンに `/auth/callback` を付けたURLを追加する。Viteの既定ポートで `localhost` を使う場合は `http://localhost:5173/auth/callback`。本番も実際のHTTPSオリジンを指定し、ホスティング側で `/auth/callback` をWebアプリにルーティングする。マイページのGoogleログインと、匿名で本棚・非公開栞を作った後のGoogle連携は別々に確認する。連携では同じタブに戻り、既存の本棚・非公開栞を開けることを確認する。
+
 **Enable Data API、Automatically expose new tablesは無効のまま**とする。SDKの認証利用にアプリテーブルの直接権限は不要。
 
 ### 開発環境と本番環境

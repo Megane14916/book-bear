@@ -1,7 +1,7 @@
 import { ApiError, isAbortError } from '../api/errors'
 
 export class AuthError extends ApiError {
-  constructor(public readonly stage: 'config' | 'restore' | 'signin' | 'signout', message: string) {
+  constructor(public readonly stage: 'config' | 'restore' | 'signin' | 'signout' | 'oauth', message: string) {
     super('auth', message)
     this.name = 'AuthError'
   }

@@ -12,6 +12,8 @@ import BookmarkFlowPage from './features/bookmark-flow/BookmarkFlowPage'
 import MyProfilePage from './features/profile/MyProfilePage'
 import PublicProfilePage from './features/profile/PublicProfilePage'
 import SettingsPage from './features/profile/SettingsPage'
+import GoogleCallbackPage from './lib/auth/GoogleCallbackPage'
+import { googleCallbackPath } from './lib/auth/google'
 
 export default function App() {
   return (
@@ -51,6 +53,7 @@ export default function App() {
           />
           <Route path="/me" element={<MyProfilePage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path={googleCallbackPath} element={<GoogleCallbackPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </main>

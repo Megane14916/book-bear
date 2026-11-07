@@ -7,6 +7,7 @@ import { HttpError } from '../../lib/api/errors'
 import type { components } from '../../lib/api/generated'
 import { requireData } from '../../lib/api/result'
 import { useAuth } from '../../lib/auth/AuthProvider'
+import { GoogleAction } from '../../lib/auth/GoogleAction'
 import { queryKeys } from '../../lib/query/keys'
 
 type Profile = components['schemas']['Profile']
@@ -26,6 +27,7 @@ export default function MyProfilePage() {
       <Link to="/settings" className="ui-action inline-flex underline">設定</Link>
       {auth.canReadPrivate && <Link to={`/users/${auth.userId}`} className="ui-action inline-flex underline">公開プロフィール</Link>}
     </nav>
+    <GoogleAction />
     {auth.status === 'error' ? <ErrorState description={auth.error?.message ?? 'ログイン状態を確認できませんでした。'}
       onRetry={() => void auth.retrySession().catch(() => {})} /> :
       auth.status === 'guest' || auth.status === 'unconfigured' ? <EmptyState title="プロフィールの保存にはアカウントが必要です"
