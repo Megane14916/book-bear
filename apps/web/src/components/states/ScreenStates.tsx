@@ -14,12 +14,12 @@ export function LoadingState({ variant = 'initial', label }: { variant?: 'initia
   )
 }
 
-export function EmptyState({ title, description, action }: { title: string; description: string; action: ReactElement }) {
+export function EmptyState({ title, description, action }: { title: string; description: string; action?: ReactElement }) {
   return (
     <section aria-label={title} className="min-w-0 rounded-2xl border border-[#e2e7e2] bg-white p-6 text-center [overflow-wrap:anywhere]">
       <p className="font-bold">{title}</p>
       <p className="mt-2 text-sm leading-7 text-[#526356]">{description}</p>
-      <div className="mt-4">{action}</div>
+      {action && <div className="mt-4">{action}</div>}
     </section>
   )
 }

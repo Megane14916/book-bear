@@ -20,12 +20,8 @@ export default function MyProfilePage() {
   const auth = useAuth()
   if (auth.canReadPrivate && auth.userId) return <PublicProfile userId={auth.userId} />
   return <section className="space-y-5">
-    <PageBack fallback="/" />
     <h1 className="text-3xl font-bold">マイページ</h1>
-    <nav aria-label="マイページメニュー" className="flex flex-wrap gap-4 text-sm font-bold text-forest">
-      <Link to="/library" className="ui-action inline-flex underline">自分の本棚</Link>
-      <Link to="/settings" className="ui-action inline-flex underline">設定</Link>
-    </nav>
+    <Link to="/settings" className="ui-action inline-flex text-sm font-bold text-forest underline">設定</Link>
     <GoogleAction />
     {auth.status === 'error' ? <ErrorState description={auth.error?.message ?? 'ログイン状態を確認できませんでした。'}
       onRetry={() => void auth.retrySession().catch(() => {})} /> :
