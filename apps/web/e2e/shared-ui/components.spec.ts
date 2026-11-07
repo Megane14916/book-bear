@@ -59,7 +59,7 @@ test('retry, last action and fixed navigation remain keyboard accessible', async
 
 test('existing home and navigation still work without the fixture', async ({ page }) => {
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: '本の中に、 あなたの栞を。' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'ホーム', exact: true })).toBeVisible()
   for (const [label, heading] of [['検索', '本を探す'], ['投稿', '栞を残す'], ['本棚', '自分の本棚'], ['マイページ', 'マイページ']]) {
     await page.getByRole('link', { name: label, exact: true }).click()
     await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible()

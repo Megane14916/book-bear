@@ -13,7 +13,7 @@ function readGuestMode(): FeedContentMode {
   try { return localStorage.getItem(storageKey) === 'all' ? 'all' : 'tap' } catch { return 'tap' }
 }
 
-export function useContentPreference({ enabled = true } = {}) {
+export function useContentPreference({ enabled = true, compact = false } = {}) {
   const auth = useAuth()
   const queryClient = useQueryClient()
   const [guestMode, setGuestMode] = useState(readGuestMode)
@@ -49,11 +49,20 @@ export function useContentPreference({ enabled = true } = {}) {
     }
   }
 
-  const control = <div className="mb-4 rounded-2xl border border-[#e2e7e2] bg-white px-4 py-3">
+  const control = <div className={compact ? 'min-w-0' : 'mb-4 rounded-2xl border border-[#e2e7e2] bg-white px-4 py-3'}>
     <div aria-busy={update.isPending}>
+      {compact ? <button type="button"
+        disabled={(!isGuest && (!auth.canReadPrivate || !preferences.data)) || update.isPending}
+        aria-label={`本文：${mode === 'all' ? 'すべて表示' : 'タップして表示'}`}
+        title={mode === 'all' ? 'タップして表示に切り替える' : 'すべて表示に切り替える'}
+        className="ui-action flex w-full gap-2 border border-[#d6e0d5] bg-white px-3 text-xs font-bold text-forest shadow-sm hover:bg-mist"
+        onClick={() => changeMode(mode === 'all' ? 'tap' : 'all')}>
+        <span aria-hidden="true" className="text-base">Aa</span>
+        <span>{mode === 'all' ? 'すべて表示' : 'タップして表示'}</span>
+      </button> :
       <fieldset disabled={(!isGuest && (!auth.canReadPrivate || !preferences.data)) || update.isPending}>
         <ContentModeSwitch value={mode} onChange={changeMode} />
-      </fieldset>
+      </fieldset>}
     </div>
     {preferences.isError && auth.canReadPrivate && <ErrorState description="表示設定を取得できませんでした。" onRetry={() => void preferences.refetch()} />}
     {update.isError && <p role="alert" className="text-sm text-red-700">表示設定を保存できませんでした。もう一度お試しください。</p>}
