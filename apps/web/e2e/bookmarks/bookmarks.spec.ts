@@ -85,6 +85,54 @@ async function setup(page: Page, options: { signedIn?: boolean; anonymous?: bool
   return { events, bodies, counts: () => ({ signup, saves, adds, deletes, libraryPages }) }
 }
 
+test('my page, bookmark flow and reply controls work at 360px', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 })
+  await setup(page, { signedIn: true })
+  const profilePath = `/api/v1/users/${userId}`
+  const flowPath = `/users/${userId}/books/${bookId}/bookmarks`
+  await page.route(`${origin}${profilePath}`, (route) => route.fulfill({ json: {
+    ...initial.author, handle: 'reader', bio: '読書記録です。', followersCount: 0, followingCount: 0, publicBookmarkCount: 1, followedByMe: false,
+  } }))
+  await page.route(`${origin}${profilePath}/books?**`, (route) => route.fulfill({ json: { items: [book], nextCursor: null } }))
+  await page.route(`${origin}/api/v1${flowPath}?**`, (route) => route.fulfill({ json: {
+    author: initial.author, book, items: [{ ...initial, likeCount: 2, likedByMe: true, replyCount: 3 }], nextCursor: null,
+  } }))
+  await page.route(`${origin}/api/v1/bookmarks/${bookmarkId}/replies?**`, (route) => route.fulfill({ json: { items: [], nextCursor: null } }))
+
+  await page.goto('/library')
+  await page.getByRole('link', { name: 'マイページ' }).click()
+  await expect(page).toHaveURL('/me')
+  await expect(page.getByRole('heading', { name: '読者' })).toBeVisible()
+  await expect(page.getByRole('link', { name: '編集' })).toHaveAttribute('href', '/me/edit')
+  await page.getByRole('link', { name: '設定' }).click()
+  await expect(page.getByRole('heading', { name: '設定' })).toBeVisible()
+  await page.getByRole('button', { name: '戻る' }).click()
+  await expect(page).toHaveURL('/me')
+
+  await page.getByRole('link', { name: book.title }).click()
+  await expect(page).toHaveURL(flowPath)
+  const card = page.getByRole('article', { name: '栞' })
+  const body = card.getByText(initial.content)
+  await expect(body).toBeVisible()
+  const close = card.getByRole('button', { name: '本文を閉じる' })
+  expect((await close.boundingBox())!.y).toBeGreaterThan((await body.boundingBox())!.y)
+  await close.click()
+  await expect(body).toHaveCount(0)
+  const like = card.getByRole('button', { name: 'いいねを解除（2）' })
+  await expect(like).toHaveText('2')
+  await expect(like.locator('svg')).toHaveAttribute('fill', 'currentColor')
+  const reply = card.getByRole('link', { name: '返信（3）' })
+  await expect(reply).toHaveText('3')
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(360)
+  await reply.click()
+  await expect(page).toHaveURL(`/bookmarks/${bookmarkId}#replies`)
+  await expect(page.getByRole('region', { name: '返信', exact: true })).toBeFocused()
+  await page.getByRole('button', { name: '戻る' }).click()
+  await expect(page).toHaveURL(flowPath)
+  await page.getByRole('button', { name: '戻る' }).click()
+  await expect(page).toHaveURL('/me')
+})
+
 test('guest browsing creates no account; first private save initializes auth, adds the book and saves once at 360px', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 800 })
   const mock = await setup(page)

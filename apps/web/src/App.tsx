@@ -9,7 +9,7 @@ import LibraryPage from './features/library/LibraryPage'
 import BookmarkCreatePage from './features/bookmarks/BookmarkCreatePage'
 import BookmarkDetailPage from './features/bookmarks/BookmarkDetailPage'
 import BookmarkFlowPage from './features/bookmark-flow/BookmarkFlowPage'
-import MyProfilePage from './features/profile/MyProfilePage'
+import MyProfilePage, { EditProfilePage } from './features/profile/MyProfilePage'
 import PublicProfilePage from './features/profile/PublicProfilePage'
 import SettingsPage from './features/profile/SettingsPage'
 import GoogleCallbackPage from './lib/auth/GoogleCallbackPage'
@@ -59,6 +59,7 @@ export default function App() {
             element={<LibraryPage />}
           />
           <Route path="/me" element={<MyProfilePage />} />
+          <Route path="/me/edit" element={<EditProfilePage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path={googleCallbackPath} element={<GoogleCallbackPage />} />
           <Route path="*" element={<NotFoundPage />} />

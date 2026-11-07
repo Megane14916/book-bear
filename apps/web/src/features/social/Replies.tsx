@@ -1,6 +1,6 @@
 import { useInfiniteQuery } from '@tanstack/react-query'
-import { useState, type FormEvent } from 'react'
-import { Link } from 'react-router'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { Link, useLocation } from 'react-router'
 import { BookmarkBody, type FeedContentMode } from '../../components/bookmarks/BookmarkBody'
 import { LoadMore } from '../../components/states/LoadMore'
 import { ErrorState, LoadingState } from '../../components/states/ScreenStates'
@@ -16,6 +16,9 @@ type ReplyInput = components['schemas']['CreateReplyRequest']
 
 export function Replies({ bookmarkId, mode }: { bookmarkId: string; mode: FeedContentMode }) {
   const auth = useAuth()
+  const { hash, key } = useLocation()
+  const section = useRef<HTMLElement>(null)
+  useEffect(() => { if (hash === '#replies') section.current?.focus() }, [hash, key])
   const registered = auth.status === 'ready' && !auth.isAnonymous
   const replies = useInfiniteQuery({
     queryKey: ['replies', bookmarkId, auth.userId],
@@ -27,7 +30,7 @@ export function Replies({ bookmarkId, mode }: { bookmarkId: string; mode: FeedCo
   })
   const items = replies.data?.pages.flatMap((page) => page.items) ?? []
 
-  return <section aria-labelledby="replies-title" className="space-y-4">
+  return <section ref={section} id="replies" tabIndex={-1} aria-labelledby="replies-title" className="space-y-4">
     <h2 id="replies-title" className="text-xl font-bold">返信</h2>
     {replies.isPending ? <LoadingState /> : !replies.data ? <ErrorState description="返信を取得できませんでした。"
       onRetry={() => void replies.refetch()} isRetrying={replies.isFetching} /> : <>
