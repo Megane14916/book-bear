@@ -3,6 +3,7 @@ import BottomNav from './components/BottomNav'
 import HomePage from './pages/HomePage'
 import PlaceholderPage from './pages/PlaceholderPage'
 import NotFoundPage from './pages/NotFoundPage'
+import LibraryPage from './features/library/LibraryPage'
 
 export default function App() {
   return (
@@ -32,7 +33,7 @@ export default function App() {
           />
           <Route
             path="/library"
-            element={<PlaceholderPage title="自分の本棚" description="登録した本や読書の進み具合を、ここで確認できるようにします。" />}
+            element={<LibraryPage />}
           />
           <Route
             path="/me"
