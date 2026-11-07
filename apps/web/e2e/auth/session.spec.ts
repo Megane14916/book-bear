@@ -32,7 +32,7 @@ async function ready() {
 }
 async function prepare() {
   await page.getByRole('button', { name: '保存前処理を確認', exact: true }).click()
-  await expect(page.getByRole('status')).toHaveText('保存前の認証・初期化・認証付きGET /meが成功しました。')
+  await expect(page.getByRole('complementary', { name: '開発用認証確認' }).getByRole('status')).toHaveText('保存前の認証・初期化・認証付きGET /meが成功しました。')
   await ready()
 }
 
@@ -63,13 +63,15 @@ test.describe.serial(live ? 'development services' : 'mock services', () => {
   test.afterAll(async () => { await context?.close() })
 
   test('1 browsing does not create an anonymous user', async () => {
-    await page.goto('/?auth-check=1')
+    // Keep cache-count assertions isolated from the home feed's own queries.
+    // Home/feed integration is exercised by the UI and bookmark browser suites.
+    await page.goto('/me?auth-check=1')
     await expect(page.getByText(/状態：guest/)).toBeVisible()
     await page.getByRole('link', { name: '検索', exact: true }).click()
     await expect(page.getByRole('heading', { name: '本を探す' })).toBeVisible()
     expect(signupCount === 0 && putCount === 0).toBe(true)
     expect(await sessionSnapshot() === null).toBe(true)
-    await page.goto('/?auth-check=1')
+    await page.goto('/me?auth-check=1')
   })
 
   test('2 first save preparation signs in and initializes through the real client', async () => {
@@ -92,7 +94,7 @@ test.describe.serial(live ? 'development services' : 'mock services', () => {
     const before = await sessionSnapshot()
     const response = page.waitForResponse((response) => response.url() === `${apiOrigin}/api/v1/me` && response.request().method() === 'GET')
     await page.getByRole('button', { name: 'JWT更新を確認', exact: true }).click()
-    await expect(page.getByRole('status')).toHaveText('JWT更新後の本人確認が成功しました。')
+    await expect(page.getByRole('complementary', { name: '開発用認証確認' }).getByRole('status')).toHaveText('JWT更新後の本人確認が成功しました。')
     const after = await sessionSnapshot()
     const me = await response
     expect(Boolean(before && after && before.uid === after.uid && before.token !== after.token)).toBe(true)
@@ -128,7 +130,7 @@ test.describe.serial(live ? 'development services' : 'mock services', () => {
     }
     page.on('request', onRequest)
     await page.getByRole('button', { name: '保存前処理を確認', exact: true }).click()
-    await expect(page.getByRole('status')).toHaveText('検証用の一時的な初期化失敗')
+    await expect(page.getByRole('complementary', { name: '開発用認証確認' }).getByRole('status')).toHaveText('検証用の一時的な初期化失敗')
     expect(injected && getCount === 0).toBe(true)
     const countBefore = signupCount
     await prepare()
