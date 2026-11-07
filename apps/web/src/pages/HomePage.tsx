@@ -1,4 +1,5 @@
 import { Link } from 'react-router'
+import { Feed } from '../features/feed/Feed'
 
 export default function HomePage() {
   return (
@@ -25,21 +26,7 @@ export default function HomePage() {
         </Link>
       </section>
 
-      <section className="mt-10">
-        <div className="mb-4 flex items-baseline justify-between gap-3">
-          <h2 className="text-xl font-bold">みんなの栞</h2>
-          <span className="text-[11px] text-[#8b958d]">これから表示されます</span>
-        </div>
-        <div className="rounded-[20px] border border-[#e7ebe5] bg-white px-6 py-10 text-center">
-          <div className="mx-auto mb-4 grid h-[54px] w-[54px] place-items-center rounded-2xl bg-[#eef4ec] text-[28px] text-[#4c775a]" aria-hidden="true">
-            ▤
-          </div>
-          <p className="mb-2 font-extrabold">栞はまだありません</p>
-          <p className="text-[13px] leading-7 text-[#78827a]">
-            投稿が集まると、ここに新しい栞が表示されます。
-          </p>
-        </div>
-      </section>
+      <Feed />
     </>
   )
 }
