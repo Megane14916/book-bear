@@ -8,6 +8,12 @@
   --color-forest-dark: #285139;
 }
 
+@layer components {
+  .ui-action {
+    @apply min-h-11 items-center justify-center rounded-lg py-2 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest disabled:cursor-not-allowed disabled:opacity-50;
+  }
+}
+
 @layer base {
   html {
     font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", system-ui, sans-serif;
