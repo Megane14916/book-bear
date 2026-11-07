@@ -8,6 +8,9 @@ export const queryKeys = {
   bookmark: (bookmarkId: string, viewerId: string | null) => ['bookmarks', 'detail', bookmarkId, viewerId] as const,
   myBookmarks: (viewerId: string) => ['my-bookmarks', viewerId] as const,
   myBooks: (viewerId: string, limit = 15) => ['my-books', viewerId, { limit }] as const,
+  me: (viewerId: string | null) => ['me', viewerId] as const,
+  publicProfile: (userId: string, viewerId: string | null) => ['public-profile', userId, viewerId] as const,
+  publicBooks: (userId: string, limit = 15) => ['public-books', userId, { limit }] as const,
   feed: (scope: 'all' | 'following', viewerId: string | null, limit = 15) =>
     ['feed', scope, viewerId, { limit }] as const,
   bookmarkFlow: (userId: string, bookId: string, viewerId: string | null, limit = 15) =>

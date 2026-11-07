@@ -39,7 +39,7 @@ export default function BookmarkFlowPage() {
   return <section className="space-y-5">
     <h1 className="text-3xl font-bold">栞の流れ</h1>
     <header className="space-y-2 rounded-2xl border border-[#e2e7e2] bg-white p-4">
-      <p className="text-sm font-bold">{author.displayName}</p>
+      <Link className="ui-action inline-flex text-sm font-bold text-forest underline" to={`/users/${author.id}`}>{author.displayName}</Link>
       <BookCard book={book} titleHref={`/books/${book.id}`} />
     </header>
     {items.length === 0 && <EmptyState title="表示できる栞はまだありません" description="この本の栞が集まると、ここに投稿順で表示されます。" action={back} />}

@@ -4,12 +4,14 @@ import BookSearchPage from './pages/BookSearchPage'
 import BookDetailPage from './pages/BookDetailPage'
 import ManualBookPage from './pages/ManualBookPage'
 import HomePage from './pages/HomePage'
-import PlaceholderPage from './pages/PlaceholderPage'
 import NotFoundPage from './pages/NotFoundPage'
 import LibraryPage from './features/library/LibraryPage'
 import BookmarkCreatePage from './features/bookmarks/BookmarkCreatePage'
 import BookmarkDetailPage from './features/bookmarks/BookmarkDetailPage'
 import BookmarkFlowPage from './features/bookmark-flow/BookmarkFlowPage'
+import MyProfilePage from './features/profile/MyProfilePage'
+import PublicProfilePage from './features/profile/PublicProfilePage'
+import SettingsPage from './features/profile/SettingsPage'
 
 export default function App() {
   return (
@@ -42,14 +44,13 @@ export default function App() {
           <Route path="/bookmarks/:bookmarkId" element={<BookmarkDetailPage />} />
           <Route path="/bookmarks/:bookmarkId/edit" element={<BookmarkDetailPage edit />} />
           <Route path="/users/:userId/books/:bookId/bookmarks" element={<BookmarkFlowPage />} />
+          <Route path="/users/:userId" element={<PublicProfilePage />} />
           <Route
             path="/library"
             element={<LibraryPage />}
           />
-          <Route
-            path="/me"
-            element={<PlaceholderPage title="マイページ" description="プロフィールと、これまでに残した栞を表示する予定です。" />}
-          />
+          <Route path="/me" element={<MyProfilePage />} />
+          <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </main>
