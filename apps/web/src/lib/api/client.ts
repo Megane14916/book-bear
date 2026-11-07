@@ -7,6 +7,7 @@ export type AccessTokenGetter = () => Promise<string | null>
 // Each instance owns its getter, allowing isolated tests without global auth state.
 export function createApiClient(options: { baseUrl?: string; fetch?: typeof fetch } = {}) {
   let getAccessToken: AccessTokenGetter | undefined
+  let getRequestSignal: (() => AbortSignal) | undefined
   const api = createClient<paths>({
     baseUrl: options.baseUrl ?? (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8787'),
     ...(options.fetch ? { fetch: options.fetch } : {}),
@@ -14,6 +15,9 @@ export function createApiClient(options: { baseUrl?: string; fetch?: typeof fetc
 
   api.use({
     async onRequest({ request }) {
+      if (getRequestSignal) {
+        request = new Request(request, { signal: AbortSignal.any([request.signal, getRequestSignal()]) })
+      }
       throwIfAborted(request.signal)
       let token: string | null = null
       try {
@@ -53,7 +57,8 @@ export function createApiClient(options: { baseUrl?: string; fetch?: typeof fetc
     api,
     // Issue #36 installs the getter; this module never logs in or refreshes tokens.
     setAccessTokenGetter(getter?: AccessTokenGetter) { getAccessToken = getter },
+    setRequestSignalGetter(getter?: () => AbortSignal) { getRequestSignal = getter },
   }
 }
 
-export const { api, setAccessTokenGetter } = createApiClient()
+export const { api, setAccessTokenGetter, setRequestSignalGetter } = createApiClient()

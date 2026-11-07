@@ -137,4 +137,35 @@ describe('typed API transport', () => {
     expect(isAbortError(await result)).toBe(true)
     expect(sentSignal?.aborted).toBe(true)
   })
+
+  it('combines the auth lifecycle signal with a caller signal without changing a JSON body', async () => {
+    const sent = vi.fn<typeof fetch>().mockImplementation(async () => Response.json({ status: 'ok' }))
+    const { api, setRequestSignalGetter } = createApiClient({ baseUrl, fetch: sent })
+    const lifecycle = new AbortController(), caller = new AbortController()
+    setRequestSignalGetter(() => lifecycle.signal)
+    await api.POST('/api/v1/me/books', {
+      body: { bookId: '00000000-0000-4000-8000-000000000001' }, signal: caller.signal,
+    })
+    const request = sent.mock.calls[0][0] as Request
+    expect(await request.json()).toEqual({ bookId: '00000000-0000-4000-8000-000000000001' })
+    lifecycle.abort()
+    expect(request.signal.aborted).toBe(true)
+    setRequestSignalGetter(undefined)
+    await expect(api.GET('/api/v1/health')).resolves.toHaveProperty('data')
+  })
+
+  it('does not send a request if auth changes while the JWT getter is pending', async () => {
+    const fetcher = vi.fn<typeof fetch>()
+    const { api, setAccessTokenGetter, setRequestSignalGetter } = createApiClient({ baseUrl, fetch: fetcher })
+    const lifecycle = new AbortController()
+    let resolve!: (token: string) => void
+    setRequestSignalGetter(() => lifecycle.signal)
+    setAccessTokenGetter(() => new Promise((yes) => { resolve = yes }))
+    const result = api.GET('/api/v1/health').catch((error: unknown) => error)
+    await vi.waitFor(() => expect(resolve).toBeTypeOf('function'))
+    lifecycle.abort()
+    resolve('old-user-token')
+    expect(isAbortError(await result)).toBe(true)
+    expect(fetcher).not.toHaveBeenCalled()
+  })
 })
