@@ -3,6 +3,7 @@ import { count, cursorPage, dateTime, patchObject, positivePage, uuid } from '..
 import { BookSummary } from '../books/schemas'
 
 export const ReadingStatus = z.enum(['want_to_read', 'reading', 'completed'])
+export const LibrarySort = z.enum(['read_recent', 'read_oldest', 'added_recent', 'added_oldest'])
 export const UserBook = z.object({
   id: uuid, userId: uuid, book: BookSummary, status: ReadingStatus,
   currentPage: count.nullable(), createdAt: dateTime, updatedAt: dateTime,

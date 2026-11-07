@@ -7,7 +7,8 @@ export const queryKeys = {
   book: (bookId: string) => ['books', 'detail', bookId] as const,
   bookmark: (bookmarkId: string, viewerId: string | null) => ['bookmarks', 'detail', bookmarkId, viewerId] as const,
   myBookmarks: (viewerId: string) => ['my-bookmarks', viewerId] as const,
-  myBooks: (viewerId: string, limit = 15) => ['my-books', viewerId, { limit }] as const,
+  myBooks: (viewerId: string, limit = 15, selection?: { sort?: string; status?: string }) =>
+    ['my-books', viewerId, { limit }, ...(selection ? [selection] : [])] as const,
   me: (viewerId: string | null) => ['me', viewerId] as const,
   publicProfile: (userId: string, viewerId: string | null) => ['public-profile', userId, viewerId] as const,
   publicBooks: (userId: string, limit = 15) => ['public-books', userId, { limit }] as const,

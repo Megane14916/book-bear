@@ -65,8 +65,10 @@ it('clears inactive public/list/other-viewer caches rather than leaving stale pr
     queryKeys.searchPosts('q', null), ['public-profile', 'owner'], queryKeys.bookmark('bookmark', null)]
   for (const key of keys) client.setQueryData(key, { content: '古い公開本文' })
   const library = queryKeys.myBooks('owner'), otherLibrary = queryKeys.myBooks('other')
+  const filteredLibrary = queryKeys.myBooks('owner', 15, { sort: 'read_recent', status: 'reading' })
   const libraryPages = { pages: [{ items: [], nextCursor: null }], pageParams: [undefined] }
   client.setQueryData(library, libraryPages)
+  client.setQueryData(filteredLibrary, libraryPages)
   client.setQueryData(otherLibrary, libraryPages)
   client.setQueryData(queryKeys.book('book'), { title: '本' })
   client.setQueryData(queryKeys.bookmark('bookmark', 'owner'), { ...bookmark, content: '旧本文' })
@@ -76,6 +78,7 @@ it('clears inactive public/list/other-viewer caches rather than leaving stale pr
   expect(client.getQueryData(queryKeys.book('book'))).toEqual({ title: '本' })
   expect(client.getQueryData(library)).toEqual(libraryPages)
   expect(client.getQueryState(library)?.isInvalidated).toBe(true)
+  expect(client.getQueryState(filteredLibrary)?.isInvalidated).toBe(true)
   expect(client.getQueryState(otherLibrary)?.isInvalidated).toBe(false)
   client.clear()
 })

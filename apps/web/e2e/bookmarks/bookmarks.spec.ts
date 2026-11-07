@@ -67,12 +67,13 @@ async function setup(page: Page, options: { signedIn?: boolean; anonymous?: bool
         return route.fulfill({ status: 201, json: libraryBook })
       }
       libraryPages++
-      const hasNext = (options.paginated || options.manyBooks) && !url.searchParams.has('cursor')
+      const hasNext = ((options.paginated && !url.searchParams.has('sort')) || options.manyBooks) && !url.searchParams.has('cursor')
       const items = options.manyBooks && hasNext ? Array.from({ length: 15 }, (_, index) => {
         const id = `00000000-0000-4000-8000-${String(index + 100).padStart(12, '0')}`
         return { ...shelf, id, book: { ...book, id, title: index === 0 ? '書名が長くてもカードの高さがそろう本' : `本棚の本 ${index + 1}` } }
       }) : hasNext ? [] : [libraryBook]
-      return route.fulfill({ json: { items, nextCursor: hasNext ? 'next' : null } })
+      const status = url.searchParams.get('status')
+      return route.fulfill({ json: { items: items.filter((item) => !status || item.status === status), nextCursor: hasNext ? 'next' : null } })
     }
     if (url.pathname === '/api/v1/bookmarks' && method === 'POST') {
       saves++; events.push('save')
@@ -194,10 +195,13 @@ test('bookmark detail opens at the current post with adjacent pages and an inlin
 
 test('the compact bookshelf shows reading progress after posting and reloading', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 800 })
-  await setup(page, { signedIn: true })
+  await setup(page, { signedIn: true, paginated: true })
   await page.goto('/library')
   const card = page.getByRole('article', { name: book.title })
   const status = card.getByRole('combobox', { name: '読書状態' })
+  const sort = page.getByRole('combobox', { name: '並べ替え' })
+  await expect(sort).toHaveValue('read_recent')
+  await expect(page.getByRole('radio', { name: 'すべて', exact: true })).toBeChecked()
   await expect(status).toHaveValue('want_to_read')
   await expect(card.getByText('未設定')).toBeVisible()
   await expect(card.getByRole('button', { name: '本棚から削除' }).locator('svg')).toBeVisible()
@@ -205,6 +209,15 @@ test('the compact bookshelf shows reading progress after posting and reloading',
   await expect(page.getByText('MY BOOKSHELF', { exact: true })).toHaveCount(0)
   await expect(card.getByRole('button', { name: '保存', exact: true })).toHaveCount(0)
 
+  await sort.selectOption({ label: '最近読んでない' })
+  const filterApplied = page.waitForRequest((request) => {
+    const query = new URL(request.url()).searchParams
+    return query.get('sort') === 'read_oldest' && query.get('status') === 'reading' && !query.has('cursor')
+  })
+  await page.getByRole('radio', { name: '読書中', exact: true }).press('Space')
+  await filterApplied
+  await expect(page.getByRole('region', { name: '条件に一致する本がありません' })).toBeVisible()
+  await page.getByRole('radio', { name: '読みたい', exact: true }).press('Space')
   await card.getByRole('link', { name: '栞を残す', exact: true }).click()
   await page.getByRole('textbox', { name: /本文/ }).fill('本棚から残した栞')
   await page.getByLabel('ページ番号（任意）').fill('42')

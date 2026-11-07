@@ -189,7 +189,7 @@ export interface paths {
         };
         /**
          * 自分の本棚
-         * @description created_at DESC, id DESC。limit既定15・最大30、limit+1件で続きを判定。日時（小数6桁）・IDのBase64URLカーソル。署名・有効期限なし。SQLで所有者・公開条件を毎回検証。
+         * @description 読書状態で絞り込み、最新の未削除の栞または本棚への登録日時で並べる。読書順では栞なしを新しい順の末尾・古い順の先頭に置く。カーソルは取得時と同じ条件で使用する。
          */
         get: operations["getMeBooks"];
         put?: never;
@@ -1496,6 +1496,8 @@ export interface operations {
             query?: {
                 cursor?: string;
                 limit?: number;
+                status?: "want_to_read" | "reading" | "completed";
+                sort?: "read_recent" | "read_oldest" | "added_recent" | "added_oldest";
             };
             header?: never;
             path?: never;

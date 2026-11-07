@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Link } from 'react-router'
+import { Link, useLocation } from 'react-router'
 import type { components } from '../../lib/api/generated'
 import { api } from '../../lib/api/client'
 import { HttpError } from '../../lib/api/errors'
@@ -9,14 +9,22 @@ import { BookCover } from '../../components/books/BookCover'
 import { EmptyState, ErrorState, LoadingState } from '../../components/states/ScreenStates'
 import { useAuth } from '../../lib/auth/AuthProvider'
 import { queryKeys } from '../../lib/query/keys'
-import { getLibraryPage } from './api'
+import { getLibraryPage, type LibrarySelection } from './api'
 
 type UserBook = components['schemas']['UserBook']
 type ReadingStatus = UserBook['status']
+type Sort = NonNullable<LibrarySelection['sort']>
 const statuses: { value: ReadingStatus; label: string }[] = [
   { value: 'want_to_read', label: '読みたい' },
   { value: 'reading', label: '読書中' },
   { value: 'completed', label: '読了' },
+]
+const filters = [{ value: undefined, label: 'すべて' }, ...statuses]
+const sorts: { value: Sort; label: string }[] = [
+  { value: 'read_recent', label: '最近読んだ' },
+  { value: 'read_oldest', label: '最近読んでない' },
+  { value: 'added_recent', label: '登録日が新しい' },
+  { value: 'added_oldest', label: '登録日が古い' },
 ]
 
 export default function LibraryPage() {
@@ -28,12 +36,16 @@ export default function LibraryPage() {
 
 function LibraryContents() {
   const auth = useAuth()
+  const { state } = useLocation()
   const userId = auth.status === 'ready' ? auth.userId : null
+  const [status, setStatus] = useState<ReadingStatus>()
+  const [sort, setSort] = useState<Sort>(state?.sort === 'added_recent' ? 'added_recent' : 'read_recent')
+  const selection = sort === 'added_recent' && !status ? undefined : { sort, status }
   const books = useInfiniteQuery({
-    queryKey: queryKeys.myBooks(userId ?? 'unavailable'),
+    queryKey: queryKeys.myBooks(userId ?? 'unavailable', 15, selection),
     enabled: userId !== null,
     initialPageParam: undefined as string | undefined,
-    queryFn: ({ pageParam, signal }) => getLibraryPage(pageParam, signal),
+    queryFn: ({ pageParam, signal }) => getLibraryPage(pageParam, signal, selection),
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
   })
 
@@ -48,9 +60,30 @@ function LibraryContents() {
 
   const items = books.data?.pages.flatMap((page) => page.items) ?? []
   return <>
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5">
+      <fieldset className="min-w-0 flex-1 basis-60">
+        <legend className="sr-only">絞り込み</legend>
+        <div className="grid grid-cols-4 gap-1 rounded-xl border border-[#e2e7e2] bg-white p-1">
+          {filters.map((filter) => <label key={filter.label}
+            className="grid min-h-11 cursor-pointer place-items-center rounded-lg px-1 text-center text-xs font-semibold text-[#526356] hover:bg-paper has-checked:bg-mist has-checked:text-forest has-[:focus-visible]:outline-2 has-[:focus-visible]:-outline-offset-2 has-[:focus-visible]:outline-forest">
+            <input type="radio" name="library-status" className="sr-only" checked={status === filter.value}
+              onChange={() => setStatus(filter.value)} />
+            {filter.label}
+          </label>)}
+        </div>
+      </fieldset>
+      <label className="ml-auto flex items-center gap-2 text-xs font-semibold text-[#526356]">
+        並べ替え
+        <select value={sort} onChange={(event) => setSort(event.target.value as Sort)}
+          className="min-h-11 rounded-lg border border-[#e2e7e2] bg-white px-3 text-sm font-semibold text-forest focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-forest">
+          {sorts.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+        </select>
+      </label>
+    </div>
     {books.isPending ? <LoadingState /> : books.isError && !books.data ?
       <ErrorState description={books.error.message} onRetry={() => void books.refetch()} isRetrying={books.isFetching} /> :
-      items.length === 0 ? <EmptyState title="本棚は空です" description="気になる本を探して、本棚に追加してみましょう。"
+      items.length === 0 ? status ? <EmptyState title="条件に一致する本がありません" description="「すべて」を選ぶと、本棚全体を表示できます。" /> :
+        <EmptyState title="本棚は空です" description="気になる本を探して、本棚に追加してみましょう。"
         action={<Link className="ui-action inline-flex bg-forest px-5 text-sm font-bold text-white" to="/search">本を探す</Link>} /> :
       <ul className="grid gap-3 sm:grid-cols-2">
         {items.map((item) => <li key={item.id} className="min-w-0"><LibraryBook item={item} userId={userId!} /></li>)}

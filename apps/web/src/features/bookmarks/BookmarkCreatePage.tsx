@@ -83,8 +83,13 @@ function Compose({ bookId, userBookId, library }: {
   const client = useQueryClient()
   const registered = useRef<{ userId: string; id: string } | null>(null)
   const catalogBook = useQuery({ ...bookOptions(bookId ?? ''), enabled: !!bookId })
-  const selectedBook = auth.canReadPrivate ? library.data?.pages.flatMap((page) => page.items)
+  const pickedBook = auth.canReadPrivate ? library.data?.pages.flatMap((page) => page.items)
     .find((item) => bookId ? item.book.id === bookId : item.id === userBookId) : undefined
+  // A book selected on a filtered shelf may be outside the picker's loaded pages.
+  const selectedBook = pickedBook ?? (auth.canReadPrivate && auth.userId && userBookId
+    ? client.getQueriesData<NonNullable<typeof library.data>>({ queryKey: queryKeys.myBooks(auth.userId) })
+      .flatMap(([, cached]) => cached?.pages ?? []).flatMap((page) => page.items).find((item) => item.id === userBookId)
+    : undefined)
   const book = bookId ? catalogBook.data : selectedBook?.book
   const mutation = useBookmarkWrite(async (input: BookmarkInput, signal) => {
     let shelfId = selectedBook?.id

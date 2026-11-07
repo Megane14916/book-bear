@@ -144,6 +144,7 @@ test('saves from book details and shows the saved book while the shelf list load
 
   await add.click()
   await expect(page).toHaveURL('/library')
+  await expect(page.getByRole('combobox', { name: '並べ替え' })).toHaveValue('added_recent')
   await expect.poll(() => reads).toBe(1)
   const saved = page.getByRole('heading', { name: local.title, exact: true })
   await expect(saved).toBeVisible()
