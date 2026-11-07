@@ -14,3 +14,9 @@ export async function requestData<T>(
     throw new ApiError('response', 'APIの応答を処理できませんでした。')
   }
 }
+
+export async function requireData<T>(request: () => Promise<{ data?: T; response: Response }>): Promise<T> {
+  const data = await requestData(request)
+  if (data === null) throw new ApiError('response', 'APIの応答に必要なデータがありません。')
+  return data
+}
