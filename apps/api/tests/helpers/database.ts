@@ -11,10 +11,12 @@ export const migrationFolder = fileURLToPath(new URL('../../drizzle/', import.me
 export const bootstrapSql = () => readFile(new URL('../../scripts/sql/bootstrap.sql', import.meta.url), 'utf8')
 export const grantsSql = () => readFile(new URL('../../scripts/sql/grants.sql', import.meta.url), 'utf8')
 
-export async function createTestDatabase() {
+export async function createTestDatabase({ isolated = false } = {}) {
   const providedUrl = process.env.TEST_DATABASE_URL
   let embedded: PGlite | undefined
   let server: PGLiteSocketServer | undefined
+  let databaseOwner: Client | undefined
+  let isolatedDatabase: string | undefined
   let connectionString: string
   if (providedUrl) {
     const url = new URL(providedUrl)
@@ -24,6 +26,21 @@ export async function createTestDatabase() {
       throw new Error('TEST_DATABASE_URL must target a local disposable book_bear_test database')
     }
     connectionString = providedUrl
+    if (isolated) {
+      // Suites with fixed IDs or globally ranked data need their own database.
+      const name = `book_bear_test_${randomUUID().replaceAll('-', '')}`
+      databaseOwner = new Client({ connectionString })
+      try {
+        await databaseOwner.connect()
+        await databaseOwner.query(`CREATE DATABASE "${name}"`)
+      } catch (error) {
+        await databaseOwner.end().catch(() => {})
+        throw error
+      }
+      isolatedDatabase = name
+      url.pathname = `/${name}`
+      connectionString = url.toString()
+    }
   } else {
     embedded = await PGlite.create()
     server = new PGLiteSocketServer({ db: embedded, host: '127.0.0.1', port: 0, maxConnections: 4 })
@@ -31,34 +48,46 @@ export async function createTestDatabase() {
     connectionString = `postgres://postgres:postgres@${server.getServerConn()}/postgres`
   }
   const client = new Client({ connectionString })
-  await client.connect()
-  await client.query(`
-    CREATE SCHEMA IF NOT EXISTS auth;
-    CREATE TABLE IF NOT EXISTS auth.users (id uuid PRIMARY KEY);
-    DO $$ BEGIN
-      IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN CREATE ROLE anon NOLOGIN; END IF;
-      IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN CREATE ROLE authenticated NOLOGIN; END IF;
-    END $$;
-  `)
-  const apply = async () => {
-    await client.query(await bootstrapSql())
-    await migrate(drizzle(client), { migrationsFolder: migrationFolder })
-    await client.query(await grantsSql())
+  const close = async () => {
+    try {
+      await client.end()
+      await server?.stop()
+      await embedded?.close()
+      if (isolatedDatabase) await databaseOwner?.query(`DROP DATABASE "${isolatedDatabase}"`)
+    } finally {
+      await databaseOwner?.end()
+    }
   }
-  await apply()
-  let apiConnectionString = connectionString
-  if (providedUrl) {
-    // Real PostgreSQL CI must exercise the actual runtime login, not postgres.
-    // PGlite's shared embedded session is tested with SET ROLE instead.
-    const password = randomUUID()
-    await client.query(`ALTER ROLE book_bear_api LOGIN PASSWORD '${password}'`)
-    const apiUrl = new URL(connectionString)
-    apiUrl.username = 'book_bear_api'
-    apiUrl.password = password
-    apiConnectionString = apiUrl.toString()
-  }
-  return {
-    client, connectionString, apiConnectionString, apply,
-    close: async () => { await client.end(); await server?.stop(); await embedded?.close() },
+  try {
+    await client.connect()
+    await client.query(`
+      CREATE SCHEMA IF NOT EXISTS auth;
+      CREATE TABLE IF NOT EXISTS auth.users (id uuid PRIMARY KEY);
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN CREATE ROLE anon NOLOGIN; END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN CREATE ROLE authenticated NOLOGIN; END IF;
+      END $$;
+    `)
+    const apply = async () => {
+      await client.query(await bootstrapSql())
+      await migrate(drizzle(client), { migrationsFolder: migrationFolder })
+      await client.query(await grantsSql())
+    }
+    await apply()
+    let apiConnectionString = connectionString
+    if (providedUrl) {
+      // Real PostgreSQL CI must exercise the actual runtime login, not postgres.
+      // PGlite's shared embedded session is tested with SET ROLE instead.
+      const password = randomUUID()
+      await client.query(`ALTER ROLE book_bear_api LOGIN PASSWORD '${password}'`)
+      const apiUrl = new URL(connectionString)
+      apiUrl.username = 'book_bear_api'
+      apiUrl.password = password
+      apiConnectionString = apiUrl.toString()
+    }
+    return { client, connectionString, apiConnectionString, apply, close }
+  } catch (error) {
+    await close().catch(() => {})
+    throw error
   }
 }

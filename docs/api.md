@@ -6,9 +6,10 @@
 
 ### 現在の契約と実装状況（Issue #7）
 
-`apps/api/src/modules/*/schemas.ts` と各モジュールの `routes.ts` を正本として、主要34操作の `contracts/openapi.json` とWebの `src/lib/api/generated.ts` を生成する。`GET /openapi.json` も同一仕様を返す。手書きの初期ドラフトは履歴資料とし、以降の変更はZod定義・生成物・本書に反映する。
+各モジュールのHono/Zod定義から `contracts/openapi.json` とWebの `src/lib/api/generated.ts` を生成する。`GET /openapi.json` も同一仕様を返す。手書きの初期ドラフトは履歴資料とし、以降の変更はZod定義・生成物・本書に反映する。
 
-- 操作単位の `x-implementation-status: implemented` は実装済み（health・DB接続確認、プロフィール／設定6操作、書籍・本棚9操作、栞CRUD・本人一覧5操作、栞の流れ1操作、all／followingフィード1操作、フォロー・いいね・返信10操作、投稿／ユーザー検索2操作）。全36操作が実装済み。
+- 操作単位の `x-implementation-status: implemented` は実装済み。初期の主要34操作、health・DB接続確認、書籍推薦の全37操作が実装済み。
+- `GET /me/recommendations?limit=5` は正式ユーザー向け。本人の公開栞に基づく書籍を `{ items: BookSummary[] }` で返す。limitは1〜10、履歴・候補不足時は空配列、AI障害時は503。[推薦API設計・評価手順](recommendations-design.md)
 - `x-auth` は `Public / OptionalAuth / AnyAuth / Owner / Registered`。`OptionalAuth` はJWTなしでも閲覧可、送信時は必ず検証して無効なら401。`Registered` は匿名ユーザーに403。公開化・followingフィードなどの条件付き制限は各操作の説明と403レスポンスに記載する。
 - `followedByMe`・`likedByMe` を返す公開GETと、本人の非公開情報を返し得るGETは任意認証。初期ドラフトの公開プロフィール・返信一覧・投稿検索の認証記載を補完した。
 - 入力はUUID、UTC日時、列挙値、本文長、整数範囲をZodで検証。JSONの数値・booleanは文字列から変換しない。クエリのlimitは数値化し、1〜30（既定15、書籍・ユーザー検索は20）とする。
@@ -21,7 +22,7 @@
 
 契約の更新・確認：`pnpm generate:openapi` → `pnpm check:openapi` → `pnpm typecheck` → `pnpm test` → `pnpm build`。MSWはまだリポジトリに存在しないため、本Issueではモックを追加・更新しない。導入時には生成型を使い、認証シナリオ・403/404・空データ・カーソルを再現する。
 
-Issue #25で最後の検索2操作を `app.openapi()` へ登録し、旧plannedRoutesと契約専用登録を削除した。全36操作の一意性・初期ドラフト34操作の網羅・認証とJSON契約を引き続き検証する。
+Issue #25で旧plannedRoutesと契約専用登録を削除した。追加機能を含む全操作の一意性、初期ドラフト34操作の網羅、認証とJSON契約を引き続き検証する。
 
 ### DB接続確認（Issue #8）
 

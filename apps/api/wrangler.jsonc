@@ -4,6 +4,7 @@
   "main": "src/index.ts",
   "compatibility_date": "2025-06-18",
   "compatibility_flags": ["nodejs_compat"],
+  "ai": { "binding": "AI" },
   "hyperdrive": [
     {
       "binding": "HYPERDRIVE",

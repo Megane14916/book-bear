@@ -12,6 +12,7 @@ import { registerFeedRoutes } from './modules/feed/http'
 import { registerSocialRoutes } from './modules/social/http'
 import { registerReplyRoutes } from './modules/replies/http'
 import { registerSearchRoutes } from './modules/search/http'
+import { registerRecommendationRoutes } from './modules/recommendations/http'
 import { ApiError } from './shared/errors'
 import { ErrorSchema } from './shared/schemas'
 
@@ -19,7 +20,7 @@ export const openApiConfig = {
   openapi: '3.0.0',
   info: {
     title: 'Book Bear API', version: '0.1.0',
-    description: 'Hono/Zodから生成するAPI契約。全36操作を実装し、x-implementation-status=implementedで示す。',
+    description: 'Hono/Zodから生成するAPI契約。実装済みの操作はx-implementation-status=implementedで示す。',
   },
 }
 
@@ -87,6 +88,7 @@ export function createApp(dependencies: { verifyToken?: TokenVerifier; database?
   registerSocialRoutes(app, database, auth)
   registerReplyRoutes(app, database, auth)
   registerSearchRoutes(app, database, auth)
+  registerRecommendationRoutes(app, database, auth)
 
   app.openAPIRegistry.registerComponent('securitySchemes', 'bearerAuth', {
     type: 'http', scheme: 'bearer', bearerFormat: 'JWT',

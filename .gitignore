@@ -15,3 +15,4 @@ dist/
 .local-db/
 /apps/api/wrangler.remote.*.json
 /apps/api/.cloud-test-results/
+/apps/api/.recommendation-experiments/

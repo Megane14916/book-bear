@@ -3,7 +3,7 @@
   "info": {
     "title": "Book Bear API",
     "version": "0.1.0",
-    "description": "Hono/Zodから生成するAPI契約。全36操作を実装し、x-implementation-status=implementedで示す。"
+    "description": "Hono/Zodから生成するAPI契約。実装済みの操作はx-implementation-status=implementedで示す。"
   },
   "components": {
     "securitySchemes": {
@@ -917,6 +917,20 @@
         "required": [
           "items",
           "nextCursor"
+        ]
+      },
+      "BookRecommendations": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BookSummary"
+            }
+          }
+        },
+        "required": [
+          "items"
         ]
       }
     },
@@ -4157,6 +4171,105 @@
           },
           "500": {
             "description": "INTERNAL_ERROR: 内部情報を含めないエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/recommendations": {
+      "get": {
+        "operationId": "getMeRecommendations",
+        "summary": "自分の公開栞に基づく書籍推薦",
+        "description": "公開・未削除の栞を使用し、本人の本棚にある書籍を除外する。履歴・候補なしは空配列。",
+        "x-implementation-status": "implemented",
+        "x-auth": "Registered",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10,
+              "default": 5
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "推薦順の書籍",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookRecommendations"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "候補件数が範囲外",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "認証が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "正式登録が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "プロフィールが未初期化",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "内部エラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "AIまたは認証サービスを利用できない",
             "content": {
               "application/json": {
                 "schema": {
