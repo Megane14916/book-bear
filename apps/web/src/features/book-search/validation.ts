@@ -1,6 +1,11 @@
 import type { ManualBookInput } from './api'
 
 export const isUuid = (value: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+export function isIsbn13(value: string) {
+  if (!/^97[89]\d{10}$/.test(value)) return false
+  const sum = [...value].reduce((total, digit, index) => total + Number(digit) * (index % 2 ? 3 : 1), 0)
+  return sum % 10 === 0
+}
 export type ManualErrors = { title?: string; totalPages?: string }
 export function validateManualBook(input: { title: string; author: string; totalPages: string }):
   { data: ManualBookInput; errors?: never } | { errors: ManualErrors; data?: never } {

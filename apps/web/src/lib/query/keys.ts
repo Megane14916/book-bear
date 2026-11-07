@@ -17,6 +17,7 @@ export const queryKeys = {
     ['bookmark-flow', userId, bookId, viewerId, { limit }] as const,
   searchPosts: (q: string, viewerId: string | null, limit = 15) =>
     ['search-posts', viewerId, { q: q.trim(), limit }] as const,
+  searchUsers: (q: string, limit = 30) => ['search-users', { q: q.trim(), limit }] as const,
 }
 
 // Future infinite queries use these list keys and pass opaque cursors through
