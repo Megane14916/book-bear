@@ -98,8 +98,7 @@ test('external import authenticates, sends provider identity, and handles 201/20
   expect(mock.events.indexOf('signup')).toBeLessThan(mock.events.indexOf('init'))
   expect(mock.events.indexOf('init')).toBeLessThan(mock.events.indexOf('import'))
   expect(mock.imports[0]).toEqual({ provider: 'google_books', providerId: 'external-volume-id' })
-  const library = page.getByRole('link', { name: '本棚への追加へ進む', exact: true })
-  await expect(library).toHaveAttribute('href', `/library?bookId=${importedId}`)
+  await expect(page.getByRole('button', { name: '本棚に追加', exact: true })).toBeVisible()
   await page.getByRole('link', { name: '書籍検索へ戻る', exact: true }).click()
   await search(page, '外部')
   await page.getByRole('button', { name: '書籍情報を取り込む', exact: true }).click()
@@ -107,6 +106,59 @@ test('external import authenticates, sends provider identity, and handles 201/20
   expect(mock.imports).toHaveLength(2)
   expect(mock.counts().signup).toBe(1)
   expect(mock.counts().libraries).toBe(0)
+})
+
+test('saves from book details and shows the saved book while the shelf list loads', async ({ page }) => {
+  const mock = await setup(page)
+  const writes: unknown[] = []
+  const item = {
+    id: '00000000-0000-4000-8000-000000000020', userId, book: local, status: 'want_to_read', currentPage: null,
+    createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z',
+  }
+  let reads = 0
+  let releaseFirstRead!: () => void
+  const firstRead = new Promise<void>((resolve) => { releaseFirstRead = resolve })
+  await page.route((url) => url.origin === origin && url.pathname === '/api/v1/me/books', async (route) => {
+    const request = route.request()
+    if (request.method() === 'POST') {
+      expect(Boolean(request.headers().authorization)).toBe(true)
+      writes.push(request.postDataJSON())
+      if (writes.length === 1) return route.fulfill({ status: 503, json: { error: { code: 'INTERNAL_ERROR', message: '一時的な保存失敗' } } })
+      return route.fulfill({ status: writes.length === 2 ? 201 : 200, json: item })
+    }
+    if (++reads === 1) {
+      await firstRead
+      return route.fulfill({ status: 500, json: { error: { code: 'INTERNAL_ERROR', message: '一時的な取得失敗' } } })
+    }
+    return route.fulfill({ json: { items: [item], nextCursor: null } })
+  })
+
+  await page.goto(`/books/${localId}`)
+  const add = page.getByRole('button', { name: '本棚に追加', exact: true })
+  await expect(add).toBeVisible()
+  expect(writes).toHaveLength(0)
+  expect(mock.counts().signup).toBe(0)
+  await add.click()
+  await expect(page.getByRole('alert')).toHaveText('一時的な保存失敗')
+  await expect(page).toHaveURL(`/books/${localId}`)
+
+  await add.click()
+  await expect(page).toHaveURL('/library')
+  await expect.poll(() => reads).toBe(1)
+  const saved = page.getByRole('heading', { name: local.title, exact: true })
+  await expect(saved).toBeVisible()
+  releaseFirstRead()
+  await expect(page.getByText('本棚の一覧を更新できませんでした。')).toBeVisible()
+  await expect(saved).toBeVisible()
+  await page.getByRole('button', { name: 'もう一度試す' }).click()
+  await expect(page.getByText('本棚の一覧を更新できませんでした。')).toHaveCount(0)
+
+  await page.goBack()
+  await add.click()
+  await expect(page).toHaveURL('/library')
+  await expect(saved).toHaveCount(1)
+  expect(writes).toEqual([{ bookId: localId }, { bookId: localId }, { bookId: localId }])
+  expect(mock.counts().signup).toBe(1)
 })
 
 test('manual registration validates before auth, retains inputs and retries the current edited values', async ({ page }) => {

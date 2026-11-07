@@ -1,14 +1,16 @@
-import { useParams, Link, useSearchParams } from 'react-router'
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { BookCard } from '../components/books/BookCard'
 import { EmptyState, ErrorState, LoadingState } from '../components/states/ScreenStates'
 import { bookOptions } from '../features/book-search/queries'
 import { bookErrorMessage } from '../features/book-search/errors'
 import { isUuid } from '../features/book-search/validation'
+import { AddToLibraryButton } from '../features/library/AddToLibraryButton'
 import { HttpError } from '../lib/api/errors'
 
 export default function BookDetailPage() {
   const { bookId = '' } = useParams()
+  const navigate = useNavigate()
   const [params] = useSearchParams()
   const userId = params.get('userId')
   const query = useQuery({ ...bookOptions(bookId), enabled: isUuid(bookId) })
@@ -26,7 +28,7 @@ export default function BookDetailPage() {
       <div><dt className="font-bold">出版社</dt><dd>{book.publisher ?? '出版社情報なし'}</dd></div>
       <div><dt className="font-bold">総ページ数</dt><dd>{book.totalPages === null ? '未設定' : `${book.totalPages}ページ`}</dd></div>
     </dl>
-    <Link className="ui-action inline-flex border border-forest px-4 text-forest" to={`/library?bookId=${book.id}`}>本棚への追加へ進む</Link>
+    <AddToLibraryButton key={book.id} bookId={book.id} onAdded={() => void navigate('/library')} />
     <p className="text-xs text-[#526356]">書籍情報の登録と、自分の本棚への追加は別の操作です。</p>
     <p><Link className="ui-action inline-flex bg-forest px-4 text-white" to={`/create?bookId=${book.id}`}>この本に栞を残す</Link></p>
     {userId && isUuid(userId) && <p><Link className="ui-action inline-flex text-forest underline"
