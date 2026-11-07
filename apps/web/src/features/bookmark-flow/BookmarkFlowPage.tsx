@@ -54,7 +54,7 @@ function FlowContent({ userId, bookId }: { userId: string; bookId: string }) {
           </span>}
         {author.displayName}
       </Link>
-      <BookCard book={book} titleHref={`/books/${book.id}`} compact plain />
+      <BookCard book={book} titleHref={`/books/${book.id}`} compact />
     </header>
     {items.length === 0 && <EmptyState title="表示できる栞はまだありません" description="この本の栞が集まると、ここに投稿順で表示されます。" action={back} />}
     {items.map((bookmark) => <SocialBookmarkCard key={bookmark.id} variant="flow" bookmark={bookmark} viewerId={auth.userId}

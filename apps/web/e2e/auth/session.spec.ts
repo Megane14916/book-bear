@@ -52,6 +52,8 @@ test.describe.serial(live ? 'development services' : 'mock services', () => {
         if (pathname.endsWith('/health')) return route.fulfill({ json: { status: 'ok' } })
         if (pathname === `/api/v1/users/${currentUser}`) return route.fulfill({ json: { ...profile(currentUser), publicBookmarkCount: 0, followedByMe: false } })
         if (pathname === `/api/v1/users/${currentUser}/books`) return route.fulfill({ json: { items: [], nextCursor: null } })
+        if (pathname === '/api/v1/me/bookmarks') return route.fulfill({ json: { items: [], nextCursor: null } })
+        if (pathname === '/api/v1/me/preferences') return route.fulfill({ json: { feedContentMode: 'tap' } })
         if (request.method() === 'PUT') initialized = true
         await route.fulfill(initialized ? { json: profile(currentUser) }
           : { status: 404, json: { error: { code: 'NOT_FOUND', message: 'プロフィールがありません。' } } })

@@ -18,8 +18,8 @@ const fieldClass = 'mt-1 min-h-11 w-full rounded-lg border border-[#d6ded6] bg-w
 
 export default function MyProfilePage() {
   const auth = useAuth()
-  if (auth.canReadPrivate && auth.userId) return <PublicProfile userId={auth.userId} />
-  return <section className="space-y-5">
+  if (auth.canReadPrivate && auth.userId) return <PublicProfile key={auth.userId} userId={auth.userId} myPage />
+  return <section className="h-full space-y-5 overflow-y-auto px-5 py-4 sm:px-6">
     <h1 className="text-3xl font-bold">マイページ</h1>
     <Link to="/settings" className="ui-action inline-flex text-sm font-bold text-forest underline">設定</Link>
     <GoogleAction />

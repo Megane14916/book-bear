@@ -1,24 +1,27 @@
 import { useId, useRef, useState, type KeyboardEvent, type ReactNode, type UIEvent } from 'react'
 
-export function ScrollableTabs<Value extends string>({ tabs, value, onChange, label, scrollLabel, panelClassName, children }: {
+export function ScrollableTabs<Value extends string>({ tabs, value, onChange, label, scrollLabel, panelClassName, beforeTabs, children }: {
   tabs: readonly { value: Value; label: string }[]
   value: Value
   onChange: (value: Value) => void
   label: string
   scrollLabel: string
   panelClassName: string
+  beforeTabs?: ReactNode
   children: ReactNode
 }) {
   const id = useId()
   const scrollArea = useRef<HTMLDivElement>(null)
+  const leadingContent = useRef<HTMLDivElement>(null)
   const lastScrollTop = useRef(0)
   const [hidden, setHidden] = useState(false)
 
   function updateTabs({ currentTarget }: UIEvent<HTMLDivElement>) {
     const top = Math.max(0, currentTarget.scrollTop)
+    const tabsTop = leadingContent.current?.offsetHeight ?? 0
     const delta = top - lastScrollTop.current
-    if (top > 0 && Math.abs(delta) < 8) return
-    setHidden(top > 0 && delta > 0)
+    if (top > tabsTop && Math.abs(delta) < 8) return
+    setHidden(top > tabsTop && delta > 0)
     lastScrollTop.current = top
   }
 
@@ -45,6 +48,7 @@ export function ScrollableTabs<Value extends string>({ tabs, value, onChange, la
 
   return <div ref={scrollArea} role="region" aria-label={scrollLabel} tabIndex={0} onScroll={updateTabs}
     className="h-full overflow-y-auto overscroll-y-contain focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-forest">
+    {beforeTabs && <div ref={leadingContent}>{beforeTabs}</div>}
     <div className={`sticky top-0 z-20 border-b border-[#e2e7e2] bg-white/95 backdrop-blur-sm motion-safe:transition-transform has-[:focus-visible]:translate-y-0 ${hidden ? '-translate-y-full' : ''}`}>
       <div role="tablist" aria-label={label} className="grid auto-cols-fr grid-flow-col">
         {tabs.map((tab, index) => <button key={tab.value} id={`${id}-tab-${tab.value}`} type="button" role="tab"
