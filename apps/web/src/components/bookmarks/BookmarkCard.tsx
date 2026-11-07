@@ -62,7 +62,7 @@ export function BookmarkCard(props: Props) {
           {bookmark.pageNumber !== null && <span>{bookmark.pageNumber}ページ</span>}
         </div>}
         <BookmarkBody bookmarkId={bookmark.id} viewerId={viewerId} mode={mode} isSpoiler={bookmark.isSpoiler} content={bookmark.content}
-          closeBelow={props.variant === 'flow'} compact={timeline && !inThread} revealOverlay={timeline} />
+          compact={timeline && !inThread} revealOverlay={timeline || props.variant === 'flow'} />
         {timeline && book}
         {(!inThread || bookmark.visibility === 'public') && <div className={`flex flex-wrap items-start gap-x-3 text-sm text-[#526356] tabular-nums ${timeline ? 'mt-1' : 'mt-2 border-t border-[#e2e7e2] pt-1'}`}>
           {props.likeAction ?? <span className="inline-flex min-h-11 items-center gap-1.5 px-2">

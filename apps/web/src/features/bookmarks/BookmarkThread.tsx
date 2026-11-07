@@ -1,6 +1,5 @@
 import { useInfiniteQuery } from '@tanstack/react-query'
-import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react'
-import { Link } from 'react-router'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import type { FeedContentMode } from '../../components/bookmarks/BookmarkBody'
 import { LoadMore } from '../../components/states/LoadMore'
 import { ErrorState } from '../../components/states/ScreenStates'
@@ -13,18 +12,20 @@ export function BookmarkThread({ bookmark, viewerId, mode, actions, feedback }: 
   bookmark: Bookmark; viewerId: string | null; mode: FeedContentMode; actions?: ReactNode; feedback?: ReactNode
 }) {
   const { author, book } = bookmark
+  const [showAfter, setShowAfter] = useState(false)
   const flow = useInfiniteQuery(bookmarkFlowOptions(author.id, book.id, viewerId))
   const { fetchNextPage, hasNextPage, isFetching, isFetchNextPageError } = flow
   const items = flow.data?.pages.flatMap((page) => page.items) ?? []
   const currentIndex = items.findIndex((item) => item.id === bookmark.id)
   const before = currentIndex < 0 ? [] : items.slice(0, currentIndex)
   const after = currentIndex < 0 ? [] : items.slice(currentIndex + 1)
-  const needsContext = after.length === 0
+  const hasFollowing = currentIndex >= 0 && (after.length > 0 || hasNextPage)
+  const needsContext = currentIndex < 0 || (showAfter && after.length === 0)
   const scroller = useRef<HTMLDivElement>(null)
   const earlier = useRef<HTMLDivElement>(null)
   const aligned = useRef(false)
 
-  // The flow API pages from oldest to newest. Load through the current post and its next neighbor.
+  // Find the focused post in the oldest-first list. Fetch its following page when expanded.
   useEffect(() => {
     if (needsContext && hasNextPage && !isFetching && !isFetchNextPageError) {
       void fetchNextPage({ cancelRefetch: false })
@@ -48,25 +49,31 @@ export function BookmarkThread({ bookmark, viewerId, mode, actions, feedback }: 
       </ThreadEntry>)}
     </div>}
     <div className="min-h-full px-4 pb-8 sm:px-6">
-      <ThreadEntry above={hasEarlier} below={after.length > 0} current>
+      <ThreadEntry above={hasEarlier} below={hasFollowing} current>
         <SocialBookmarkCard bookmark={bookmark} viewerId={viewerId} mode={mode} appearance="timeline" inThread actions={actions} />
         {feedback && <div className="ml-11 pb-4">{feedback}</div>}
-        {bookmark.visibility === 'public' && <div className="pb-4 pl-11">
-          <Replies bookmarkId={bookmark.id} mode={mode} />
-        </div>}
       </ThreadEntry>
-      {after.map((item, index) => <ThreadEntry key={item.id} above below={index < after.length - 1}>
-        <SocialBookmarkCard bookmark={{ ...item, author, book }} viewerId={viewerId} mode={mode}
-          appearance="timeline" inThread detailHref={`/bookmarks/${item.id}`} />
-      </ThreadEntry>)}
-      <div className="ml-11 pt-2">
+      {hasFollowing && <div className="relative pl-11">
+        <span aria-hidden="true" className={`pointer-events-none absolute inset-y-0 left-[15px] border-l-2 border-[#9eb9a2] ${showAfter ? '' : 'border-dashed'}`} />
+        <button type="button" className="ui-action inline-flex gap-1.5 rounded-full px-3 text-sm font-bold text-forest hover:bg-mist"
+          aria-expanded={showAfter} aria-controls="following-bookmarks" onClick={() => setShowAfter((value) => !value)}>
+          {showAfter ? '後の栞を閉じる' : 'もっと見る'}
+        </button>
+      </div>}
+      <div id="following-bookmarks" role="region" aria-label="後の栞" hidden={!showAfter}>
+        {showAfter && after.map((item, index) => <ThreadEntry key={item.id} above below={index < after.length - 1}>
+          <SocialBookmarkCard bookmark={{ ...item, author, book }} viewerId={viewerId} mode={mode}
+            appearance="timeline" inThread detailHref={`/bookmarks/${item.id}`} />
+        </ThreadEntry>)}
+        {showAfter && hasNextPage && <div className="ml-11"><LoadMore query={flow} /></div>}
+      </div>
+      {currentIndex < 0 && <div className="ml-11">
         {flow.isError && !flow.data ? <ErrorState description="前後の栞を取得できませんでした。"
           onRetry={() => void flow.refetch()} isRetrying={flow.isFetching} /> :
-          flow.isPending || (needsContext && hasNextPage && !isFetchNextPageError) ?
-          <p role="status" className="py-2 text-sm text-[#526356]">前後の栞を読み込み中…</p> : <LoadMore query={flow} />}
-        <Link className="ui-action inline-flex text-sm font-semibold text-forest hover:underline"
-          to={`/users/${author.id}/books/${book.id}/bookmarks`}>この本の栞の流れ</Link>
-      </div>
+          isFetchNextPageError ? <LoadMore query={flow} /> :
+          (flow.isPending || hasNextPage) && <p role="status" className="py-2 text-sm text-[#526356]">前後の栞を読み込み中…</p>}
+      </div>}
+      {bookmark.visibility === 'public' && <Replies bookmarkId={bookmark.id} mode={mode} />}
     </div>
   </div>
 }

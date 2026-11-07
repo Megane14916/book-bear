@@ -23,7 +23,7 @@ export default function BookmarkFlowPage() {
 function FlowContent({ userId, bookId }: { userId: string; bookId: string }) {
   const auth = useAuth()
   const valid = isUuid(userId) && isUuid(bookId)
-  const { mode } = useContentPreference({ enabled: valid })
+  const { mode, control } = useContentPreference({ enabled: valid, compact: true })
   const flow = useInfiniteQuery({
     ...bookmarkFlowOptions(userId, bookId, auth.userId),
     enabled: valid && canReadPublic(auth.status),
@@ -51,5 +51,8 @@ function FlowContent({ userId, bookId }: { userId: string; bookId: string }) {
     {items.map((bookmark) => <SocialBookmarkCard key={bookmark.id} variant="flow" bookmark={bookmark} viewerId={auth.userId}
       mode={mode} detailHref={`/bookmarks/${bookmark.id}`} />)}
     <LoadMore query={flow} />
+    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(var(--app-nav-height)+env(safe-area-inset-bottom)+1rem)] z-20 mx-auto flex max-w-[740px] justify-end px-4 sm:px-6">
+      <div className="pointer-events-auto">{control}</div>
+    </div>
   </>
 }

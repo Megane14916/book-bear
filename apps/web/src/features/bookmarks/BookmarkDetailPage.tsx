@@ -16,24 +16,27 @@ import { BookmarkThread } from './BookmarkThread'
 
 export default function BookmarkDetailPage({ edit = false }: { edit?: boolean }) {
   const { bookmarkId = '' } = useParams()
+  const query = useBookmark(bookmarkId)
+  const bookmark = query.data
   if (edit) return <div className="space-y-5">
     <PageBack fallback={isUuid(bookmarkId) ? `/bookmarks/${bookmarkId}` : '/'} />
-    <Detail key={bookmarkId} bookmarkId={bookmarkId} edit />
+    <Detail key={bookmarkId} bookmarkId={bookmarkId} query={query} edit />
   </div>
   return <section aria-labelledby="bookmark-detail-title" className="flex h-full flex-col bg-white sm:border-x sm:border-[#edf0eb]">
-    <header className="flex shrink-0 items-center gap-3 border-b border-[#e2e7e2] px-3 py-1 sm:px-5">
+    <header className="flex shrink-0 items-center justify-between gap-3 border-b border-[#e2e7e2] px-3 py-1 sm:px-5">
       <PageBack fallback="/" />
-      <h1 id="bookmark-detail-title" className="text-lg font-bold">栞の詳細</h1>
+      <h1 id="bookmark-detail-title" className="sr-only">栞の詳細</h1>
+      {bookmark && <Link className="ui-action inline-flex gap-2 rounded-full bg-mist px-4 text-sm font-bold text-forest hover:bg-[#d8e9da]"
+        to={`/users/${bookmark.author.id}/books/${bookmark.book.id}/bookmarks`}>栞の流れ <span aria-hidden="true">→</span></Link>}
     </header>
-    <Detail key={bookmarkId} bookmarkId={bookmarkId} edit={false} />
+    <Detail key={bookmarkId} bookmarkId={bookmarkId} query={query} edit={false} />
   </section>
 }
 
-function Detail({ bookmarkId, edit }: { bookmarkId: string; edit: boolean }) {
+function Detail({ bookmarkId, query, edit }: { bookmarkId: string; query: ReturnType<typeof useBookmark>; edit: boolean }) {
   const auth = useAuth()
   const navigate = useNavigate()
   const { mode } = useContentPreference({ enabled: !edit && isUuid(bookmarkId) })
-  const query = useBookmark(bookmarkId)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const write = useBookmarkWrite(async (input: PatchBookmark | null, signal) => {
     if (input) return patchBookmark(bookmarkId, input, signal)
@@ -63,8 +66,8 @@ function Detail({ bookmarkId, edit }: { bookmarkId: string; edit: boolean }) {
   </section>
   return <BookmarkThread key={auth.userId} bookmark={bookmark} viewerId={auth.userId} mode={mode}
     actions={owner && <>
-      <Link className="ui-action inline-flex px-3 text-sm font-semibold text-forest hover:bg-mist" to={`/bookmarks/${bookmarkId}/edit`}>編集</Link>
-      <button className="ui-action px-3 text-sm font-semibold text-red-700 hover:bg-red-50" disabled={write.isPending} onClick={() => setConfirmDelete(true)}>削除</button>
+      <Link className="ui-action inline-flex rounded-full border border-[#e2e7e2] px-4 text-xs font-semibold text-forest hover:bg-mist" to={`/bookmarks/${bookmarkId}/edit`}>編集</Link>
+      <button className="ui-action rounded-full px-4 text-xs font-semibold text-red-700 hover:bg-red-50" disabled={write.isPending} onClick={() => setConfirmDelete(true)}>削除</button>
     </>}
     feedback={((confirmDelete && owner) || write.error) && <>
       {confirmDelete && owner && <div role="group" aria-label="栞の削除確認" className="space-y-3 rounded-lg border border-red-700 bg-white p-4">

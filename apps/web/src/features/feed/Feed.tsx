@@ -52,7 +52,7 @@ export function Feed() {
           action={<Link className="ui-action inline-flex text-forest underline" to="/search">本を探す</Link>} /> :
         <div className="divide-y divide-[#e2e7e2]">
           {items.map((bookmark) => <SocialBookmarkCard key={bookmark.id} appearance="timeline" bookmark={bookmark} viewerId={auth.userId} mode={mode} detailHref={`/bookmarks/${bookmark.id}`} />)}
-          <LoadMore query={feed} />
+          <LoadMore query={feed} automatic />
         </div>}
     </ScrollableTabs>
     <div className="absolute right-4 bottom-4 z-30 max-w-[calc(100%-2rem)] sm:right-6">

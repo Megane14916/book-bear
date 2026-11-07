@@ -1,3 +1,4 @@
+import { useLayoutEffect } from 'react'
 import { Route, Routes, Link, matchPath, useLocation } from 'react-router'
 import BottomNav from './components/BottomNav'
 import bearPaw from './assets/bear-paw.svg'
@@ -20,11 +21,16 @@ import RelationshipsPage from './features/social/RelationshipsPage'
 
 export default function App() {
   const { pathname } = useLocation()
-  const isTimelinePage = pathname === '/' || !!matchPath('/bookmarks/:bookmarkId', pathname)
+  const isHome = pathname === '/'
+  const isTimelinePage = isHome || !!matchPath('/bookmarks/:bookmarkId', pathname)
   const isViewportPage = isTimelinePage || pathname === '/search' || pathname === '/library'
   const compactTop = matchPath('/me', pathname) || matchPath('/users/:userId', pathname)
+  useLayoutEffect(() => {
+    if (isHome && (window.scrollY || window.scrollX)) window.scrollTo(0, 0)
+  }, [isHome])
   return (
-    <div className={`min-h-screen text-ink ${isTimelinePage ? 'bg-white' : 'bg-paper'}`}>
+    <div data-home={isHome ? '' : undefined}
+      className={`text-ink ${isHome ? 'h-dvh overflow-clip' : 'min-h-screen'} ${isTimelinePage ? 'bg-white' : 'bg-paper'}`}>
       <header className="h-(--app-header-height) border-b border-[#e7e9e4] bg-white">
         <div className="mx-auto flex h-full max-w-[740px] items-center justify-between gap-3 px-4 sm:px-5">
           <Link
