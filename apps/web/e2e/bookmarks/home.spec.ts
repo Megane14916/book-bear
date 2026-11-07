@@ -32,6 +32,8 @@ for (const width of [360, 1024]) test(`home timeline controls and content do not
   await page.getByRole('button', { name: '本文：タップして表示', exact: true }).click()
   await expect(page.getByRole('button', { name: '本文：すべて表示', exact: true })).toBeVisible()
   await expect(page.getByText(/読書の記録1。/)).toBeVisible()
+  const firstPost = await timeline.getByRole('article', { name: '栞', exact: true }).first().boundingBox()
+  expect(firstPost!.height).toBeLessThan(330)
   await expect(page.getByText('ネタバレの本文', { exact: true })).toHaveCount(0)
   const area = await timeline.boundingBox(), controls = await dock.boundingBox(), navigation = await nav.boundingBox()
   expect(Boolean(area && controls && navigation && area.y + area.height <= controls.y + 1 && controls.y + controls.height <= navigation.y + 1)).toBe(true)
