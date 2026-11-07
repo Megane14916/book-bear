@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import { BookCard } from '../../components/books/BookCard'
 import { EmptyState, ErrorState, LoadingState } from '../../components/states/ScreenStates'
 import { useAuth } from '../../lib/auth/AuthProvider'
+import { GoogleAction } from '../../lib/auth/GoogleAction'
 import { queryKeys } from '../../lib/query/keys'
 import { bookOptions } from '../book-search/queries'
 import { isUuid } from '../book-search/validation'
@@ -80,6 +81,7 @@ function CreateForm({ bookId, userBookId }: { bookId: string | null; userBookId:
         <Link className="ui-action inline-flex text-forest underline" to="/search">検索から本を選ぶ</Link>
       </div>}
     <BookmarkForm pending={mutation.isPending} error={mutation.error} canPublish={auth.status === 'ready' && !auth.isAnonymous}
+      registrationAction={<GoogleAction />}
       canSave={!authBusy && (bookId ? book.isSuccess : !!selectedBook)}
       onSave={(input) => void mutation.save(input)}>
       <p className="text-sm text-[#526356]">非公開の栞は自分だけが読めます。本棚にない本は保存時に本棚へ追加します。</p>

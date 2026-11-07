@@ -186,6 +186,8 @@ test('another user receives private 404 and cannot edit or delete; public guests
 test('public guest reading exposes no owner actions and creates no account', async ({ page }) => {
   const mock = await setup(page)
   await page.goto(`/bookmarks/${bookmarkId}`)
+  await expect(page.getByText('以前の公開本文', { exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: '本文を表示', exact: true }).click()
   await expect(page.getByText('以前の公開本文', { exact: true })).toBeVisible()
   await expect(page.getByRole('link', { name: '編集', exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '削除', exact: true })).toHaveCount(0)

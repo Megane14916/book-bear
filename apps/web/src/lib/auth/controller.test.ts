@@ -27,6 +27,12 @@ function setup(initial: AuthSession | null = null) {
     getSession: vi.fn(async () => current),
     signInAnonymously: vi.fn(async () => { emit(user()); return current! }),
     signOut: vi.fn(async () => { emit(null) }),
+    googleUrl: vi.fn(async (_redirectTo: string, _link: boolean) => ({ url: 'https://accounts.google.com', flowId: 'flow' })),
+    exchangeGoogle: vi.fn(async (_code: string, _flowId: string, linkedUserId: string | null) => {
+      const next = user(linkedUserId ?? 'new', false, 'formal-token')
+      emit(next, 'SIGNED_IN')
+      return next
+    }),
     onChange: vi.fn((callback: (session: AuthSession | null, event?: string) => void) => { listener = callback; return () => { listener = undefined } }),
   } satisfies AuthAdapter
   function emit(next: AuthSession | null, event?: string) { current = next; listener?.(next, event) }
@@ -39,6 +45,21 @@ function setup(initial: AuthSession | null = null) {
 }
 
 describe('anonymous auth and profile preparation', () => {
+  it('keeps the linked UID and waits for formal profile initialization before becoming ready', async () => {
+    const { auth, controller, initializeProfile } = setup(user())
+    await vi.waitFor(() => expect(controller.getSnapshot().status).toBe('ready'))
+    await expect(controller.startGoogle('https://app.example/auth/callback')).resolves.toMatchObject({ linkedUserId: 'a' })
+    expect(auth.googleUrl).toHaveBeenCalledWith('https://app.example/auth/callback', true)
+    const formal = deferred<ReturnType<typeof profile>>()
+    initializeProfile.mockReturnValueOnce(formal.promise)
+    await expect(controller.exchangeGoogle('code', 'flow', 'a')).resolves.toBe('a')
+    expect(controller.getSnapshot()).toMatchObject({ status: 'preparing', userId: 'a', isAnonymous: false, canReadPrivate: false })
+    await expect(controller.getAccessToken()).resolves.toBe('formal-token')
+    formal.resolve(profile(user('a', false)))
+    await vi.waitFor(() => expect(controller.getSnapshot().status).toBe('ready'))
+    expect(initializeProfile).toHaveBeenCalledTimes(2)
+  })
+
   it('does not create an account or initialize a profile for guest browsing', async () => {
     const { auth, controller, initializeProfile } = setup()
     await vi.waitFor(() => expect(controller.getSnapshot().status).toBe('guest'))

@@ -11,6 +11,7 @@ type Props = ({ variant?: 'full'; bookmark: components['schemas']['BookmarkCard'
   authorHref?: string
   bookHref?: string
   detailHref?: string
+  likeAction?: ReactNode
   actions?: ReactNode
 }
 const dateFormat = new Intl.DateTimeFormat('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -37,8 +38,8 @@ export function BookmarkCard(props: Props) {
         {bookmark.pageNumber !== null && <span>{bookmark.pageNumber}ページ</span>}
       </div>
       <BookmarkBody bookmarkId={bookmark.id} viewerId={viewerId} mode={mode} isSpoiler={bookmark.isSpoiler} content={bookmark.content} />
-      <div className="mt-3 flex flex-wrap gap-4 border-t border-[#e2e7e2] pt-3 text-sm text-[#526356]">
-        <span>いいね {bookmark.likeCount}{bookmark.likedByMe ? '（いいね済み）' : ''}</span>
+      <div className="mt-3 flex flex-wrap items-center gap-4 border-t border-[#e2e7e2] pt-3 text-sm text-[#526356]">
+        {props.likeAction ?? <span>いいね {bookmark.likeCount}{bookmark.likedByMe ? '（いいね済み）' : ''}</span>}
         <span>返信 {bookmark.replyCount}</span>
       </div>
       {actions && <div className="mt-3 flex flex-wrap gap-2">{actions}</div>}

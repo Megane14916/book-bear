@@ -40,5 +40,6 @@ export function useAuth() {
   const context = useContext(AuthContext)
   if (!context) throw new Error('useAuthはAuthProvider配下で使用してください。')
   return { ...context.state, runAuthenticatedWrite: context.controller.runAuthenticatedWrite,
-    retrySession: context.controller.retrySession, signOut: context.controller.signOut, refreshSession: context.controller.refreshSession }
+    retrySession: context.controller.retrySession, signOut: context.controller.signOut, refreshSession: context.controller.refreshSession,
+    startGoogle: context.controller.startGoogle, exchangeGoogle: context.controller.exchangeGoogle }
 }
