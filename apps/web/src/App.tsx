@@ -1,11 +1,11 @@
 import { Route, Routes, Link } from 'react-router'
 import BottomNav from './components/BottomNav'
-import HomePage from './pages/HomePage'
-import PlaceholderPage from './pages/PlaceholderPage'
-import NotFoundPage from './pages/NotFoundPage'
 import BookSearchPage from './pages/BookSearchPage'
 import BookDetailPage from './pages/BookDetailPage'
 import ManualBookPage from './pages/ManualBookPage'
+import HomePage from './pages/HomePage'
+import PlaceholderPage from './pages/PlaceholderPage'
+import NotFoundPage from './pages/NotFoundPage'
 import LibraryPage from './features/library/LibraryPage'
 
 export default function App() {
