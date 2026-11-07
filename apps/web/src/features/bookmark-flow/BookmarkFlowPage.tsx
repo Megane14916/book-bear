@@ -4,15 +4,13 @@ import { PageBack } from '../../components/PageBack'
 import { BookCard } from '../../components/books/BookCard'
 import { LoadMore } from '../../components/states/LoadMore'
 import { EmptyState, ErrorState, LoadingState } from '../../components/states/ScreenStates'
-import { api } from '../../lib/api/client'
 import { HttpError } from '../../lib/api/errors'
-import { requireData } from '../../lib/api/result'
 import { useAuth } from '../../lib/auth/AuthProvider'
 import { canReadPublic } from '../../lib/auth/readable'
-import { queryKeys } from '../../lib/query/keys'
 import { isUuid } from '../book-search/validation'
 import { useContentPreference } from '../feed/useContentPreference'
 import { SocialBookmarkCard } from '../social/SocialBookmarkCard'
+import { bookmarkFlowOptions } from './queries'
 
 export default function BookmarkFlowPage() {
   const { userId = '', bookId = '' } = useParams()
@@ -27,13 +25,8 @@ function FlowContent({ userId, bookId }: { userId: string; bookId: string }) {
   const valid = isUuid(userId) && isUuid(bookId)
   const { mode } = useContentPreference({ enabled: valid })
   const flow = useInfiniteQuery({
-    queryKey: queryKeys.bookmarkFlow(userId, bookId, auth.userId),
+    ...bookmarkFlowOptions(userId, bookId, auth.userId),
     enabled: valid && canReadPublic(auth.status),
-    initialPageParam: undefined as string | undefined,
-    queryFn: ({ pageParam, signal }) => requireData(() => api.GET('/api/v1/users/{userId}/books/{bookId}/bookmarks', {
-      params: { path: { userId, bookId }, query: { limit: 15, cursor: pageParam } }, signal,
-    })),
-    getNextPageParam: (page) => page.nextCursor ?? undefined,
   })
   const back = auth.userId === userId
     ? <Link className="ui-action inline-flex text-forest underline" to="/library">本棚へ戻る</Link>

@@ -16,7 +16,7 @@ export const bookOptions = (bookId: string) => queryOptions({
 
 // Share authentication, cancellation, duplicate prevention and navigation for
 // import/manual creation. Never turn providerId or ISBN into an internal ID.
-export function useBookCreation<T>(write: (input: T, signal: AbortSignal) => Promise<Book>, scopeKey: string) {
+export function useBookCreation<T>(write: (input: T, signal: AbortSignal) => Promise<Book>, scopeKey: string, onSaved?: (book: Book) => void) {
   const { runAuthenticatedWrite, retrySession, status, error } = useAuth()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
@@ -47,7 +47,8 @@ export function useBookCreation<T>(write: (input: T, signal: AbortSignal) => Pro
       if (signal.aborted) return
       queryClient.setQueryData(queryKeys.book(book.id), book)
       void queryClient.invalidateQueries({ queryKey: ['books', 'search'] })
-      navigate(`/books/${book.id}`)
+      if (onSaved) onSaved(book)
+      else void navigate(`/books/${book.id}`)
     } catch { /* Safe, retryable UI uses mutation.error; never log raw responses. */ }
     finally { if (busy.current === signal) busy.current = null }
   }
