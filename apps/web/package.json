@@ -8,6 +8,7 @@
     "test:auth:e2e": "playwright test --config playwright.auth.config.ts",
     "test:ui:e2e": "playwright test --config playwright.ui.config.ts",
     "test:books:e2e": "playwright test --config playwright.books.config.ts",
+    "test:bookmarks:e2e": "playwright test --config playwright.bookmarks.config.ts",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.e2e.json",
     "generate:api": "openapi-typescript ../../contracts/openapi.json -o src/lib/api/generated.ts --default-non-nullable false",

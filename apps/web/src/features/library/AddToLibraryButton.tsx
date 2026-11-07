@@ -1,8 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { components } from '../../lib/api/generated'
-import { api } from '../../lib/api/client'
-import { ApiError } from '../../lib/api/errors'
-import { requestData } from '../../lib/api/result'
+import { addToLibrary } from './api'
 import { queryKeys } from '../../lib/query/keys'
 import { useAuth } from '../../lib/auth/AuthProvider'
 
@@ -13,11 +11,7 @@ export function AddToLibraryButton({ bookId, onAdded }: { bookId: string; onAdde
   const auth = useAuth()
   const queryClient = useQueryClient()
   const mutation = useMutation({
-    mutationFn: () => auth.runAuthenticatedWrite(async ({ signal }) => {
-      const item = await requestData(() => api.POST('/api/v1/me/books', { body: { bookId }, signal }))
-      if (!item) throw new ApiError('response', '本棚登録の応答がありません。')
-      return item
-    }),
+    mutationFn: () => auth.runAuthenticatedWrite(({ signal }) => addToLibrary(bookId, signal)),
     onSuccess: (item) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.myBooks(item.userId) })
       onAdded?.(item)
