@@ -85,7 +85,7 @@ export function Feed() {
       <div className="space-y-4">
         {items.map((bookmark) => <BookmarkCard key={bookmark.id} bookmark={bookmark} viewerId={auth.userId} mode={mode} />)}
         {feed.isFetchingNextPage && <LoadingState variant="more" />}
-        {feed.isFetchNextPageError && <ErrorState description="続きを取得できませんでした。" onRetry={() => void feed.fetchNextPage()} />}
+        {feed.isFetchNextPageError && <ErrorState description="続きを取得できませんでした。" onRetry={() => void feed.fetchNextPage()} isRetrying={feed.isFetchingNextPage} />}
         {feed.hasNextPage && !feed.isFetchNextPageError && <button type="button" disabled={feed.isFetchingNextPage}
           className="ui-action w-full border border-forest text-sm font-bold text-forest" onClick={() => void feed.fetchNextPage()}>もっと見る</button>}
       </div>}
