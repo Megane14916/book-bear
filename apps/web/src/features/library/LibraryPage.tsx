@@ -56,8 +56,9 @@ export default function LibraryPage() {
       items.length === 0 ? <EmptyState title="本棚は空です" description="気になる本を探して、本棚に追加してみましょう。"
         action={<Link className="ui-action inline-flex bg-forest px-5 text-sm font-bold text-white" to="/search">本を探す</Link>} /> :
       <div className="space-y-4">{items.map((item) => <LibraryBook key={item.id} item={item} userId={userId!} />)}</div>}
-    {books.hasNextPage && <button type="button" className="ui-action w-full border border-forest text-sm font-bold text-forest"
-      disabled={books.isFetchingNextPage} onClick={() => void books.fetchNextPage()}>
+    {books.isRefetchError && <ErrorState description="本棚の一覧を更新できませんでした。" onRetry={() => void books.refetch()} isRetrying={books.isFetching} />}
+    {books.hasNextPage && !books.isRefetchError && <button type="button" className="ui-action w-full border border-forest text-sm font-bold text-forest"
+      disabled={books.isFetching} onClick={() => void books.fetchNextPage()}>
       {books.isFetchingNextPage ? '読み込み中…' : books.isFetchNextPageError ? '再試行' : '続きを読み込む'}
     </button>}
     {books.isFetchNextPageError && <p role="alert" className="text-sm text-red-700">続きの読み込みに失敗しました。もう一度お試しください。</p>}
