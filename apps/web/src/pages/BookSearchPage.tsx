@@ -137,7 +137,7 @@ export default function BookSearchPage() {
       </>}
       </div>
       {books && !scanning && !inputFocused && !keyboardOpen && <div className="h-24 shrink-0" aria-label="バーコード検索">
-        <div className="pointer-events-none fixed inset-x-0 bottom-[calc(70px+env(safe-area-inset-bottom))] z-10 mx-auto max-w-[740px] bg-paper px-5 py-4">
+        <div className="pointer-events-none fixed inset-x-0 bottom-[calc(var(--app-nav-height)+env(safe-area-inset-bottom))] z-10 mx-auto max-w-[740px] bg-paper px-5 py-4">
           <button type="button" className="ui-action pointer-events-auto flex min-h-14 w-full gap-3 rounded-2xl bg-forest px-5 text-sm font-bold text-white shadow-lg hover:bg-forest-dark" disabled={registration.isPending}
             onClick={() => { setCameraError(''); setScanning(true) }}>
             <svg aria-hidden="true" className="size-6 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M3 7V3h4M17 3h4v4M21 17v4h-4M7 21H3v-4M7 7v10M10 7v10M14 7v10M17 7v10" /></svg>

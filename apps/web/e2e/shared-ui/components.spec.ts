@@ -57,11 +57,44 @@ test('retry, last action and fixed navigation remain keyboard accessible', async
   await expect(page.getByRole('link', { name: '検索', exact: true })).toBeFocused()
 })
 
-test('existing home and navigation still work without the fixture', async ({ page }) => {
+test('bottom navigation crossfades to the rendered page and respects reduced motion', async ({ page }) => {
+  await page.addInitScript(() => {
+    const startTransition = document.startViewTransition.bind(document)
+    document.startViewTransition = (update) => {
+      const transition = startTransition(update)
+      const root = document.documentElement
+      root.dataset.transitions = String(Number(root.dataset.transitions ?? 0) + 1)
+      void transition.ready.then(() => {
+        root.dataset.destination = document.querySelector('main h1')?.textContent ?? ''
+        root.dataset.outgoing = getComputedStyle(root, '::view-transition-old(root)').animationName
+        root.dataset.incoming = getComputedStyle(root, '::view-transition-new(root)').animationName
+      }, () => {})
+      return transition
+    }
+  })
   await page.goto('/')
   await expect(page.getByRole('tab', { name: '新着順', exact: true })).toBeVisible()
+  await expect(page.getByRole('banner')).toHaveCSS('height', '60px')
+  await expect(page.getByText('読書の足あと', { exact: true })).toHaveCount(0)
+  const nav = page.getByRole('navigation', { name: 'メインメニュー' })
+  await expect(nav.locator('svg')).toHaveCount(5)
+  const post = nav.getByRole('link', { name: '投稿', exact: true })
+  await expect(post.locator('span[aria-hidden]')).toHaveCSS('background-color', 'rgb(52, 104, 75)')
+
+  const root = page.locator('html')
   for (const [label, heading] of [['検索', '本を探す'], ['投稿', '本を選ぶ'], ['本棚', '自分の本棚'], ['マイページ', 'マイページ']]) {
-    await page.getByRole('link', { name: label, exact: true }).click()
+    const link = nav.getByRole('link', { name: label, exact: true })
+    await link.click()
     await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible()
+    await expect(link).toHaveAttribute('aria-current', 'page')
+    await expect(root).toHaveAttribute('data-destination', new RegExp(`${heading}$`))
   }
+  await expect(root).toHaveAttribute('data-outgoing', /fade-out/)
+  await expect(root).toHaveAttribute('data-incoming', /fade-in/)
+  await expect(root).toHaveAttribute('data-transitions', '4')
+
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await nav.getByRole('link', { name: 'ホーム', exact: true }).click()
+  await expect(page.getByRole('tab', { name: '新着順', exact: true })).toBeVisible()
+  await expect(root).toHaveAttribute('data-transitions', '4')
 })
