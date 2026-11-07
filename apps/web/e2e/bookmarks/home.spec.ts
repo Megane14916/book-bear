@@ -21,6 +21,9 @@ for (const width of [360, 1024]) test(`home timeline tabs, reveal and card navig
         nextCursor: url.searchParams.has('cursor') ? null : 'next' } })
     }
     if (url.pathname === `/api/v1/bookmarks/${post(1).id}`) return route.fulfill({ json: post(1) })
+    if (url.pathname.endsWith('/books/00000000-0000-4000-8000-000000000080/bookmarks')) {
+      return route.fulfill({ json: { author: post(1).author, book: post(1).book, items: [post(1)], nextCursor: null } })
+    }
     if (url.pathname.endsWith('/replies')) return route.fulfill({ json: { items: [], nextCursor: null } })
     return route.fulfill({ status: 404 })
   })
@@ -35,6 +38,9 @@ for (const width of [360, 1024]) test(`home timeline tabs, reveal and card navig
   const first = cards.first()
   const firstBody = first.getByText(/読書の記録1。/)
   await expect(latest).toHaveAttribute('aria-selected', 'true')
+  const underline = (tab: typeof latest) => tab.locator('span').evaluate((element) => getComputedStyle(element, '::after').backgroundColor)
+  expect(await underline(latest)).toBe('rgb(52, 104, 75)')
+  expect(await underline(following)).toBe('rgba(0, 0, 0, 0)')
   await expect(cards).toHaveCount(3)
   await expect(firstBody).toHaveCount(0)
   await first.getByRole('button', { name: '本文を表示', exact: true }).click()
@@ -52,6 +58,10 @@ for (const width of [360, 1024]) test(`home timeline tabs, reveal and card navig
   await expect(book).toContainText('42ページ')
   expect((await firstBody.boundingBox())!.y).toBeLessThan((await book.boundingBox())!.y)
   await expect(first.getByText('公開', { exact: true })).toHaveCount(0)
+  const share = first.getByRole('link', { name: 'Xで共有' })
+  const shareUrl = new URL((await share.getAttribute('href'))!)
+  expect(shareUrl.searchParams.get('url')).toBe(new URL(`/bookmarks/${post(1).id}`, page.url()).href)
+  await expect(share).toHaveAttribute('target', '_blank')
   await expect(page.getByText('ネタバレの本文', { exact: true })).toHaveCount(0)
   const area = (await timeline.boundingBox())!, control = (await toggle.boundingBox())!, navigation = (await nav.boundingBox())!
   expect(control.y + control.height).toBeLessThan(area.y + area.height)

@@ -69,13 +69,15 @@ export function Feed() {
     <h1 id="feed-title" className="sr-only">タイムライン</h1>
     <div ref={scrollArea} role="region" aria-label="投稿一覧" tabIndex={0} onScroll={updateTabs}
       className="h-full overflow-y-auto overscroll-y-contain focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-forest">
-      <div className={`sticky top-0 z-20 border-b border-[#e2e7e2] bg-white/95 px-5 py-2 backdrop-blur-sm motion-safe:transition-transform has-[:focus-visible]:translate-y-0 ${tabsHidden ? '-translate-y-full' : ''}`}>
+      <div className={`sticky top-0 z-20 border-b border-[#e2e7e2] bg-white/95 backdrop-blur-sm motion-safe:transition-transform has-[:focus-visible]:translate-y-0 ${tabsHidden ? '-translate-y-full' : ''}`}>
         <div role="tablist" aria-label="タイムラインの表示範囲"
-          className="mx-auto grid max-w-xs grid-cols-2 gap-1 rounded-full bg-mist/70 p-1">
+          className="grid grid-cols-2">
           {tabs.map((tab) => <button key={tab.scope} id={`feed-tab-${tab.scope}`} type="button" role="tab"
             aria-selected={scope === tab.scope} aria-controls="feed-panel" tabIndex={scope === tab.scope ? 0 : -1}
-            className="ui-action rounded-full px-3 text-sm font-semibold text-[#526356] hover:text-forest aria-selected:bg-white aria-selected:text-forest aria-selected:shadow-sm"
-            onClick={() => selectScope(tab.scope)} onKeyDown={onTabKeyDown}>{tab.label}</button>)}
+            className="ui-action group grid min-h-13 place-items-center rounded-none p-0 text-sm font-medium text-[#526356] hover:bg-forest/5 focus-visible:-outline-offset-2 aria-selected:font-bold aria-selected:text-ink"
+            onClick={() => selectScope(tab.scope)} onKeyDown={onTabKeyDown}>
+            <span className="relative grid h-full items-center after:absolute after:inset-x-0 after:bottom-0 after:h-1 after:rounded-full group-aria-selected:after:bg-forest">{tab.label}</span>
+          </button>)}
         </div>
       </div>
       <div id="feed-panel" role="tabpanel" aria-labelledby={`feed-tab-${scope}`} className="px-5 pb-20 sm:px-6">

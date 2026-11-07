@@ -9,7 +9,7 @@ export function BookCard({ book, titleHref, actions, compact = false, pageNumber
   book: BookData; titleHref?: string; actions?: ReactNode; compact?: boolean; pageNumber?: number | null
 }) {
   return (
-    <article aria-label={`書籍：${book.title}`} className={`flex min-w-0 border border-[#e2e7e2] ${compact ? 'items-center gap-3 rounded-xl bg-paper p-2.5' : 'gap-4 rounded-2xl bg-white p-4'}`}>
+    <article aria-label={`書籍：${book.title}`} className={`flex min-w-0 border border-[#e2e7e2] ${compact ? 'items-center gap-3 rounded-xl bg-[#fbfcfa] p-2.5' : 'gap-4 rounded-2xl bg-white p-4'}`}>
       <BookCover src={book.coverUrl} size={compact ? 'tiny' : 'default'} />
       <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
         <h3 className={compact ? 'text-sm leading-5 font-bold' : 'text-base leading-7 font-bold'}>

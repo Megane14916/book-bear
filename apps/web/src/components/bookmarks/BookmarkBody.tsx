@@ -27,7 +27,7 @@ function BodySession({ content, isSpoiler, mode, closeBelow = false, compact = f
   const [full, setFull] = useState(false)
   const long = compact && (content.length > 120 || content.split('\n').length > 3)
   const visibleContent = long && !full ? `${content.slice(0, 120).split('\n').slice(0, 3).join('\n')}…` : content
-  const bodySpacing = compact ? 'leading-6' : closeBelow ? 'mb-1 leading-8' : 'mt-2 leading-8'
+  const bodySpacing = compact || revealOverlay ? 'leading-6' : closeBelow ? 'mb-1 leading-8' : 'mt-2 leading-8'
   const revealLabel = isSpoiler ? 'ネタバレ本文を表示' : '本文を表示'
   const toggle = <button type="button" className="ui-action text-sm font-bold text-forest underline"
     aria-expanded={expanded} aria-controls={id} onClick={() => setExpanded((value) => !value)}>
@@ -45,8 +45,8 @@ function BodySession({ content, isSpoiler, mode, closeBelow = false, compact = f
       {expanded ? <>
         <p className={`text-sm whitespace-pre-wrap [overflow-wrap:anywhere] ${bodySpacing}`}>{visibleContent}</p>
         {previewToggle}
-      </> : <div className={`relative grid min-h-24 place-items-center rounded-xl border px-3 py-2 ${isSpoiler ? 'border-[#efe5d4] bg-[#fbf8f2]' : 'border-[#edf0eb] bg-paper'}`}>
-        <div aria-hidden="true" className="absolute inset-x-4 top-1/2 -translate-y-1/2 space-y-3 blur-[2px]">
+      </> : <div className="relative grid min-h-18 place-items-center py-2">
+        <div aria-hidden="true" className="absolute inset-x-1 top-1/2 -translate-y-1/2 space-y-3 blur-[2px]">
           <div className="h-1.5 w-11/12 rounded-full bg-current/15" />
           <div className="h-1.5 w-4/5 rounded-full bg-current/15" />
           <div className="h-1.5 w-3/5 rounded-full bg-current/15" />

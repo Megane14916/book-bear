@@ -51,6 +51,9 @@ async function setup(page: Page, options: { signedIn?: boolean; anonymous?: bool
       ] : [], nextCursor: null,
     } })
     if (url.pathname === '/api/v1/me/preferences') return route.fulfill({ json: { feedContentMode: 'all' } })
+    if (url.pathname === `/api/v1/bookmarks/${bookmarkId}/replies` && method === 'GET') {
+      return current?.visibility === 'public' ? route.fulfill({ json: { items: [], nextCursor: null } }) : missing()
+    }
     if (url.pathname === '/api/v1/feed') return route.fulfill({ json: {
       items: current?.visibility === 'public' ? [current] : [], nextCursor: null,
     } })
@@ -146,6 +149,46 @@ test('my page, bookmark flow and reply controls work at 360px', async ({ page })
   await expect(page).toHaveURL('/me')
 })
 
+test('bookmark detail opens at the current post with adjacent pages and an inline reply composer', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 })
+  await setup(page, { signedIn: true })
+  const previous = { ...initial, id: '00000000-0000-4000-8000-000000000011', content: 'ひとつ前の栞',
+    createdAt: '2025-12-31T00:00:00Z', visibility: 'private' }
+  const following = { ...initial, id: '00000000-0000-4000-8000-000000000012', content: 'ひとつ後の栞',
+    createdAt: '2026-01-02T00:00:00Z', pageNumber: 12 }
+  const cursors: (string | null)[] = []
+  await page.route(`${origin}/api/v1/users/${userId}/books/${bookId}/bookmarks?**`, (route) => {
+    const cursor = new URL(route.request().url()).searchParams.get('cursor')
+    cursors.push(cursor)
+    const [item, nextCursor] = cursor === 'current' ? [initial, 'following'] : cursor === 'following' ? [following, null] : [previous, 'current']
+    return route.fulfill({ json: { author: initial.author, book, items: [item], nextCursor } })
+  })
+  await page.route(`${origin}/api/v1/bookmarks/${bookmarkId}/replies?**`, (route) => route.fulfill({ json: { items: [], nextCursor: null } }))
+
+  await page.goto(`/bookmarks/${bookmarkId}`)
+  const thread = page.getByRole('region', { name: '前後の栞と返信' })
+  const cards = thread.getByRole('article', { name: '栞', exact: true })
+  await expect(cards).toHaveCount(3)
+  expect(cursors).toEqual([null, 'current', 'following'])
+  await expect(cards.nth(0)).toContainText(previous.content)
+  await expect(cards.nth(1)).toContainText(initial.content)
+  await expect(cards.nth(2)).toContainText(following.content)
+  const viewport = (await thread.boundingBox())!
+  const current = cards.nth(1)
+  const replies = thread.getByRole('region', { name: '返信', exact: true })
+  expect(Math.abs((await current.boundingBox())!.y - viewport.y)).toBeLessThanOrEqual(1)
+  expect((await replies.boundingBox())!.y).toBeLessThan((await cards.nth(2).boundingBox())!.y)
+  await expect(replies.getByRole('textbox', { name: '返信本文（1,000文字以内）' })).toBeInViewport()
+  await expect(current.getByRole('link', { name: 'Xで共有' })).toBeVisible()
+  await expect(cards.nth(0).getByRole('link', { name: 'Xで共有' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'URLをコピー' })).toHaveCount(0)
+  await page.screenshot({ path: 'test-results/bookmark-thread-360.png' })
+  await thread.evaluate((element) => { element.scrollTop = 0 })
+  await expect(cards.nth(0)).toBeInViewport()
+  await thread.evaluate((element) => { element.scrollTop = element.scrollHeight })
+  await expect(cards.nth(2)).toBeInViewport()
+})
+
 test('guest browsing creates no account; first private save initializes auth, adds the book and saves once at 360px', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 800 })
   const mock = await setup(page)
@@ -225,7 +268,7 @@ test('owner edits public to private, retains the new body on back navigation, th
   await page.getByRole('link', { name: '編集', exact: true }).click()
   await page.getByLabel('公開範囲').selectOption('public')
   await page.getByRole('button', { name: '栞を保存' }).click()
-  await expect(page.getByText('公開', { exact: true })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Xで共有' })).toBeVisible()
   await page.getByRole('button', { name: '削除', exact: true }).click()
   await page.getByRole('button', { name: 'キャンセル', exact: true }).click()
   expect(mock.counts().deletes).toBe(0)

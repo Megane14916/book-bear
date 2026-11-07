@@ -30,17 +30,20 @@ export function Replies({ bookmarkId, mode }: { bookmarkId: string; mode: FeedCo
   })
   const items = replies.data?.pages.flatMap((page) => page.items) ?? []
 
-  return <section ref={section} id="replies" tabIndex={-1} aria-labelledby="replies-title" className="space-y-4">
-    <h2 id="replies-title" className="text-xl font-bold">返信</h2>
+  return <section ref={section} id="replies" tabIndex={-1} aria-labelledby="replies-title"
+    className="space-y-3 rounded-xl border border-[#e2e7e2] bg-[#fbfcfa] p-3 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-forest sm:p-4">
+    <h2 id="replies-title" className="text-base font-bold">返信</h2>
+    {registered ? <NewReply bookmarkId={bookmarkId} /> : <div className="space-y-2">
+      <p className="text-sm text-[#526356]">返信するにはGoogleでの登録とログインが必要です。</p>
+      <GoogleAction />
+    </div>}
     {replies.isPending ? <LoadingState /> : !replies.data ? <ErrorState description="返信を取得できませんでした。"
       onRetry={() => void replies.refetch()} isRetrying={replies.isFetching} /> : <>
-      {items.length === 0 && <p className="text-sm text-[#526356]">返信はまだありません。</p>}
-      {items.map((reply) => <ReplyItem key={reply.id} reply={reply} bookmarkId={bookmarkId} mode={mode} />)}
+      {items.length === 0 ? <p className="border-t border-[#e2e7e2] pt-3 text-sm text-[#526356]">返信はまだありません。</p> :
+        <div className="divide-y divide-[#e2e7e2] border-t border-[#e2e7e2]">
+          {items.map((reply) => <ReplyItem key={reply.id} reply={reply} bookmarkId={bookmarkId} mode={mode} />)}
+        </div>}
       <LoadMore query={replies} />
-      {registered ? <NewReply bookmarkId={bookmarkId} /> : <div className="space-y-2">
-        <p className="text-sm">返信するにはGoogleでの登録とログインが必要です。</p>
-        <GoogleAction />
-      </div>}
     </>}
   </section>
 }
@@ -64,12 +67,12 @@ function ReplyItem({ reply, bookmarkId, mode }: { reply: Reply; bookmarkId: stri
     return body ? requireData(() => api.PATCH('/api/v1/replies/{replyId}', { params, body, signal })) :
       requestData(() => api.DELETE('/api/v1/replies/{replyId}', { params, signal }))
   }, (client) => refreshBookmarkSocial(client, bookmarkId))
-  return <article aria-label="返信" className="space-y-2 rounded-2xl border border-[#e2e7e2] bg-white p-4">
+  return <article aria-label="返信" className="min-w-0 space-y-2 py-3 [overflow-wrap:anywhere]">
     <Link className="ui-action inline-flex font-bold text-forest underline" to={`/users/${reply.author.id}`}>{reply.author.displayName}</Link>
     {editing && owner ? <ReplyForm initial={reply} label="返信を保存" pending={change.pending} error={change.error}
       onSave={(body) => change.mutate(body, { onSuccess: () => setEditing(false) })}
       onCancel={() => { change.reset(); setEditing(false) }} /> : <>
-      <BookmarkBody bookmarkId={reply.id} viewerId={auth.userId} mode={mode} isSpoiler={reply.isSpoiler} content={reply.content} />
+      <BookmarkBody bookmarkId={reply.id} viewerId={auth.userId} mode={mode} isSpoiler={reply.isSpoiler} content={reply.content} revealOverlay />
       {owner && <div className="flex flex-wrap gap-2">
         {confirming ? <>
           <button type="button" className="ui-action border border-red-700 px-3 text-sm text-red-700" disabled={change.pending}
@@ -105,16 +108,19 @@ function ReplyForm({ initial, label, pending, error, onSave, onCancel }: {
   return <form onSubmit={submit} className="space-y-3">
     <fieldset disabled={pending} className="space-y-2">
       <label className="block text-sm font-bold">返信本文（1,000文字以内）
-        <textarea className="mt-1 w-full rounded-lg border bg-white px-3 py-2" value={content} maxLength={1_000} rows={3}
+        <textarea className="mt-1 w-full resize-y rounded-lg border border-[#d6e0d5] bg-white px-3 py-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-forest"
+          value={content} maxLength={1_000} rows={2}
           onChange={(event) => setContent(event.target.value)} />
-      </label>
-      <label className="flex min-h-11 items-center gap-2 text-sm font-bold">
-        <input type="checkbox" checked={isSpoiler} onChange={(event) => setSpoiler(event.target.checked)} />返信にネタバレを含む
       </label>
       {(invalid || Boolean(error)) && <p role="alert" className="text-sm text-red-700">
         {invalid ? '返信本文は1〜1,000文字で入力してください。' : socialError(error)}</p>}
-      <button className="ui-action bg-forest px-4 text-sm font-bold text-white">{pending ? '保存中…' : label}</button>
-      {onCancel && <button type="button" className="ui-action ml-2 border px-3 text-sm" onClick={onCancel}>キャンセル</button>}
+      <div className="flex flex-wrap items-center gap-x-3">
+        <label className="mr-auto flex min-h-11 items-center gap-1.5 text-xs font-semibold">
+          <input type="checkbox" className="accent-forest" checked={isSpoiler} onChange={(event) => setSpoiler(event.target.checked)} />返信にネタバレを含む
+        </label>
+        {onCancel && <button type="button" className="ui-action border px-3 text-sm" onClick={onCancel}>キャンセル</button>}
+        <button className="ui-action rounded-full bg-forest px-4 text-sm font-bold text-white">{pending ? '保存中…' : label}</button>
+      </div>
     </fieldset>
   </form>
 }
