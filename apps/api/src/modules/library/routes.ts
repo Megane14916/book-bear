@@ -2,7 +2,7 @@ import { createRoute } from '@hono/zod-openapi'
 import { cursor, ErrorSchema, PaginationQuery, UserBookIdParams, UserIdParams } from '../../shared/schemas'
 import { authErrors, body, commonErrors, json } from '../../shared/http'
 import { PublicBookPage } from '../books/schemas'
-import { CreateUserBookRequest, PatchUserBookRequest, UserBook, UserBookPage } from './schemas'
+import { CreateUserBookRequest, LibrarySort, PatchUserBookRequest, ReadingStatus, UserBook, UserBookPage } from './schemas'
 
 const base = { tags: ['Library'], 'x-implementation-status': 'implemented' as const }
 const owner = { ...base, security: [{ bearerAuth: [] }], 'x-auth': 'Owner' }
@@ -11,8 +11,10 @@ const pagination = 'created_at DESC, id DESC。limit既定15・最大30、limit+
 const libraryQuery = PaginationQuery.extend({ cursor: cursor.openapi({ description: '日時とIDのBase64URLカーソル。署名・有効期限なし。不正な形式は400 INVALID_CURSOR。認可はSQLで毎回確認。' }).optional() })
 
 export const libraryRoutes = {
-  list: createRoute({ ...owner, method: 'get', path: '/api/v1/me/books', operationId: 'getMeBooks', summary: '自分の本棚', description: pagination,
-    request: { query: libraryQuery }, responses: { ...errors, 200: json(UserBookPage) } }),
+  list: createRoute({ ...owner, method: 'get', path: '/api/v1/me/books', operationId: 'getMeBooks', summary: '自分の本棚',
+    description: '読書状態で絞り込み、最新の未削除の栞または本棚への登録日時で並べる。読書順では栞なしを新しい順の末尾・古い順の先頭に置く。カーソルは取得時と同じ条件で使用する。',
+    request: { query: libraryQuery.extend({ status: ReadingStatus.optional(), sort: LibrarySort.default('added_recent') }) },
+    responses: { ...errors, 200: json(UserBookPage) } }),
   create: createRoute({ ...owner, 'x-auth': 'AnyAuth', method: 'post', path: '/api/v1/me/books', operationId: 'postMeBooks', summary: '本棚へ登録（冪等）',
     description: '同一ユーザー・書籍は既存を返し、状態・進捗・日時を変更しない。status省略時want_to_read。プロフィール未初期化は404。',
     request: { body: body(CreateUserBookRequest) }, responses: { ...errors, 200: json(UserBook, '既存を再利用'), 201: json(UserBook, '新規登録') } }),

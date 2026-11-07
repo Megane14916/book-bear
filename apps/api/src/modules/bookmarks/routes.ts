@@ -15,7 +15,7 @@ export const bookmarkRoutes = {
     request: { params: BookmarkFlowParams, query: PaginationQuery.extend({ cursor: cursor.openapi({ description: '日時・IDのBase64URLカーソル。署名・有効期限なし。不正形式は400 INVALID_CURSOR。SQLで対象本棚・公開範囲・未削除条件を毎回確認。' }).optional() }) },
     responses: { ...errors, 401: json(ErrorSchema, 'UNAUTHORIZED: 提示されたJWTが無効・期限切れ'), 404: json(ErrorSchema, 'NOT_FOUND: 対象プロフィールまたは書籍が存在しない'), 200: json(BookmarkFlowPage) } }),
   create: createRoute({ ...owner, 'x-auth': 'AnyAuth', method: 'post', path: '/api/v1/bookmarks', operationId: 'postBookmarks', summary: '栞作成',
-    description: 'JWT本人の本棚のみ。公開は正式ユーザーのみ。省略時private・isSpoiler=false。所有者確認・INSERT・応答取得は同一トランザクション。本棚の明示ロックは追加しない。',
+    description: 'JWT本人の本棚のみ。公開は正式ユーザーのみ。省略時private・isSpoiler=false。所有者確認・本棚の状態をreadingに更新・栞のINSERT・応答取得は同一トランザクション。',
     request: { body: body(CreateBookmarkRequest) }, responses: { ...errors, ...publishError, 201: json(BookmarkCard) } }),
   get: createRoute({ ...owner, 'x-auth': 'OptionalAuth', security: optionalBearer, method: 'get', path: '/api/v1/bookmarks/{bookmarkId}', operationId: 'getBookmarksBookmarkid', summary: '公開または本人の栞詳細',
     description: 'JWT任意。提示時は必ず検証。不正JWTは401。非公開は本人のみ、削除済みは本人にも404。',

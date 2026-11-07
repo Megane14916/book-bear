@@ -28,7 +28,7 @@ export default function BookDetailPage() {
       <div><dt className="font-bold">出版社</dt><dd>{book.publisher ?? '出版社情報なし'}</dd></div>
       <div><dt className="font-bold">総ページ数</dt><dd>{book.totalPages === null ? '未設定' : `${book.totalPages}ページ`}</dd></div>
     </dl>
-    <AddToLibraryButton key={book.id} bookId={book.id} onAdded={() => void navigate('/library')} />
+    <AddToLibraryButton key={book.id} bookId={book.id} onAdded={() => void navigate('/library', { state: { sort: 'added_recent' } })} />
     <p className="text-xs text-[#526356]">書籍情報の登録と、自分の本棚への追加は別の操作です。</p>
     <p><Link className="ui-action inline-flex bg-forest px-4 text-white" to={`/create?bookId=${book.id}`}>この本に栞を残す</Link></p>
     {userId && isUuid(userId) && <p><Link className="ui-action inline-flex text-forest underline"

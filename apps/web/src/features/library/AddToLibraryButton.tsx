@@ -16,7 +16,7 @@ export function AddToLibraryButton({ bookId, onAdded }: { bookId: string; onAdde
     mutationFn: () => auth.runAuthenticatedWrite(async ({ userId, signal }) => {
       const item = await addToLibrary(bookId, signal)
       if (item.userId !== userId) throw new ApiError('response', '本棚登録の利用者を確認できませんでした。')
-      const query = { queryKey: queryKeys.myBooks(userId), exact: true }
+      const query = { queryKey: queryKeys.myBooks(userId) }
       await queryClient.cancelQueries(query)
       throwIfAborted(signal)
       queryClient.setQueryData<LibraryData>(query.queryKey, (current) => {

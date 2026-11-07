@@ -8,16 +8,18 @@ import { getBookmark, type Bookmark } from './api'
 
 // Public profile/flow/list caches can contain full text, even while inactive.
 // Reset (rather than only invalidate) so an old public body cannot flash on return.
-// Preserve public book metadata, health and the unrelated bookshelf data shape.
+// Preserve public book metadata and health. Keep bookshelf pages and mark the owner's list stale.
 export async function refreshBookmarkCaches(client: QueryClient, bookmark: Bookmark | null, viewerId: string, signal: AbortSignal) {
   const filters = { predicate: (query: { queryKey: readonly unknown[] }) => !['books', 'health', 'my-books'].includes(String(query.queryKey[0])) }
-  await client.cancelQueries(filters)
+  const library = { queryKey: queryKeys.myBooks(viewerId) }
+  await Promise.all([client.cancelQueries(filters), client.cancelQueries(library)])
   throwIfAborted(signal)
   // Keep the mounted detail/form stable until navigation. Reset other viewers'
   // details as well; after deletion the hook removes all detail caches.
   void client.resetQueries({ predicate: (query) => filters.predicate(query) && (query.queryKey[0] !== 'bookmarks'
     || (bookmark !== null && !(query.queryKey[2] === bookmark.id && query.queryKey[3] === viewerId))) })
   if (bookmark) client.setQueryData(queryKeys.bookmark(bookmark.id, viewerId), bookmark)
+  void client.invalidateQueries(library)
 }
 
 export function useBookmark(bookmarkId: string) {

@@ -54,6 +54,7 @@
 - `/me/books` の所有者は検証済みJWTのsubだけで決定する。一覧・更新・削除のSQLすべてに `user_id = sub` を含める。他人のuserBookIdと存在しないIDは同じ404にする。
 - 本棚登録は `(user_id, book_id)` のUNIQUE制約で競合処理する。再登録は既存の状態・進捗・作成更新日時を変更せず200。新規時のstatus省略はDB既定値 `want_to_read`、currentPageはnull。存在しないbookIdは404。
 - PATCHはstatusとcurrentPageだけを受け付ける。空PATCH・未知フィールド・不正な列挙値を拒否。currentPageはPostgreSQL INTEGERの範囲内の0以上の整数またはnullで、総ページ数を上限にしない。省略は保持、nullは解除。createdAtは保持する。
+- 本棚画面の現在ページには `latestBookmarkPage` を使う。未削除の栞を作成日時・IDの降順で選び、その先頭のページを取得する。栞なし・ページ未入力はnullとする。
 - DELETEは所有者条件付きで削除する。栞へのFK違反は、該当する制約を確認して409 `HAS_BOOKMARKS` に変換する。事前SELECTだけに依存せず、並行して栞が作成されてもDBのFKで保護する。共有のbooks行は削除しない。
 - **論理削除済みの栞も行が残っていれば409とする。** 既存FKはdeletedAtによらず参照を保護する。DB設計書の「栞を削除後に削除」は論理削除との関係が曖昧なため、本Issueでは栞・返信・いいねの物理削除やCASCADEを導入しない。実装時にDB/API設計書へこの制約を追記する。
 - 公開本一覧は対象プロフィールの存在を確認し、存在しなければ404、存在して対象本がなければ200と空配列。`EXISTS (visibility='public' AND deleted_at IS NULL)` を使い、本ごとに1件を返す。本人からの要求でも公開本だけとし、私有本棚は `/me/books` を使う。

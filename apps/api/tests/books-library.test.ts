@@ -312,6 +312,45 @@ describe('本棚・公開本一覧のページ境界と非公開情報', () => {
     for (let i = 0; i < count; i++) result.push(await shelf((await manual()).id, owner.token))
     return result
   }
+  it('本棚全体を読書状態で絞り込み、最新の栞または登録日時でカーソル順に並べる', async () => {
+    const owner = await actor()
+    const [oldRead, unread, recentRead, deletedOnly] = await entries(owner, 4)
+    for (const [index, entry] of [oldRead, unread, recentRead, deletedOnly].entries()) {
+      await fixture.client.query('UPDATE user_books SET created_at=$1,status=$2 WHERE id=$3', [
+        `2026-01-0${index + 1}T00:00:00Z`, index % 2 === 0 ? 'reading' : 'want_to_read', entry.id,
+      ])
+    }
+    await fixture.client.query(`INSERT INTO bookmarks (user_book_id,content,page_number,created_at,deleted_at) VALUES
+      ($1,'以前',70,'2026-02-01T00:00:00.000001Z',NULL),
+      ($2,'最近',NULL,'2026-02-01T00:00:00.000002Z',NULL),
+      ($1,'削除済み',80,'2026-03-01T00:00:00Z',now()),
+      ($3,'削除済み',90,'2026-03-01T00:00:00Z',now())`, [oldRead.id, recentRead.id, deletedOnly.id])
+
+    async function orderedIds(sort: string, status?: string) {
+      const ids: string[] = []
+      let cursor: string | null = null
+      do {
+        const query = new URLSearchParams({ sort, limit: '1' })
+        if (status) query.set('status', status)
+        if (cursor) query.set('cursor', cursor)
+        const response = await request(`/me/books?${query}`, 'GET', undefined, owner.token)
+        expect(response.status).toBe(200)
+        const page = UserBookPage.parse(await response.json())
+        ids.push(...page.items.map((item) => item.id))
+        cursor = page.nextCursor
+      } while (cursor)
+      return ids
+    }
+
+    expect(await orderedIds('read_recent')).toEqual([recentRead.id, oldRead.id, deletedOnly.id, unread.id])
+    expect(await orderedIds('read_oldest')).toEqual([unread.id, deletedOnly.id, oldRead.id, recentRead.id])
+    expect(await orderedIds('added_recent')).toEqual([deletedOnly.id, recentRead.id, unread.id, oldRead.id])
+    expect(await orderedIds('added_oldest')).toEqual([oldRead.id, unread.id, recentRead.id, deletedOnly.id])
+    expect(await orderedIds('read_recent', 'reading')).toEqual([recentRead.id, oldRead.id])
+    for (const query of ['status=unknown', 'sort=unknown']) {
+      expect((await request(`/me/books?${query}`, 'GET', undefined, owner.token)).status).toBe(400)
+    }
+  })
   it('既定15件、同一時刻とmicrosecondsの境界でも漏れ・重複なし、境界行の削除後も継続', async () => {
     const owner = await actor(), rows = await entries(owner, 18)
     // Opposite UUID order across sub-millisecond boundaries catches Date truncation.

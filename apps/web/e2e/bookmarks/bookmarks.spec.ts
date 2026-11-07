@@ -9,7 +9,8 @@ const bookmarkId = '00000000-0000-4000-8000-000000000003'
 const userId = '00000000-0000-4000-8000-000000000004'
 const otherId = '00000000-0000-4000-8000-000000000005'
 const book = { id: bookId, title: '栞をつける本', author: null, coverUrl: null, isbn13: null, publisher: null, totalPages: null, source: 'manual' }
-const shelf = { id: shelfId, userId, book, status: 'reading', currentPage: null, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' }
+const shelf = { id: shelfId, userId, book, status: 'want_to_read', currentPage: null, latestBookmarkPage: null as number | null,
+  createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' }
 const initial = { id: bookmarkId, author: { id: userId, displayName: '読者', avatarUrl: null }, book,
   content: '以前の公開本文', pageNumber: 10, visibility: 'public', isSpoiler: false, likeCount: 0, replyCount: 0, likedByMe: false,
   createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' }
@@ -26,6 +27,7 @@ async function setup(page: Page, options: { signedIn?: boolean; anonymous?: bool
   const events: string[] = [], bodies: Record<string, unknown>[] = []
   let signup = 0, saves = 0, adds = 0, deletes = 0, libraryPages = 0, init = 0
   let current: typeof initial | null = { ...initial, visibility: options.private ? 'private' : 'public' }
+  let libraryBook = shelf
   let identity: string | null = options.signedIn ? (options.otherUser ? otherId : userId) : null
   if (options.signedIn) await page.addInitScript((value) => {
     localStorage.setItem('sb-bookmarks-e2e-auth-token', JSON.stringify(value))
@@ -62,15 +64,16 @@ async function setup(page: Page, options: { signedIn?: boolean; anonymous?: bool
         adds++; events.push('shelf')
         expect(request.postDataJSON()).toEqual({ bookId })
         expect(Boolean(request.headers().authorization)).toBe(true)
-        return route.fulfill({ status: 201, json: shelf })
+        return route.fulfill({ status: 201, json: libraryBook })
       }
       libraryPages++
-      const hasNext = (options.paginated || options.manyBooks) && !url.searchParams.has('cursor')
+      const hasNext = ((options.paginated && !url.searchParams.has('sort')) || options.manyBooks) && !url.searchParams.has('cursor')
       const items = options.manyBooks && hasNext ? Array.from({ length: 15 }, (_, index) => {
         const id = `00000000-0000-4000-8000-${String(index + 100).padStart(12, '0')}`
         return { ...shelf, id, book: { ...book, id, title: index === 0 ? '書名が長くてもカードの高さがそろう本' : `本棚の本 ${index + 1}` } }
-      }) : hasNext ? [] : [shelf]
-      return route.fulfill({ json: { items, nextCursor: hasNext ? 'next' : null } })
+      }) : hasNext ? [] : [libraryBook]
+      const status = url.searchParams.get('status')
+      return route.fulfill({ json: { items: items.filter((item) => !status || item.status === status), nextCursor: hasNext ? 'next' : null } })
     }
     if (url.pathname === '/api/v1/bookmarks' && method === 'POST') {
       saves++; events.push('save')
@@ -80,6 +83,7 @@ async function setup(page: Page, options: { signedIn?: boolean; anonymous?: bool
       if (options.denyPublic && body.visibility === 'public') return route.fulfill({ status: 403, json: { error: { code: 'REGISTRATION_REQUIRED' } } })
       expect(body.userBookId).toBe(shelfId)
       current = { ...initial, ...body }
+      libraryBook = { ...libraryBook, status: 'reading', latestBookmarkPage: body.pageNumber ?? null }
       return route.fulfill({ status: 201, json: current })
     }
     if (url.pathname === `/api/v1/bookmarks/${bookmarkId}`) {
@@ -187,6 +191,75 @@ test('bookmark detail opens at the current post with adjacent pages and an inlin
   await expect(cards.nth(0)).toBeInViewport()
   await thread.evaluate((element) => { element.scrollTop = element.scrollHeight })
   await expect(cards.nth(2)).toBeInViewport()
+})
+
+test('the compact bookshelf shows reading progress after posting and reloading', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 })
+  await setup(page, { signedIn: true, paginated: true })
+  await page.goto('/library')
+  const card = page.getByRole('article', { name: book.title })
+  const status = card.getByRole('combobox', { name: '読書状態' })
+  const sort = page.getByRole('combobox', { name: '並べ替え' })
+  await expect(sort).toHaveValue('read_recent')
+  await expect(sort.locator('..').locator('svg')).toBeVisible()
+  const filters = page.getByRole('tablist', { name: '絞り込み' })
+  await expect(filters.getByRole('tab', { name: 'すべて', exact: true })).toHaveAttribute('aria-selected', 'true')
+  await expect(status).toHaveValue('want_to_read')
+  await expect(card.getByText('未設定')).toBeVisible()
+  await expect(card.getByRole('button', { name: '本棚から削除' }).locator('svg')).toBeVisible()
+  await expect(page.getByRole('link', { name: '本を探す', exact: true })).toHaveCount(0)
+  await expect(page.getByText('MY BOOKSHELF', { exact: true })).toHaveCount(0)
+  await expect(card.getByRole('button', { name: '保存', exact: true })).toHaveCount(0)
+
+  await sort.selectOption({ label: '最近読んでない' })
+  const filterApplied = page.waitForRequest((request) => {
+    const query = new URL(request.url()).searchParams
+    return query.get('sort') === 'read_oldest' && query.get('status') === 'reading' && !query.has('cursor')
+  })
+  const reading = filters.getByRole('tab', { name: '読書中', exact: true })
+  await reading.click()
+  await filterApplied
+  await expect(reading).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByRole('region', { name: '条件に一致する本がありません' })).toBeVisible()
+  await reading.press('ArrowLeft')
+  await expect(filters.getByRole('tab', { name: '読みたい', exact: true })).toBeFocused()
+  await card.getByRole('link', { name: '栞を残す', exact: true }).click()
+  await page.getByRole('textbox', { name: /本文/ }).fill('本棚から残した栞')
+  await page.getByLabel('ページ番号（任意）').fill('42')
+  await page.getByRole('button', { name: '栞を投稿' }).click()
+  await expect(page).toHaveURL(`/bookmarks/${bookmarkId}`)
+  await page.getByRole('navigation', { name: 'メインメニュー' }).getByRole('link', { name: '本棚', exact: true }).click()
+  await expect(status).toHaveValue('reading')
+  await expect(card.getByText('42ページ', { exact: true })).toBeVisible()
+  await page.reload()
+  await expect(status).toHaveValue('reading')
+  await expect(card.getByText('42ページ', { exact: true })).toBeVisible()
+  await page.screenshot({ path: 'test-results/library-360.png' })
+  await page.setViewportSize({ width: 1024, height: 800 })
+  expect((await card.boundingBox())!.width).toBeLessThan(360)
+  await page.screenshot({ path: 'test-results/library-1024.png' })
+})
+
+test('bookshelf tabs hide while reading further and reappear when scrolling back', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 })
+  await setup(page, { signedIn: true, manyBooks: true })
+  await page.goto('/library')
+  const scroller = page.getByRole('region', { name: '本棚の一覧' })
+  const tabs = scroller.getByRole('tablist', { name: '絞り込み' })
+  const selected = tabs.getByRole('tab', { selected: true })
+  await expect(selected).toHaveText('すべて')
+  expect(await selected.locator('span').evaluate((element) => getComputedStyle(element, '::after').backgroundColor)).toBe('rgb(52, 104, 75)')
+  await expect(scroller.getByRole('listitem')).toHaveCount(15)
+
+  const top = (await scroller.boundingBox())!.y
+  await scroller.evaluate((element) => { element.scrollTop = 260 })
+  await expect.poll(async () => {
+    const box = (await tabs.boundingBox())!
+    return box.y + box.height
+  }).toBeLessThanOrEqual(top)
+  await scroller.evaluate((element) => { element.scrollTop -= 50 })
+  await expect.poll(async () => (await tabs.boundingBox())!.y).toBeGreaterThanOrEqual(top)
+  expect(await scroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
 })
 
 test('guest browsing creates no account; first private save initializes auth, adds the book and saves once at 360px', async ({ page }) => {
