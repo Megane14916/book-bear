@@ -82,7 +82,7 @@ test('bottom navigation crossfades to the rendered page and respects reduced mot
   await expect(post.locator('span[aria-hidden]')).toHaveCSS('background-color', 'rgb(52, 104, 75)')
 
   const root = page.locator('html')
-  for (const [label, heading] of [['検索', '本を探す'], ['投稿', '本を選ぶ'], ['本棚', '自分の本棚'], ['マイページ', 'マイページ']]) {
+  for (const [label, heading] of [['検索', '本を探す'], ['投稿', '本を選ぶ'], ['本棚', '本棚'], ['マイページ', 'マイページ']]) {
     const link = nav.getByRole('link', { name: label, exact: true })
     await link.click()
     await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible()

@@ -279,7 +279,7 @@ export interface paths {
         put?: never;
         /**
          * 栞作成
-         * @description JWT本人の本棚のみ。公開は正式ユーザーのみ。省略時private・isSpoiler=false。所有者確認・INSERT・応答取得は同一トランザクション。本棚の明示ロックは追加しない。
+         * @description JWT本人の本棚のみ。公開は正式ユーザーのみ。省略時private・isSpoiler=false。所有者確認・本棚の状態をreadingに更新・栞のINSERT・応答取得は同一トランザクション。
          */
         post: operations["postBookmarks"];
         delete?: never;
@@ -642,6 +642,8 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+            /** @description 最後に投稿した未削除の栞のページ。栞がない場合やページが未入力の場合はnull。 */
+            latestBookmarkPage?: number | null;
         };
         UserBookPage: {
             items: components["schemas"]["UserBook"][];

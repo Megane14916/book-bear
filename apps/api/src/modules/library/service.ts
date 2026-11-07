@@ -1,4 +1,4 @@
-import { and, desc, eq, exists, isNull } from 'drizzle-orm'
+import { and, desc, eq, exists, isNull, sql } from 'drizzle-orm'
 import type { z } from '@hono/zod-openapi'
 import type { Database } from '../../db/client'
 import { books, bookmarks, userBooks } from '../../db/schema'
@@ -10,6 +10,12 @@ import type { CreateUserBookRequest, PatchUserBookRequest } from './schemas'
 
 const fields = {
   id: userBooks.id, userId: userBooks.userId, book: bookSummaryFields, status: userBooks.status, currentPage: userBooks.currentPage,
+  latestBookmarkPage: sql<number | null>`(
+    select ${bookmarks.pageNumber} from ${bookmarks}
+    where ${bookmarks.userBookId} = ${userBooks.id} and ${bookmarks.deletedAt} is null
+    order by ${bookmarks.createdAt} desc, ${bookmarks.id} desc
+    limit 1
+  )`,
   createdAt: preciseTimestamp(userBooks.createdAt), updatedAt: preciseTimestamp(userBooks.updatedAt),
 }
 const ownership = (viewer: Identity, id: string) => and(eq(userBooks.id, id), eq(userBooks.userId, viewer.id))

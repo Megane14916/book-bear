@@ -64,11 +64,18 @@ it('clears inactive public/list/other-viewer caches rather than leaving stale pr
   const keys = [queryKeys.feed('all', null), queryKeys.bookmarkFlow('owner', 'book', null), queryKeys.myBookmarks('owner'),
     queryKeys.searchPosts('q', null), ['public-profile', 'owner'], queryKeys.bookmark('bookmark', null)]
   for (const key of keys) client.setQueryData(key, { content: '古い公開本文' })
+  const library = queryKeys.myBooks('owner'), otherLibrary = queryKeys.myBooks('other')
+  const libraryPages = { pages: [{ items: [], nextCursor: null }], pageParams: [undefined] }
+  client.setQueryData(library, libraryPages)
+  client.setQueryData(otherLibrary, libraryPages)
   client.setQueryData(queryKeys.book('book'), { title: '本' })
   client.setQueryData(queryKeys.bookmark('bookmark', 'owner'), { ...bookmark, content: '旧本文' })
   await refreshBookmarkCaches(client, bookmark, 'owner', new AbortController().signal)
   for (const key of keys) expect(client.getQueryData(key)).toBeUndefined()
   expect(client.getQueryData(queryKeys.bookmark('bookmark', 'owner'))).toEqual(bookmark)
   expect(client.getQueryData(queryKeys.book('book'))).toEqual({ title: '本' })
+  expect(client.getQueryData(library)).toEqual(libraryPages)
+  expect(client.getQueryState(library)?.isInvalidated).toBe(true)
+  expect(client.getQueryState(otherLibrary)?.isInvalidated).toBe(false)
   client.clear()
 })

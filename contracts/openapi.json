@@ -445,6 +445,13 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "latestBookmarkPage": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "description": "最後に投稿した未削除の栞のページ。栞がない場合やページが未入力の場合はnull。"
           }
         },
         "required": [
@@ -2453,7 +2460,7 @@
         "x-auth": "AnyAuth",
         "operationId": "postBookmarks",
         "summary": "栞作成",
-        "description": "JWT本人の本棚のみ。公開は正式ユーザーのみ。省略時private・isSpoiler=false。所有者確認・INSERT・応答取得は同一トランザクション。本棚の明示ロックは追加しない。",
+        "description": "JWT本人の本棚のみ。公開は正式ユーザーのみ。省略時private・isSpoiler=false。所有者確認・本棚の状態をreadingに更新・栞のINSERT・応答取得は同一トランザクション。",
         "requestBody": {
           "required": true,
           "content": {

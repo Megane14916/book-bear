@@ -22,7 +22,7 @@ export default function App() {
   const { pathname } = useLocation()
   const isTimelinePage = pathname === '/' || !!matchPath('/bookmarks/:bookmarkId', pathname)
   const isViewportPage = isTimelinePage || pathname === '/search'
-  const isProfilePage = matchPath('/me', pathname) || matchPath('/users/:userId', pathname)
+  const compactTop = pathname === '/library' || matchPath('/me', pathname) || matchPath('/users/:userId', pathname)
   return (
     <div className={`min-h-screen text-ink ${isTimelinePage ? 'bg-white' : 'bg-paper'}`}>
       <header className="h-(--app-header-height) border-b border-[#e7e9e4] bg-white">
@@ -41,7 +41,7 @@ export default function App() {
 
       <main id="main-content" className={isViewportPage
         ? 'mx-auto h-[calc(100dvh-var(--app-header-height)-var(--app-nav-height)-env(safe-area-inset-bottom))] w-full max-w-[740px]'
-        : `mx-auto w-full max-w-[740px] px-5 pb-32 ${isProfilePage ? 'pt-4' : 'pt-8 md:pt-12'}`}>
+        : `mx-auto w-full max-w-[740px] px-5 pb-32 ${compactTop ? 'pt-4' : 'pt-8 md:pt-12'}`}>
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route

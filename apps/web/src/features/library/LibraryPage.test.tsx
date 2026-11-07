@@ -16,7 +16,7 @@ afterEach(cleanup)
 
 const userBook = (id: string, title: string): components['schemas']['UserBook'] => ({
   id, userId: 'viewer-1', book: { id: `book-${id}`, title, author: null, isbn13: null, coverUrl: null },
-  status: 'reading', currentPage: 12, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z',
+  status: 'reading', currentPage: 99, latestBookmarkPage: 12, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z',
 })
 
 beforeEach(() => {
@@ -32,6 +32,8 @@ it('keeps loaded books visible after a next-page error and lets the user retry',
   render(<QueryClientProvider client={queryClient}><MemoryRouter><LibraryPage /></MemoryRouter></QueryClientProvider>)
 
   expect(await screen.findByRole('heading', { name: '最初の本' })).toBeTruthy()
+  expect(screen.getByText('12ページ')).toBeTruthy()
+  expect(screen.queryByRole('spinbutton')).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: '続きを読み込む' }))
 
   expect(await screen.findByRole('alert')).toBeTruthy()

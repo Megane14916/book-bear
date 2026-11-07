@@ -7,6 +7,7 @@ import { createApp } from '../src/index'
 import { withDatabase } from '../src/db/client'
 import { createTokenVerifier } from '../src/middleware/auth'
 import { BookmarkCard, FeedPage } from '../src/modules/bookmarks/schemas'
+import { UserBookPage } from '../src/modules/library/schemas'
 import { createTestDatabase } from './helpers/database'
 import { createSigningFixture, supabaseUrl } from './helpers/tokens'
 
@@ -168,6 +169,27 @@ describe('栞CRUDの認証・所有権（実DB・署名済みJWT）', () => {
 })
 
 describe('栞入力・応答・トランザクション', () => {
+  it('栞を作成すると読書中になり、現在ページは最新の未削除の栞を反映する', async () => {
+    const owner = await actor(), entry = await shelf(owner)
+    const shelfPath = `/me/books/${entry.id}`
+    const read = async () => UserBookPage.parse(await (await request('/me/books', 'GET', undefined, owner.token)).json()).items[0]
+    expect((await request(shelfPath, 'PATCH', { status: 'want_to_read', currentPage: 99 }, owner.token)).status).toBe(200)
+    await fixture.client.query(
+      "INSERT INTO bookmarks (user_book_id,content,page_number,created_at) VALUES ($1,'以前の栞',80,'2000-01-01T00:00:00Z')", [entry.id],
+    )
+    expect(await read()).toMatchObject({ status: 'want_to_read', currentPage: 99, latestBookmarkPage: 80 })
+
+    const numbered = await create(entry.id, owner, { pageNumber: 12 })
+    expect(await read()).toMatchObject({ status: 'reading', currentPage: 99, latestBookmarkPage: 12 })
+    expect((await request(shelfPath, 'PATCH', { status: 'completed' }, owner.token)).status).toBe(200)
+    const unnumbered = await create(entry.id, owner)
+    expect(await read()).toMatchObject({ status: 'reading', latestBookmarkPage: null })
+
+    expect((await request(`/bookmarks/${unnumbered.id}`, 'DELETE', undefined, owner.token)).status).toBe(204)
+    expect(await read()).toMatchObject({ latestBookmarkPage: 12 })
+    expect((await request(`/bookmarks/${numbered.id}`, 'PATCH', { pageNumber: 20 }, owner.token)).status).toBe(200)
+    expect(await read()).toMatchObject({ latestBookmarkPage: 20 })
+  })
   it.each([
     { content: '' }, { content: '　' }, { content: 'あ'.repeat(2001) }, { pageNumber: 0 }, { pageNumber: -1 },
     { pageNumber: 2147483648 }, { pageNumber: 1.5 }, { pageNumber: '1' }, { isSpoiler: 'false' }, { visibility: 'friends' },
@@ -201,6 +223,7 @@ describe('栞入力・応答・トランザクション', () => {
   })
   it('作成・PATCHの応答取得が失敗したらINSERTと更新をロールバックする', async () => {
     const entry = await shelf(), card = await create(entry.id)
+    expect((await request(`/me/books/${entry.id}`, 'PATCH', { status: 'completed' })).status).toBe(200)
     const before = (await fixture.client.query('SELECT * FROM bookmarks WHERE id=$1', [card.id])).rows[0]
     await fixture.client.query('REVOKE SELECT ON bookmark_likes FROM book_bear_api')
     try {
@@ -213,6 +236,7 @@ describe('栞入力・応答・トランザクション', () => {
       }
       expect((await fixture.client.query('SELECT id FROM bookmarks WHERE user_book_id=$1', [entry.id])).rowCount).toBe(1)
       expect((await fixture.client.query('SELECT * FROM bookmarks WHERE id=$1', [card.id])).rows[0]).toEqual(before)
+      expect((await fixture.client.query('SELECT status FROM user_books WHERE id=$1', [entry.id])).rows[0].status).toBe('completed')
     } finally { await fixture.client.query('GRANT SELECT ON bookmark_likes TO book_bear_api') }
   })
   it('無関係なFK違反を404に変換しない', async () => {
@@ -319,7 +343,7 @@ describe('本人一覧・集計・カーソル', () => {
 })
 
 describe('PostgreSQLでの並行処理', () => {
-  it.runIf(Boolean(process.env.TEST_DATABASE_URL))('本人確認後の本棚消失は該当FK違反を404へ変換する', async () => {
+  it.runIf(Boolean(process.env.TEST_DATABASE_URL))('本人確認後に本棚が消失したら404を返す', async () => {
     const owner = await actor(), entry = await shelf(owner)
     const original = Client.prototype.query
     await fixture.client.query("SET statement_timeout='2s'")
