@@ -22,7 +22,7 @@ function session(id: string, anonymous: boolean) {
     user: { id, is_anonymous: anonymous, aud: 'authenticated', role: 'authenticated', app_metadata: {}, user_metadata: {}, created_at: new Date().toISOString() } }
 }
 
-async function setup(page: Page, options: { signedIn?: boolean; anonymous?: boolean; otherUser?: boolean; private?: boolean; failSave?: boolean; failInit?: boolean; denyPublic?: boolean; paginated?: boolean } = {}) {
+async function setup(page: Page, options: { signedIn?: boolean; anonymous?: boolean; otherUser?: boolean; private?: boolean; failSave?: boolean; failInit?: boolean; denyPublic?: boolean; paginated?: boolean; manyBooks?: boolean } = {}) {
   const events: string[] = [], bodies: Record<string, unknown>[] = []
   let signup = 0, saves = 0, adds = 0, deletes = 0, libraryPages = 0, init = 0
   let current: typeof initial | null = { ...initial, visibility: options.private ? 'private' : 'public' }
@@ -56,7 +56,7 @@ async function setup(page: Page, options: { signedIn?: boolean; anonymous?: bool
         return route.fulfill({ status: 201, json: shelf })
       }
       libraryPages++
-      return route.fulfill({ json: { items: options.paginated && !url.searchParams.has('cursor') ? [] : [shelf],
+      return route.fulfill({ json: { items: options.paginated && !url.searchParams.has('cursor') ? [] : options.manyBooks ? Array.from({ length: 12 }, (_, index) => ({ ...shelf, id: index === 0 ? shelfId : `00000000-0000-4000-8000-${String(index + 100).padStart(12, '0')}`, book: { ...book, title: index === 0 ? book.title : `長い書名にも対応する本 ${index}` } })) : [shelf],
         nextCursor: options.paginated && !url.searchParams.has('cursor') ? 'next' : null } })
     }
     if (url.pathname === '/api/v1/bookmarks' && method === 'POST') {
@@ -144,7 +144,7 @@ test('guest browsing creates no account; first private save initializes auth, ad
   expect(mock.counts().signup).toBe(0)
   await page.getByRole('textbox', { name: /本文/ }).fill('初めての非公開栞')
   await page.getByLabel('公開範囲').selectOption('public')
-  await page.getByRole('button', { name: '栞を保存' }).click()
+  await page.getByRole('button', { name: '栞を投稿' }).click()
   await expect(page.getByRole('alert')).toContainText('正式登録')
   expect(mock.counts().signup).toBe(0)
   await page.getByLabel('公開範囲').selectOption('private')
@@ -170,13 +170,13 @@ test('network failure keeps input and retries without duplicate shelf registrati
   const mock = await setup(page, { failSave: true })
   await page.goto(`/create?bookId=${bookId}`)
   await page.getByRole('textbox', { name: /本文/ }).fill('消えない下書き')
-  await expect(page.getByRole('button', { name: '栞を保存' })).toBeEnabled()
-  await page.getByRole('button', { name: '栞を保存' }).click()
+  await expect(page.getByRole('button', { name: '栞を投稿' })).toBeEnabled()
+  await page.getByRole('button', { name: '栞を投稿' }).click()
   await expect(page.getByRole('alert')).toContainText('一時的な保存失敗')
   expect(mock.counts().saves).toBe(1)
   await expect(page.getByRole('textbox', { name: /本文/ })).toHaveValue('消えない下書き')
   await page.getByRole('textbox', { name: /本文/ }).fill('修正して再試行')
-  await page.getByRole('button', { name: '栞を保存' }).click()
+  await page.getByRole('button', { name: '栞を投稿' }).click()
   await expect(page).toHaveURL(`/bookmarks/${bookmarkId}`)
   await expect(page.getByText('修正して再試行', { exact: true })).toBeVisible()
   expect(mock.counts()).toMatchObject({ signup: 1, saves: 2, adds: 1 })
@@ -186,14 +186,14 @@ test('initialization failure preserves the draft and retry recovers the same ano
   const mock = await setup(page, { failInit: true })
   await page.goto(`/create?bookId=${bookId}`)
   await page.getByRole('textbox', { name: /本文/ }).fill('認証失敗でも残す下書き')
-  await expect(page.getByRole('button', { name: '栞を保存' })).toBeEnabled()
-  await page.getByRole('button', { name: '栞を保存' }).click()
+  await expect(page.getByRole('button', { name: '栞を投稿' })).toBeEnabled()
+  await page.getByRole('button', { name: '栞を投稿' }).click()
   await expect(page.getByRole('button', { name: 'もう一度試す' })).toBeVisible()
   expect(mock.counts()).toMatchObject({ signup: 1, saves: 0, adds: 0 })
   await expect(page.getByRole('textbox', { name: /本文/ })).toHaveValue('認証失敗でも残す下書き')
   await page.getByRole('button', { name: 'もう一度試す' }).click()
   await expect(page.getByRole('button', { name: 'もう一度試す' })).toHaveCount(0)
-  await page.getByRole('button', { name: '栞を保存' }).click()
+  await page.getByRole('button', { name: '栞を投稿' }).click()
   await expect(page).toHaveURL(`/bookmarks/${bookmarkId}`)
   expect(mock.counts()).toMatchObject({ signup: 1, saves: 1, adds: 1 })
 })
@@ -250,12 +250,12 @@ test('API registration-required also preserves inputs and offers private save', 
   await page.goto(`/create?bookId=${bookId}`)
   await page.getByRole('textbox', { name: /本文/ }).fill('公開を試した下書き')
   await page.getByLabel('公開範囲').selectOption('public')
-  await expect(page.getByRole('button', { name: '栞を保存' })).toBeEnabled()
-  await page.getByRole('button', { name: '栞を保存' }).click()
+  await expect(page.getByRole('button', { name: '栞を投稿' })).toBeEnabled()
+  await page.getByRole('button', { name: '栞を投稿' }).click()
   await expect(page.getByRole('alert')).toContainText('正式登録')
   await expect(page.getByRole('textbox', { name: /本文/ })).toHaveValue('公開を試した下書き')
   await page.getByLabel('公開範囲').selectOption('private')
-  await page.getByRole('button', { name: '栞を保存' }).click()
+  await page.getByRole('button', { name: '栞を投稿' }).click()
   await expect(page).toHaveURL(`/bookmarks/${bookmarkId}`)
   expect(mock.counts().adds).toBe(1)
 })
@@ -264,11 +264,60 @@ test('library selection supports later pages and uses its userBookId without reg
   const mock = await setup(page, { signedIn: true, anonymous: true, paginated: true })
   await page.goto(`/create?userBookId=${shelfId}`)
   await page.getByRole('button', { name: '本棚の続きを読み込む' }).click()
-  await expect(page.getByLabel('本棚から選ぶ')).toHaveValue(shelfId)
+  await expect(page.getByRole('button', { name: '投稿する本：栞をつける本' })).toHaveAttribute('aria-pressed', 'true')
   await page.getByRole('textbox', { name: /本文/ }).fill('本棚からの栞')
-  await page.getByRole('button', { name: '栞を保存' }).click()
+  await page.getByRole('button', { name: '栞を投稿' }).click()
   await expect(page).toHaveURL(`/bookmarks/${bookmarkId}`)
   expect(mock.counts()).toMatchObject({ adds: 0, saves: 1, signup: 0 })
+})
+
+for (const width of [360, 1024]) test(`composer shelf selection, collapse and keyboard docking at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 800 })
+  const mock = await setup(page, { signedIn: true, manyBooks: true })
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'visualViewport', { configurable: true, value: Object.assign(new EventTarget(), { height: innerHeight, offsetTop: 0 }) })
+  })
+  await page.goto('/create')
+  const target = page.getByRole('button', { name: '投稿する本：栞をつける本', exact: true })
+  await expect(target).toBeVisible()
+  await target.click()
+  await expect(target).toHaveAttribute('aria-pressed', 'true')
+  const preview = page.getByRole('group', { name: '本棚のプレビュー' })
+  expect(await preview.evaluate((node) => node.scrollWidth > node.clientWidth)).toBe(true)
+  await preview.getByRole('button').last().scrollIntoViewIfNeeded()
+  expect(await preview.evaluate((node) => node.scrollLeft > 0)).toBe(true)
+  await page.getByRole('button', { name: '本棚を閉じる' }).click()
+  await expect(preview).toHaveCount(0)
+  await expect(page.getByText('選択中：栞をつける本')).toBeVisible()
+  await page.getByRole('button', { name: '本棚を開く' }).click()
+  await expect(target).toHaveAttribute('aria-pressed', 'true')
+  const field = page.getByRole('textbox', { name: /本文/ })
+  await field.fill('プレビューを閉じても選択は保持されます。')
+  const dock = page.getByRole('group', { name: '投稿操作' })
+  const navBox = await page.getByRole('navigation', { name: 'メインメニュー' }).boundingBox()
+  const dockBox = await dock.boundingBox()
+  expect(dockBox!.y + dockBox!.height).toBeLessThanOrEqual(navBox!.y)
+  await page.screenshot({ path: `test-results/composer-${width}.png` })
+  await page.evaluate(() => {
+    Object.assign(window.visualViewport!, { height: innerHeight - 300 })
+    window.visualViewport!.dispatchEvent(new Event('resize'))
+  })
+  await expect.poll(async () => { const box = await dock.boundingBox(); return box!.y + box!.height }).toBeLessThanOrEqual(500)
+  await page.getByLabel('ページ番号（任意）').focus()
+  await expect.poll(async () => {
+    const input = await page.getByLabel('ページ番号（任意）').boundingBox()
+    const controls = await dock.boundingBox()
+    return input!.y + input!.height <= controls!.y
+  }).toBe(true)
+  await page.screenshot({ path: `test-results/composer-keyboard-${width}.png` })
+  await page.evaluate(() => {
+    Object.assign(window.visualViewport!, { height: innerHeight })
+    window.visualViewport!.dispatchEvent(new Event('resize'))
+  })
+  await page.getByRole('button', { name: '本棚を閉じる' }).click()
+  await page.getByRole('button', { name: '栞を投稿', exact: true }).click()
+  await expect(page).toHaveURL(`/bookmarks/${bookmarkId}`)
+  expect(mock.counts()).toMatchObject({ saves: 1, adds: 0 })
 })
 
 test('merged public feed drops cached private/deleted bookmarks and shows updated public content', async ({ page }) => {
