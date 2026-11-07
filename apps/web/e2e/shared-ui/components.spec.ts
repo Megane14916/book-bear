@@ -1,0 +1,67 @@
+import { test, expect } from '@playwright/test'
+
+test.use({ viewport: { width: 360, height: 740 } })
+test.beforeEach(async ({ page }) => { await page.goto('/e2e/shared-ui/fixture.html') })
+
+test('book card links and actions work with the keyboard above fixed navigation', async ({ page }) => {
+  const title = page.getByRole('link', { name: '長い書名'.repeat(30), exact: true }).first()
+  await title.focus()
+  await page.keyboard.press('Enter')
+  await expect(page).toHaveURL(/#book$/)
+  await page.keyboard.press('Tab')
+  const action = page.getByRole('button', { name: '本棚に追加', exact: true })
+  await expect(action).toBeFocused()
+  const button = await action.boundingBox()
+  const nav = await page.getByRole('navigation', { name: 'メインメニュー' }).boundingBox()
+  expect(Boolean(button && nav && button.height >= 44 && button.y + button.height <= nav.y)).toBe(true)
+  await page.keyboard.press('Space')
+  await expect(page.getByText('書籍操作を受け付けました')).toBeVisible()
+})
+
+test('360px cards wrap and keyboard disclosure protects spoiler text', async ({ page }) => {
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  const body = page.getByRole('article', { name: '栞', exact: true }).first().getByRole('button')
+  await expect(page.getByText('ネタバレの本文', { exact: false })).toHaveCount(0)
+  await body.focus()
+  await page.keyboard.press('Enter')
+  await expect(body).toHaveAttribute('aria-expanded', 'true')
+  await expect(page.getByText('ネタバレの本文', { exact: false })).toBeVisible()
+  await page.keyboard.press('Space')
+  await expect(body).toHaveAttribute('aria-expanded', 'false')
+  await page.getByLabel('すべて表示', { exact: true }).focus()
+  await page.keyboard.press('Space')
+  await expect(page.getByText('通常の本文', { exact: true })).toBeVisible()
+  await expect(page.getByText('ネタバレの本文', { exact: false })).toHaveCount(0)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  await page.keyboard.press('ArrowRight')
+  await expect(page.getByLabel('タップして表示')).toBeChecked()
+  await expect(page.getByText('通常の本文', { exact: true })).toHaveCount(0)
+})
+
+test('retry, last action and fixed navigation remain keyboard accessible', async ({ page }) => {
+  const retry = page.getByRole('button', { name: 'もう一度試す' })
+  await retry.focus()
+  await page.keyboard.press('Enter')
+  await expect(page.getByText('再試行を受け付けました')).toBeVisible()
+  const action = page.getByRole('link', { name: '本を探す', exact: true })
+  await action.focus()
+  await action.scrollIntoViewIfNeeded()
+  await expect(action).toBeFocused()
+  const actionBox = await action.boundingBox()
+  const navBox = await page.getByRole('navigation', { name: 'メインメニュー' }).boundingBox()
+  expect(Boolean(actionBox && navBox && actionBox.y + actionBox.height <= navBox.y)).toBe(true)
+  expect(await action.evaluate((element) => getComputedStyle(element).outlineStyle !== 'none')).toBe(true)
+  await page.keyboard.press('Tab')
+  await expect(page.getByRole('link', { name: 'ホーム', exact: true })).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(page.getByRole('link', { name: '検索', exact: true })).toBeFocused()
+})
+
+test('existing home and navigation still work without the fixture', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: '本の中に、 あなたの栞を。' })).toBeVisible()
+  for (const [label, heading] of [['検索', '本を探す'], ['投稿', '栞を残す'], ['本棚', '自分の本棚'], ['マイページ', 'マイページ']]) {
+    await page.getByRole('link', { name: label, exact: true }).click()
+    await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible()
+  }
+})
