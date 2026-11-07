@@ -3,6 +3,9 @@ import BottomNav from './components/BottomNav'
 import HomePage from './pages/HomePage'
 import PlaceholderPage from './pages/PlaceholderPage'
 import NotFoundPage from './pages/NotFoundPage'
+import BookSearchPage from './pages/BookSearchPage'
+import BookDetailPage from './pages/BookDetailPage'
+import ManualBookPage from './pages/ManualBookPage'
 
 export default function App() {
   return (
@@ -24,8 +27,10 @@ export default function App() {
           <Route path="/" element={<HomePage />} />
           <Route
             path="/search"
-            element={<PlaceholderPage title="本を探す" description="書名やISBNから本を探す画面を、次に実装します。" />}
+            element={<BookSearchPage />}
           />
+          <Route path="/books/manual" element={<ManualBookPage />} />
+          <Route path="/books/:bookId" element={<BookDetailPage />} />
           <Route
             path="/create"
             element={<PlaceholderPage title="栞を残す" description="読んだページや感想を記録する投稿画面を、これから作ります。" />}

@@ -3,6 +3,8 @@
 // including same-UID anonymous -> registered transitions.
 export const queryKeys = {
   health: () => ['health'] as const,
+  bookSearch: (q: string, limit = 20) => ['books', 'search', { q: q.trim(), limit }] as const,
+  book: (bookId: string) => ['books', 'detail', bookId] as const,
   myBooks: (viewerId: string, limit = 15) => ['my-books', viewerId, { limit }] as const,
   feed: (scope: 'all' | 'following', viewerId: string | null, limit = 15) =>
     ['feed', scope, viewerId, { limit }] as const,
