@@ -106,7 +106,7 @@ async function setup(page: Page, options: { signedIn?: boolean; anonymous?: bool
   return { events, bodies, counts: () => ({ signup, saves, adds, deletes, libraryPages }) }
 }
 
-test('my page, bookmark flow and reply controls work at 360px', async ({ page }) => {
+test('profile tabs, bookmark flow and reply controls work at 360px', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 800 })
   await setup(page, { signedIn: true })
   const profilePath = `/api/v1/users/${userId}`
@@ -196,6 +196,29 @@ test('my page, bookmark flow and reply controls work at 360px', async ({ page })
   await expect(page).toHaveURL(flowPath)
   await page.getByRole('button', { name: '戻る' }).click()
   await expect(page).toHaveURL('/me')
+
+  const other = { ...initial.author, id: otherId, displayName: '別の読者' }
+  await page.route(`${origin}/api/v1/users/${otherId}`, (route) => route.fulfill({ json: {
+    ...other, handle: null, bio: null, followersCount: 0, followingCount: 0, publicBookmarkCount: 1, followedByMe: false,
+  } }))
+  await page.route(`${origin}/api/v1/users/${otherId}/bookmarks?**`, (route) => route.fulfill({ json: {
+    items: [{ ...initial, author: other, content: '別の読者の公開栞' }], nextCursor: null,
+  } }))
+  await page.route(`${origin}/api/v1/users/${otherId}/books?**`, (route) => route.fulfill({ json: { items: [book], nextCursor: null } }))
+  await page.goto(`/users/${otherId}`)
+  const publicName = page.getByRole('heading', { name: other.displayName })
+  await expect(publicName.locator('..').getByText('公開栞 1件', { exact: true })).toBeVisible()
+  await expect(page.getByRole('tab', { name: '投稿', exact: true })).toHaveAttribute('aria-selected', 'true')
+  const publicBody = page.getByText('別の読者の公開栞', { exact: true })
+  await expect(publicBody).toHaveCount(0)
+  await page.getByRole('button', { name: '本文を表示', exact: true }).click()
+  await expect(publicBody).toBeVisible()
+  await expect(page.getByRole('button', { name: 'フォローする', exact: true })).toBeVisible()
+  await expect(page.getByRole('navigation', { name: 'プロフィールの操作' })).toHaveCount(0)
+  await page.screenshot({ path: 'test-results/public-profile-360.png' })
+  await page.getByRole('tab', { name: '栞がある本', exact: true }).click()
+  await expect(page.getByRole('link', { name: book.title, exact: true }))
+    .toHaveAttribute('href', `/users/${otherId}/books/${bookId}/bookmarks`)
 })
 
 test('bookmark detail opens at the current post and expands later bookmarks above replies', async ({ page }) => {

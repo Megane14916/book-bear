@@ -23,8 +23,8 @@ export default function App() {
   const { pathname } = useLocation()
   const isHome = pathname === '/'
   const isTimelinePage = isHome || !!matchPath('/bookmarks/:bookmarkId', pathname)
-  const isViewportPage = isTimelinePage || pathname === '/search' || pathname === '/library' || pathname === '/me'
-  const compactTop = matchPath('/users/:userId', pathname)
+  const isProfilePage = pathname === '/me' || !!matchPath('/users/:userId', pathname)
+  const isViewportPage = isTimelinePage || pathname === '/search' || pathname === '/library' || isProfilePage
   useLayoutEffect(() => {
     if (isHome && (window.scrollY || window.scrollX)) window.scrollTo(0, 0)
   }, [isHome])
@@ -47,7 +47,7 @@ export default function App() {
 
       <main id="main-content" className={isViewportPage
         ? 'mx-auto h-[calc(100dvh-var(--app-header-height)-var(--app-nav-height)-env(safe-area-inset-bottom))] w-full max-w-[740px]'
-        : `mx-auto w-full max-w-[740px] px-5 pb-32 ${compactTop ? 'pt-4' : 'pt-8 md:pt-12'}`}>
+        : 'mx-auto w-full max-w-[740px] px-5 pt-8 pb-32 md:pt-12'}>
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route

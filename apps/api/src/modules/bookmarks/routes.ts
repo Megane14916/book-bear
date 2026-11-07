@@ -1,15 +1,20 @@
 import { createRoute, type RouteConfig } from '@hono/zod-openapi'
 import { authErrors, body, commonErrors, json } from '../../shared/http'
-import { BookmarkFlowParams, BookmarkIdParams, cursor, ErrorSchema, PaginationQuery } from '../../shared/schemas'
+import { BookmarkFlowParams, BookmarkIdParams, cursor, ErrorSchema, PaginationQuery, UserIdParams } from '../../shared/schemas'
 import { BookmarkCard, BookmarkFlowPage, CreateBookmarkRequest, FeedPage, PatchBookmarkRequest } from './schemas'
 
 const owner = { tags: ['Bookmarks'], security: [{ bearerAuth: [] }], 'x-implementation-status': 'implemented' as const, 'x-auth': 'Owner' }
 const optionalBearer: NonNullable<RouteConfig['security']> = [{}, { bearerAuth: [] }]
 const errors = { ...commonErrors, ...authErrors, 404: json(ErrorSchema, 'NOT_FOUND: 対象なし。他人の栞・本棚、第三者の非公開栞、削除済み栞も404') }
 const publishError = { 403: json(ErrorSchema, 'REGISTRATION_REQUIRED: 匿名ユーザーは公開状態の作成・編集不可') }
-const query = PaginationQuery.extend({ cursor: cursor.openapi({ description: '日時・IDのBase64URLカーソル。署名・有効期限なし。不正形式は400 INVALID_CURSOR。SQLで本人・未削除条件を毎回確認。' }).optional() })
+const query = PaginationQuery.extend({ cursor: cursor.openapi({ description: '日時・IDのBase64URLカーソル。署名・有効期限なし。不正形式は400 INVALID_CURSOR。' }).optional() })
 
 export const bookmarkRoutes = {
+  publicList: createRoute({ ...owner, 'x-auth': 'OptionalAuth', security: optionalBearer, method: 'get',
+    path: '/api/v1/users/{userId}/bookmarks', operationId: 'getUsersUseridBookmarks', summary: '読者の公開栞一覧',
+    description: '指定した読者の公開・未削除の栞を投稿日時・IDの降順で返す。JWTは任意で、提示時は検証する。',
+    request: { params: UserIdParams, query },
+    responses: { ...errors, 404: json(ErrorSchema, 'NOT_FOUND: 対象プロフィールが存在しない'), 200: json(FeedPage) } }),
   flow: createRoute({ ...owner, 'x-auth': 'OptionalAuth', security: optionalBearer, method: 'get', path: '/api/v1/users/{userId}/books/{bookId}/bookmarks', operationId: 'getUsersUseridBooksBookidBookmarks', summary: '栞の流れ',
     description: 'JWT任意。提示時は必ず検証。本人は公開・非公開、それ以外は公開のみ。削除済みは除外。created_at ASC, id ASC（ページ番号順ではない）。limit既定15・最大30、limit+1件で続きを判定。日時はDBの小数6桁を保持。組み合わせや閲覧可能な栞がなければitems=[]。authorとbookはルートに1回だけ。',
     request: { params: BookmarkFlowParams, query: PaginationQuery.extend({ cursor: cursor.openapi({ description: '日時・IDのBase64URLカーソル。署名・有効期限なし。不正形式は400 INVALID_CURSOR。SQLで対象本棚・公開範囲・未削除条件を毎回確認。' }).optional() }) },

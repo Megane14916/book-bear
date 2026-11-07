@@ -25,7 +25,7 @@ type ProfileTab = typeof tabs[number]['value']
 
 export default function PublicProfilePage() {
   const { userId = '' } = useParams()
-  return <PublicProfile userId={userId} />
+  return <PublicProfile key={userId} userId={userId} />
 }
 
 export function PublicProfile({ userId, myPage = false }: { userId: string; myPage?: boolean }) {
@@ -34,13 +34,13 @@ export function PublicProfile({ userId, myPage = false }: { userId: string; myPa
   const valid = isUuid(userId)
   const enabled = valid && canReadPublic(auth.status)
   const owner = auth.status === 'ready' && auth.userId === userId
-  const showTabs = myPage && owner && auth.canReadPrivate
+  const ownPosts = myPage && owner && auth.canReadPrivate
   const profile = useQuery({
     queryKey: queryKeys.publicProfile(userId, auth.userId), enabled,
     queryFn: ({ signal }) => requireData(() => api.GET('/api/v1/users/{userId}', { params: { path: { userId } }, signal })),
   })
   const books = useInfiniteQuery({
-    queryKey: queryKeys.publicBooks(userId), enabled: enabled && (!showTabs || tab === 'books'),
+    queryKey: queryKeys.publicBooks(userId), enabled: enabled && tab === 'books',
     initialPageParam: undefined as string | undefined,
     queryFn: ({ pageParam, signal }) => requireData(() => api.GET('/api/v1/users/{userId}/books', {
       params: { path: { userId }, query: { limit: 15, cursor: pageParam } }, signal,
@@ -57,20 +57,19 @@ export function PublicProfile({ userId, myPage = false }: { userId: string; myPa
 
   const { displayName, handle, bio, avatarUrl, publicBookmarkCount } = profile.data
   const items = books.data?.pages.flatMap((page) => page.items) ?? []
-  const count = <p className="text-sm text-[#526356]">公開栞 {publicBookmarkCount}件</p>
   const actionClass = 'ui-action inline-flex gap-2 px-3 text-sm font-bold text-forest hover:bg-mist'
-  const header = <header className={`space-y-3 ${showTabs ? 'px-5 pt-4 pb-3 sm:px-6' : ''}`}>
+  const header = (
+    <header className="space-y-3 px-5 pt-4 pb-3 sm:px-6">
       <div className="flex items-center gap-3">
         {avatarUrl ? <img className="size-14 shrink-0 rounded-full object-cover" alt="" src={avatarUrl} /> :
           <span aria-hidden="true" className="grid size-14 shrink-0 place-items-center rounded-full bg-mist text-xl font-bold text-forest">{displayName.slice(0, 1)}</span>}
         <div className="min-w-0">
           <h1 className="text-3xl font-bold">{displayName}</h1>
-          {showTabs && count}
+          <p className="text-sm text-[#526356]">公開栞 {publicBookmarkCount}件</p>
           {handle && <p className="text-sm text-[#526356]">@{handle}</p>}
         </div>
       </div>
       {bio && <p className="whitespace-pre-wrap">{bio}</p>}
-      {!showTabs && count}
       <FollowControls key={`${userId}:${auth.userId}`} profile={profile.data} />
       {owner && <>
         <nav aria-label="プロフィールの操作" className="flex flex-wrap gap-x-1">
@@ -89,7 +88,8 @@ export function PublicProfile({ userId, myPage = false }: { userId: string; myPa
         </nav>
         <GoogleAction />
       </>}
-  </header>
+    </header>
+  )
   const bookList = <>
     <h2 className="text-xl font-bold">公開栞がある本</h2>
     {books.isPending ? <LoadingState /> : !books.data ? <ErrorState description="本の一覧を取得できませんでした。"
@@ -100,25 +100,27 @@ export function PublicProfile({ userId, myPage = false }: { userId: string; myPa
       </div>)}
     <LoadMore query={books} />
   </>
-  return showTabs ? <section className="h-full [overflow-wrap:anywhere]">
-    <ScrollableTabs tabs={tabs} value={tab} onChange={setTab} label="マイページの表示" scrollLabel="マイページの内容"
+  return <section className="h-full [overflow-wrap:anywhere]">
+    <ScrollableTabs tabs={tabs} value={tab} onChange={setTab}
+      label={myPage ? 'マイページの表示' : 'プロフィールの表示'} scrollLabel={myPage ? 'マイページの内容' : 'プロフィールの内容'}
       beforeTabs={header} panelClassName="space-y-5 px-5 py-4 sm:px-6">
-      {tab === 'posts' ? <MyPosts userId={userId} /> : bookList}
+      {tab === 'posts' ? <ProfilePosts userId={userId} ownPosts={ownPosts} /> : bookList}
     </ScrollableTabs>
-  </section> : <section className="space-y-5 [overflow-wrap:anywhere]">
-    {header}
-    {bookList}
   </section>
 }
 
-function MyPosts({ userId }: { userId: string }) {
+function ProfilePosts({ userId, ownPosts }: { userId: string; ownPosts: boolean }) {
+  const { userId: viewerId } = useAuth()
   const { mode } = useContentPreference()
   const posts = useInfiniteQuery({
-    queryKey: queryKeys.myBookmarks(userId),
+    queryKey: ownPosts ? queryKeys.myBookmarks(userId) : queryKeys.publicBookmarks(userId, viewerId),
     initialPageParam: undefined as string | undefined,
-    queryFn: ({ pageParam, signal }) => requireData(() => api.GET('/api/v1/me/bookmarks', {
-      params: { query: { limit: 15, cursor: pageParam } }, signal,
-    })),
+    queryFn: ({ pageParam, signal }) => {
+      const query = { limit: 15, cursor: pageParam }
+      return requireData(() => ownPosts
+        ? api.GET('/api/v1/me/bookmarks', { params: { query }, signal })
+        : api.GET('/api/v1/users/{userId}/bookmarks', { params: { path: { userId }, query }, signal }))
+    },
     getNextPageParam: (page) => page.nextCursor ?? undefined,
   })
   if (posts.isPending) return <LoadingState />
@@ -126,9 +128,10 @@ function MyPosts({ userId }: { userId: string }) {
     onRetry={() => void posts.refetch()} isRetrying={posts.isFetching} />
 
   const items = posts.data.pages.flatMap((page) => page.items)
-  if (items.length === 0) return <EmptyState title="投稿はまだありません" description="投稿した栞がここに表示されます。" />
+  if (items.length === 0) return <EmptyState title="投稿はまだありません"
+    description={ownPosts ? '投稿した栞がここに表示されます。' : '公開された栞がここに表示されます。'} />
   return <div className="divide-y divide-[#e2e7e2]">
-    {items.map((bookmark) => <SocialBookmarkCard key={bookmark.id} appearance="timeline" bookmark={bookmark} viewerId={userId}
+    {items.map((bookmark) => <SocialBookmarkCard key={bookmark.id} appearance="timeline" bookmark={bookmark} viewerId={viewerId}
       mode={mode} detailHref={`/bookmarks/${bookmark.id}`} />)}
     <LoadMore query={posts} />
   </div>

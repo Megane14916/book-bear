@@ -57,12 +57,15 @@ it('shows a handle conflict in the form and reloads the saved profile', async ()
   for (const value of ['本好き', '読書中', 'book_bear']) expect(await screen.findByDisplayValue(value)).toBeTruthy()
 })
 
-it('lets guests page through public books and navigate to the reader’s flow', async () => {
+it('lets guests switch between a reader’s public posts and books', async () => {
   auth.userId = null; auth.status = 'guest'; auth.canReadPrivate = false
   const book = { id: '0c3d957a-3be2-4cd8-9b9c-fa145ee156e5', title: '公開の本', author: null, isbn13: null, coverUrl: null }
   const secondBook = { ...book, id: '1c3d957a-3be2-4cd8-9b9c-fa145ee156e5', title: '次の本' }
+  const post = { id: 'public-post', author: profile, book, visibility: 'public', isSpoiler: false, content: '読者の公開栞',
+    pageNumber: null, likeCount: 0, replyCount: 0, likedByMe: false, createdAt: '2026-11-08T00:00:00Z', updatedAt: '2026-11-08T00:00:00Z' }
   const get = vi.spyOn(api, 'GET').mockImplementation((path, options) => {
     if (path === '/api/v1/users/{userId}') return Promise.resolve(response({ ...profile, publicBookmarkCount: 2, followedByMe: false }))
+    if (path === '/api/v1/users/{userId}/bookmarks') return Promise.resolve(response({ items: [post], nextCursor: null }))
     if (path === '/api/v1/users/{userId}/books') {
       const cursor = (options as { params?: { query?: { cursor?: string } } } | undefined)?.params?.query?.cursor
       return Promise.resolve(response(cursor ? { items: [secondBook], nextCursor: null } : { items: [book], nextCursor: 'next' }))
@@ -71,6 +74,11 @@ it('lets guests page through public books and navigate to the reader’s flow', 
     throw new Error('Unexpected API path')
   })
   show(`/users/${profile.id}`)
+  await screen.findByRole('link', { name: '公開の本の栞を開く' })
+  expect(screen.getByRole('tab', { name: '投稿' }).getAttribute('aria-selected')).toBe('true')
+  expect(get).toHaveBeenCalledWith('/api/v1/users/{userId}/bookmarks',
+    expect.objectContaining({ params: { path: { userId: profile.id }, query: { limit: 15, cursor: undefined } } }))
+  fireEvent.click(screen.getByRole('tab', { name: '栞がある本' }))
   await screen.findByRole('link', { name: book.title })
   expect(screen.queryByRole('link', { name: '編集' })).toBeNull()
   expect(screen.queryByRole('link', { name: '設定' })).toBeNull()
