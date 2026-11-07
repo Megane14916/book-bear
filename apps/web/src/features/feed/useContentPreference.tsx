@@ -13,7 +13,7 @@ function readGuestMode(): FeedContentMode {
   try { return localStorage.getItem(storageKey) === 'all' ? 'all' : 'tap' } catch { return 'tap' }
 }
 
-export function useContentPreference() {
+export function useContentPreference({ enabled = true } = {}) {
   const auth = useAuth()
   const queryClient = useQueryClient()
   const [guestMode, setGuestMode] = useState(readGuestMode)
@@ -21,7 +21,7 @@ export function useContentPreference() {
   const preferenceKey = ['preferences', auth.userId] as const
   const preferences = useQuery({
     queryKey: preferenceKey,
-    enabled: auth.canReadPrivate && !!auth.userId,
+    enabled: enabled && auth.canReadPrivate && !!auth.userId,
     queryFn: async ({ signal }) => {
       const data = await requestData(() => api.GET('/api/v1/me/preferences', { signal }))
       if (!data) throw new Error('設定の応答がありません。')

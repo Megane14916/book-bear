@@ -1,7 +1,7 @@
 import { useInfiniteQuery } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
-import { BookmarkBody } from '../../components/bookmarks/BookmarkBody'
+import { BookmarkBody, type FeedContentMode } from '../../components/bookmarks/BookmarkBody'
 import { LoadMore } from '../../components/states/LoadMore'
 import { ErrorState, LoadingState } from '../../components/states/ScreenStates'
 import { api } from '../../lib/api/client'
@@ -14,7 +14,7 @@ import { refreshBookmarkSocial, socialError, useSocialMutation } from './mutatio
 type Reply = components['schemas']['Reply']
 type ReplyInput = components['schemas']['CreateReplyRequest']
 
-export function Replies({ bookmarkId }: { bookmarkId: string }) {
+export function Replies({ bookmarkId, mode }: { bookmarkId: string; mode: FeedContentMode }) {
   const auth = useAuth()
   const registered = auth.status === 'ready' && !auth.isAnonymous
   const replies = useInfiniteQuery({
@@ -32,7 +32,7 @@ export function Replies({ bookmarkId }: { bookmarkId: string }) {
     {replies.isPending ? <LoadingState /> : !replies.data ? <ErrorState description="返信を取得できませんでした。"
       onRetry={() => void replies.refetch()} isRetrying={replies.isFetching} /> : <>
       {items.length === 0 && <p className="text-sm text-[#526356]">返信はまだありません。</p>}
-      {items.map((reply) => <ReplyItem key={reply.id} reply={reply} bookmarkId={bookmarkId} />)}
+      {items.map((reply) => <ReplyItem key={reply.id} reply={reply} bookmarkId={bookmarkId} mode={mode} />)}
       <LoadMore query={replies} />
       {registered ? <NewReply bookmarkId={bookmarkId} /> : <div className="space-y-2">
         <p className="text-sm">返信するにはGoogleでの登録とログインが必要です。</p>
@@ -51,7 +51,7 @@ function NewReply({ bookmarkId }: { bookmarkId: string }) {
     onSave={(body) => add.mutate(body, { onSuccess: () => setFormKey((key) => key + 1) })} />
 }
 
-function ReplyItem({ reply, bookmarkId }: { reply: Reply; bookmarkId: string }) {
+function ReplyItem({ reply, bookmarkId, mode }: { reply: Reply; bookmarkId: string; mode: FeedContentMode }) {
   const auth = useAuth()
   const owner = auth.status === 'ready' && !auth.isAnonymous && auth.userId === reply.author.id
   const [editing, setEditing] = useState(false)
@@ -66,7 +66,7 @@ function ReplyItem({ reply, bookmarkId }: { reply: Reply; bookmarkId: string }) 
     {editing && owner ? <ReplyForm initial={reply} label="返信を保存" pending={change.pending} error={change.error}
       onSave={(body) => change.mutate(body, { onSuccess: () => setEditing(false) })}
       onCancel={() => { change.reset(); setEditing(false) }} /> : <>
-      <BookmarkBody bookmarkId={reply.id} viewerId={auth.userId} mode="all" isSpoiler={reply.isSpoiler} content={reply.content} />
+      <BookmarkBody bookmarkId={reply.id} viewerId={auth.userId} mode={mode} isSpoiler={reply.isSpoiler} content={reply.content} />
       {owner && <div className="flex flex-wrap gap-2">
         {confirming ? <>
           <button type="button" className="ui-action border border-red-700 px-3 text-sm text-red-700" disabled={change.pending}

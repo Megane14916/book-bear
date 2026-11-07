@@ -6,6 +6,7 @@ import { useAuth } from '../../lib/auth/AuthProvider'
 import { GoogleAction } from '../../lib/auth/GoogleAction'
 import { HttpError } from '../../lib/api/errors'
 import { isUuid } from '../book-search/validation'
+import { useContentPreference } from '../feed/useContentPreference'
 import { BookmarkForm } from './BookmarkForm'
 import { deleteBookmark, patchBookmark, type PatchBookmark } from './api'
 import { useBookmark, useBookmarkWrite } from './queries'
@@ -22,6 +23,7 @@ export default function BookmarkDetailPage({ edit = false }: { edit?: boolean })
 function Detail({ bookmarkId, edit }: { bookmarkId: string; edit: boolean }) {
   const auth = useAuth()
   const navigate = useNavigate()
+  const { mode } = useContentPreference({ enabled: !edit && isUuid(bookmarkId) })
   const query = useBookmark(bookmarkId)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const write = useBookmarkWrite(async (input: PatchBookmark | null, signal) => {
@@ -51,7 +53,7 @@ function Detail({ bookmarkId, edit }: { bookmarkId: string; edit: boolean }) {
         onSave={(input) => void write.save(input)} />
       <Link className="ui-action inline-flex text-forest underline" to={`/bookmarks/${bookmarkId}`}>編集をやめる</Link>
     </> : <>
-      <SocialBookmarkCard bookmark={bookmark} viewerId={auth.userId} mode="all"
+      <SocialBookmarkCard bookmark={bookmark} viewerId={auth.userId} mode={mode}
         actions={owner && <>
           <Link className="ui-action inline-flex border border-forest px-4 text-forest" to={`/bookmarks/${bookmarkId}/edit`}>編集</Link>
           <button className="ui-action border border-red-700 px-4 text-red-700" disabled={write.isPending} onClick={() => setConfirmDelete(true)}>削除</button>
@@ -64,7 +66,7 @@ function Detail({ bookmarkId, edit }: { bookmarkId: string; edit: boolean }) {
         <button className="ui-action ml-3 border px-4" disabled={write.isPending} onClick={() => setConfirmDelete(false)}>キャンセル</button>
       </div>}
       {write.error && <p role="alert" className="text-sm text-red-700">{bookmarkError(write.error)}</p>}
-      {bookmark.visibility === 'public' && <Replies bookmarkId={bookmark.id} />}
+      {bookmark.visibility === 'public' && <Replies bookmarkId={bookmark.id} mode={mode} />}
     </>}
   </section>
 }

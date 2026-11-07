@@ -1,5 +1,5 @@
 import { QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, expect, it, vi } from 'vitest'
 import App from '../../App'
@@ -24,7 +24,7 @@ const reply: components['schemas']['Reply'] = {
 }
 const response = <T,>(data: T) => ({ data, response: Response.json(data) })
 const noContent = () => ({ data: undefined, response: new Response(null, { status: 204 }) })
-const show = (path: string) => render(<QueryClientProvider client={createQueryClient()}><MemoryRouter initialEntries={[path]}><App /></MemoryRouter></QueryClientProvider>)
+const show = (path: string, client = createQueryClient()) => render(<QueryClientProvider client={client}><MemoryRouter initialEntries={[path]}><App /></MemoryRouter></QueryClientProvider>)
 const click = (name: string) => fireEvent.click(screen.getByRole('button', { name }))
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); auth.isAnonymous = false })
 
@@ -32,7 +32,8 @@ it('keeps like state on failure and synchronizes reply and like counts after suc
   let liked = false
   let replies = [reply]
   const own = { ...reply, id: 'mine', author: owner, content: '自分の返信', isSpoiler: false }
-  vi.spyOn(api, 'GET').mockImplementation(async (path) => {
+  const get = vi.spyOn(api, 'GET').mockImplementation(async (path) => {
+    if (path === '/api/v1/me/preferences') return response({ feedContentMode: 'all' })
     if (path === '/api/v1/bookmarks/{bookmarkId}/replies') return response({ items: replies, nextCursor: null })
     return response({ ...bookmark, likedByMe: liked, likeCount: Number(liked), replyCount: replies.length })
   })
@@ -48,7 +49,8 @@ it('keeps like state on failure and synchronizes reply and like counts after suc
     else liked = false
     return noContent()
   })
-  show(`/bookmarks/${bookmark.id}`)
+  const client = createQueryClient()
+  show(`/bookmarks/${bookmark.id}`, client)
   fireEvent.click(await screen.findByRole('button', { name: 'いいね（0）' }))
   await screen.findByText('この操作にはGoogleでの登録とログインが必要です。')
   expect(screen.getByRole('button', { name: 'いいね（0）' }).getAttribute('aria-pressed')).toBe('false')
@@ -61,6 +63,17 @@ it('keeps like state on failure and synchronizes reply and like counts after suc
   fireEvent.change(screen.getByLabelText('返信本文（1,000文字以内）'), { target: { value: own.content } })
   click('返信を投稿')
   await screen.findByText('返信 2')
+  await screen.findByText(own.content)
+  const fetches = get.mock.calls.length
+  act(() => { client.setQueryData(['preferences', auth.userId], { feedContentMode: 'tap' }) })
+  await waitFor(() => expect(screen.queryByText(own.content)).toBeNull())
+  expect(screen.queryByText(bookmark.content)).toBeNull()
+  expect(screen.queryByText(reply.content)).toBeNull()
+  act(() => { client.setQueryData(['preferences', auth.userId], { feedContentMode: 'all' }) })
+  await screen.findByText(own.content)
+  expect(screen.getByText(bookmark.content)).toBeTruthy()
+  expect(screen.queryByText(reply.content)).toBeNull()
+  expect(get).toHaveBeenCalledTimes(fetches)
   fireEvent.click(await screen.findByRole('button', { name: '返信を編集' }))
   fireEvent.change(screen.getByDisplayValue(own.content), { target: { value: '編集済みの返信' } })
   click('返信を保存')
@@ -103,8 +116,11 @@ it('links an updated follower count to the public relationship list and forwards
 
 it('offers Google linking to an anonymous reader and shares only the public URL', async () => {
   auth.isAnonymous = true
-  const get = vi.spyOn(api, 'GET').mockImplementation(async (path) => path === '/api/v1/bookmarks/{bookmarkId}/replies' ?
-    response({ items: [], nextCursor: null }) : response(bookmark))
+  let current = bookmark
+  vi.spyOn(api, 'GET').mockImplementation(async (path) => {
+    if (path === '/api/v1/me/preferences') return response({ feedContentMode: 'tap' })
+    return path === '/api/v1/bookmarks/{bookmarkId}/replies' ? response({ items: [], nextCursor: null }) : response(current)
+  })
   const put = vi.spyOn(api, 'PUT')
   const copy = vi.fn().mockResolvedValue(undefined)
   vi.stubGlobal('navigator', { clipboard: { writeText: copy } })
@@ -120,7 +136,7 @@ it('offers Google linking to an anonymous reader and shares only the public URL'
   const share = new URL(screen.getByRole('link', { name: 'Xで共有' }).getAttribute('href')!)
   expect([...share.searchParams.entries()]).toEqual([['url', expected]])
   view.unmount()
-  get.mockResolvedValue(response({ ...bookmark, author: owner, visibility: 'private' }))
+  current = { ...bookmark, author: owner, visibility: 'private' }
   show(`/bookmarks/${bookmark.id}`)
   await screen.findByText('非公開')
   expect(screen.queryByRole('link', { name: 'Xで共有' })).toBeNull()

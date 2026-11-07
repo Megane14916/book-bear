@@ -10,12 +10,14 @@ import { useAuth } from '../../lib/auth/AuthProvider'
 import { canReadPublic } from '../../lib/auth/readable'
 import { queryKeys } from '../../lib/query/keys'
 import { isUuid } from '../book-search/validation'
+import { useContentPreference } from '../feed/useContentPreference'
 import { SocialBookmarkCard } from '../social/SocialBookmarkCard'
 
 export default function BookmarkFlowPage() {
   const { userId = '', bookId = '' } = useParams()
   const auth = useAuth()
   const valid = isUuid(userId) && isUuid(bookId)
+  const { mode } = useContentPreference({ enabled: valid })
   const flow = useInfiniteQuery({
     queryKey: queryKeys.bookmarkFlow(userId, bookId, auth.userId),
     enabled: valid && canReadPublic(auth.status),
@@ -44,7 +46,7 @@ export default function BookmarkFlowPage() {
     </header>
     {items.length === 0 && <EmptyState title="表示できる栞はまだありません" description="この本の栞が集まると、ここに投稿順で表示されます。" action={back} />}
     {items.map((bookmark) => <SocialBookmarkCard key={bookmark.id} variant="flow" bookmark={bookmark} viewerId={auth.userId}
-      mode="all" detailHref={`/bookmarks/${bookmark.id}`} />)}
+      mode={mode} detailHref={`/bookmarks/${bookmark.id}`} />)}
     <LoadMore query={flow} />
   </section>
 }

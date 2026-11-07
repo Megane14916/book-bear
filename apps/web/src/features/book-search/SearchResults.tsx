@@ -7,10 +7,12 @@ import { requireData } from '../../lib/api/result'
 import { useAuth } from '../../lib/auth/AuthProvider'
 import { canReadPublic } from '../../lib/auth/readable'
 import { queryKeys } from '../../lib/query/keys'
+import { useContentPreference } from '../feed/useContentPreference'
 import { SocialBookmarkCard } from '../social/SocialBookmarkCard'
 
 export function PostResults({ q }: { q: string }) {
   const auth = useAuth()
+  const { mode } = useContentPreference({ enabled: !!q })
   const enabled = !!q && canReadPublic(auth.status)
   const posts = useInfiniteQuery({
     queryKey: queryKeys.searchPosts(q, auth.userId), enabled,
@@ -28,7 +30,7 @@ export function PostResults({ q }: { q: string }) {
   if (items.length === 0) return <p role="status" className="text-sm text-[#526356]">「{q}」に一致する公開栞は見つかりませんでした。</p>
   return <div className="space-y-4">
     {items.map((bookmark) => <SocialBookmarkCard key={bookmark.id} bookmark={bookmark} viewerId={auth.userId}
-      mode="all" detailHref={`/bookmarks/${bookmark.id}`} />)}
+      mode={mode} detailHref={`/bookmarks/${bookmark.id}`} />)}
     <LoadMore query={posts} />
   </div>
 }
