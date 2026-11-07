@@ -65,8 +65,8 @@ export function PublicProfile({ userId, myPage = false }: { userId: string; myPa
           <span aria-hidden="true" className="grid size-14 shrink-0 place-items-center rounded-full bg-mist text-xl font-bold text-forest">{displayName.slice(0, 1)}</span>}
         <div className="min-w-0">
           <h1 className="text-3xl font-bold">{displayName}</h1>
-          <p className="text-sm text-[#526356]">公開栞 {publicBookmarkCount}件</p>
           {handle && <p className="text-sm text-[#526356]">@{handle}</p>}
+          <p className="text-sm text-[#526356]">公開栞 {publicBookmarkCount}件</p>
         </div>
       </div>
       {bio && <p className="whitespace-pre-wrap">{bio}</p>}
