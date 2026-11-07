@@ -2,7 +2,7 @@ import { useId, useLayoutEffect, useRef, useState, type FormEvent, type ReactNod
 import type { Bookmark, BookmarkInput } from './api'
 import { bookmarkError, bookmarkInput, registrationMessage, validateBookmark } from './validation'
 
-const field = 'mt-1 min-h-11 w-full rounded-lg border border-[#d6ded6] bg-white px-3 py-2 text-ink focus-visible:outline-2 focus-visible:outline-forest'
+const field = 'mt-1 min-h-11 w-full rounded-lg border border-[#d6ded6] bg-white px-3 py-2 text-ink focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-forest'
 
 export function BookmarkForm({ initial, pending, error, canPublish, canSave = true, onSave, registrationAction, children, submitClassName = '', submitLabel = '栞を保存', defaultVisibility = 'private', autoGrow = false }: {
   initial?: Bookmark; pending: boolean; error: unknown; canPublish: boolean
@@ -41,7 +41,7 @@ export function BookmarkForm({ initial, pending, error, canPublish, canSave = tr
       <legend className="sr-only">栞の内容</legend>
       {children}
       <label className="block text-sm font-bold">本文（必須・2,000文字以内）
-        <textarea ref={textarea} className={autoGrow ? `${field} resize-none overflow-hidden focus-visible:-outline-offset-2` : field} rows={autoGrow ? 3 : 7}
+        <textarea ref={textarea} className={autoGrow ? `${field} resize-none overflow-hidden` : field} rows={autoGrow ? 3 : 7}
           value={content} onChange={(e) => setContent(e.target.value)} aria-describedby={countId} />
       </label>
       <p id={countId} className="text-xs text-[#526356]">{content.trim().length} / 2,000文字</p>

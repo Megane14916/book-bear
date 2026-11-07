@@ -96,7 +96,7 @@ export function BookPicker({ library, active, onSelect }: {
         <label htmlFor="composer-book-query" className="block text-sm font-bold">書名・著者名・ISBN</label>
         <div className="flex gap-2">
           <input id="composer-book-query" type="search" value={input} onChange={(event) => setInput(event.target.value)}
-            className="min-h-11 min-w-0 flex-1 rounded-lg border bg-white px-3 focus-visible:outline-2 focus-visible:outline-forest" />
+            className="min-h-11 min-w-0 flex-1 rounded-lg border bg-white px-3 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-forest" />
           <button className="ui-action shrink-0 bg-forest px-4 text-sm font-bold text-white" disabled={!input.trim() || registration.isPending}>検索する</button>
         </div>
       </form>

@@ -322,9 +322,11 @@ for (const width of [360, 1024]) test(`composer steps, history and submit placem
 
   const field = page.getByRole('textbox', { name: /本文/ })
   const originalHeight = (await field.boundingBox())!.height
-  await field.focus()
-  await expect(field).toHaveCSS('outline-offset', '-2px')
-  await expect(field).toHaveCSS('outline-width', '2px')
+  for (const input of [field, page.getByLabel('ページ番号（任意）'), page.getByLabel('公開範囲')]) {
+    await input.focus()
+    await expect(input).toHaveCSS('outline-offset', '-2px')
+    await expect(input).toHaveCSS('outline-width', '2px')
+  }
   await field.fill('複数行の栞を書きます。\n'.repeat(10))
   expect((await field.boundingBox())!.height).toBeGreaterThan(originalHeight)
   await expect(field).toHaveCSS('resize', 'none')
@@ -347,6 +349,7 @@ for (const width of [360, 1024]) test(`composer steps, history and submit placem
 })
 
 test('selecting a search result opens the composer without starting a guest session', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 })
   const mock = await setup(page)
   await page.route(`${origin}/api/v1/books/search?**`, (route) => {
     expect(new URL(route.request().url()).searchParams.get('q')).toBe('栞')
@@ -354,7 +357,11 @@ test('selecting a search result opens the composer without starting a guest sess
   })
   await page.goto('/create')
   await page.getByRole('button', { name: '検索', exact: true }).click()
-  await page.getByLabel('書名・著者名・ISBN').fill('栞')
+  const query = page.getByLabel('書名・著者名・ISBN')
+  await query.focus()
+  await expect(query).toHaveCSS('outline-offset', '-2px')
+  await expect(query).toHaveCSS('outline-width', '2px')
+  await query.fill('栞')
   await page.getByRole('button', { name: '検索する', exact: true }).click()
   await page.getByRole('button', { name: `投稿する本：${book.title}`, exact: true }).click()
   await expect(page).toHaveURL(`/create?bookId=${bookId}`)
