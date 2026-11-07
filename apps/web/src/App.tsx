@@ -17,7 +17,8 @@ import { googleCallbackPath } from './lib/auth/google'
 import RelationshipsPage from './features/social/RelationshipsPage'
 
 export default function App() {
-  const isHome = useLocation().pathname === '/'
+  const { pathname } = useLocation()
+  const isViewportPage = pathname === '/' || pathname === '/search'
   return (
     <div className="min-h-screen bg-paper text-ink">
       <header className="flex h-[68px] items-center gap-2.5 border-b border-[#e7e9e4] bg-white px-6">
@@ -32,7 +33,7 @@ export default function App() {
         <span className="ml-auto text-[11px] text-[#89938b]">読書の足あと</span>
       </header>
 
-      <main id="main-content" className={isHome
+      <main id="main-content" className={isViewportPage
         ? 'mx-auto h-[calc(100dvh-138px-env(safe-area-inset-bottom))] w-full max-w-[740px]'
         : 'mx-auto w-full max-w-[740px] px-5 pt-8 pb-32 md:pt-12'}>
         <Routes>
