@@ -114,7 +114,7 @@ it('links an updated follower count to the public relationship list and forwards
   await screen.findByRole('link', { name: '次の読者' })
   expect(get).toHaveBeenCalledWith('/api/v1/users/{userId}/followers', expect.objectContaining({ params: { path: { userId: other.id }, query: { cursor: 'next', limit: 15 } } }))
   fireEvent.click(screen.getByRole('link', { name: 'ホーム' }))
-  click('表示範囲：全体')
+  fireEvent.click(screen.getByRole('tab', { name: 'フォロー中' }))
   await screen.findByText(bookmark.content)
   expect(get).toHaveBeenCalledWith('/api/v1/feed', expect.objectContaining({ params: { query: { scope: 'following', limit: 15, cursor: undefined } } }))
 })
