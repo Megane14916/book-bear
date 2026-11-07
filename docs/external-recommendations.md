@@ -8,6 +8,8 @@ CiNii Researchの候補と所蔵館数を使う比較は、[CiNii・openBDの実
 
 Google Booksの候補にOpen Libraryの読書登録数を組み合わせる比較は、[3 APIの実験手順と実測結果](google-openlibrary-recommendations.md)を参照。
 
+青空文庫の本文、NDL全国書誌、Qwen3直接提案の比較は、[3方式の実行手順](three-way-recommendations.md)と[ユーザー別の実測結果](three-way-recommendation-results.md)を参照。
+
 ## Google Booksの利用条件と実験範囲
 
 2026-11-06確認。Google Books APIの個別条件に加え、Google APIs共通条件が適用される。共通条件§5(a)・(e)では、権利者の許諾や法令による根拠がないAPIコンテンツの利用、第三者への提供、改変・二次利用、恒久コピーやキャッシュ期限超過に制約がある。Booksのブランディング指針は、Googleへの帰属表示・書籍へのリンクを求め、検索結果の並べ替えや改変を制限する。[Books API利用規約](https://developers.google.com/books/terms)・[Google APIs共通規約](https://developers.google.com/terms#section_5_content)・[Booksブランディング指針](https://developers.google.com/books/branding)
