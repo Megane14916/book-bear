@@ -22,7 +22,7 @@ function session(id: string, anonymous: boolean) {
     user: { id, is_anonymous: anonymous, aud: 'authenticated', role: 'authenticated', app_metadata: {}, user_metadata: {}, created_at: new Date().toISOString() } }
 }
 
-async function setup(page: Page, options: { signedIn?: boolean; anonymous?: boolean; otherUser?: boolean; private?: boolean; failSave?: boolean; failInit?: boolean; denyPublic?: boolean; paginated?: boolean; manyBooks?: boolean } = {}) {
+async function setup(page: Page, options: { signedIn?: boolean; anonymous?: boolean; otherUser?: boolean; private?: boolean; failSave?: boolean; failInit?: boolean; denyPublic?: boolean; paginated?: boolean; manyBooks?: boolean; history?: boolean } = {}) {
   const events: string[] = [], bodies: Record<string, unknown>[] = []
   let signup = 0, saves = 0, adds = 0, deletes = 0, libraryPages = 0, init = 0
   let current: typeof initial | null = { ...initial, visibility: options.private ? 'private' : 'public' }
@@ -44,6 +44,12 @@ async function setup(page: Page, options: { signedIn?: boolean; anonymous?: bool
       return route.fulfill({ json: { id: identity, displayName: '読者', avatarUrl: null, handle: null, bio: null, followersCount: 0, followingCount: 0, isAnonymous: options.anonymous ?? !options.signedIn } })
     }
     if (url.pathname === `/api/v1/books/${bookId}`) return route.fulfill({ json: book })
+    if (url.pathname === `/api/v1/users/${userId}/books/${bookId}/bookmarks`) return route.fulfill({ json: {
+      author: initial.author, book, items: options.history ? [
+        { ...initial, content: '前に残した栞', visibility: 'private' },
+        { ...initial, id: '00000000-0000-4000-8000-000000000006', content: '過去のネタバレ本文', isSpoiler: true },
+      ] : [], nextCursor: null,
+    } })
     if (url.pathname === '/api/v1/me/preferences') return route.fulfill({ json: { feedContentMode: 'all' } })
     if (url.pathname === '/api/v1/feed') return route.fulfill({ json: {
       items: current?.visibility === 'public' ? [current] : [], nextCursor: null,
@@ -56,8 +62,12 @@ async function setup(page: Page, options: { signedIn?: boolean; anonymous?: bool
         return route.fulfill({ status: 201, json: shelf })
       }
       libraryPages++
-      return route.fulfill({ json: { items: options.paginated && !url.searchParams.has('cursor') ? [] : options.manyBooks ? Array.from({ length: 12 }, (_, index) => ({ ...shelf, id: index === 0 ? shelfId : `00000000-0000-4000-8000-${String(index + 100).padStart(12, '0')}`, book: { ...book, title: index === 0 ? book.title : `長い書名にも対応する本 ${index}` } })) : [shelf],
-        nextCursor: options.paginated && !url.searchParams.has('cursor') ? 'next' : null } })
+      const hasNext = (options.paginated || options.manyBooks) && !url.searchParams.has('cursor')
+      const items = options.manyBooks && hasNext ? Array.from({ length: 15 }, (_, index) => {
+        const id = `00000000-0000-4000-8000-${String(index + 100).padStart(12, '0')}`
+        return { ...shelf, id, book: { ...book, id, title: index === 0 ? '書名が長くてもカードの高さがそろう本' : `本棚の本 ${index + 1}` } }
+      }) : hasNext ? [] : [shelf]
+      return route.fulfill({ json: { items, nextCursor: hasNext ? 'next' : null } })
     }
     if (url.pathname === '/api/v1/bookmarks' && method === 'POST') {
       saves++; events.push('save')
@@ -141,6 +151,7 @@ test('guest browsing creates no account; first private save initializes auth, ad
   const mock = await setup(page)
   await page.goto(`/create?bookId=${bookId}`)
   await expect(page.getByRole('heading', { name: book.title })).toBeVisible()
+  await expect(page.getByLabel('公開範囲')).toHaveValue('private')
   expect(mock.counts().signup).toBe(0)
   await page.getByRole('textbox', { name: /本文/ }).fill('初めての非公開栞')
   await page.getByLabel('公開範囲').selectOption('public')
@@ -264,60 +275,131 @@ test('library selection supports later pages and uses its userBookId without reg
   const mock = await setup(page, { signedIn: true, anonymous: true, paginated: true })
   await page.goto(`/create?userBookId=${shelfId}`)
   await page.getByRole('button', { name: '本棚の続きを読み込む' }).click()
-  await expect(page.getByRole('button', { name: '投稿する本：栞をつける本' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('heading', { name: book.title })).toBeVisible()
   await page.getByRole('textbox', { name: /本文/ }).fill('本棚からの栞')
   await page.getByRole('button', { name: '栞を投稿' }).click()
   await expect(page).toHaveURL(`/bookmarks/${bookmarkId}`)
   expect(mock.counts()).toMatchObject({ adds: 0, saves: 1, signup: 0 })
 })
 
-for (const width of [360, 1024]) test(`composer shelf selection, collapse and keyboard docking at ${width}px`, async ({ page }) => {
+for (const width of [360, 1024]) test(`composer steps, history and submit placement at ${width}px`, async ({ page }) => {
   await page.setViewportSize({ width, height: 800 })
-  const mock = await setup(page, { signedIn: true, manyBooks: true })
-  await page.addInitScript(() => {
-    Object.defineProperty(window, 'visualViewport', { configurable: true, value: Object.assign(new EventTarget(), { height: innerHeight, offsetTop: 0 }) })
-  })
+  const mock = await setup(page, { signedIn: true, manyBooks: true, history: true })
+  await page.route(`${origin}/api/v1/me/preferences`, (route) => route.fulfill({ json: { feedContentMode: 'tap' } }))
   await page.goto('/create')
-  const target = page.getByRole('button', { name: '投稿する本：栞をつける本', exact: true })
-  await expect(target).toBeVisible()
-  await target.click()
-  await expect(target).toHaveAttribute('aria-pressed', 'true')
-  const preview = page.getByRole('group', { name: '本棚のプレビュー' })
-  expect(await preview.evaluate((node) => node.scrollWidth > node.clientWidth)).toBe(true)
-  await preview.getByRole('button').last().scrollIntoViewIfNeeded()
-  expect(await preview.evaluate((node) => node.scrollLeft > 0)).toBe(true)
-  await page.getByRole('button', { name: '本棚を閉じる' }).click()
-  await expect(preview).toHaveCount(0)
-  await expect(page.getByText('選択中：栞をつける本')).toBeVisible()
-  await page.getByRole('button', { name: '本棚を開く' }).click()
-  await expect(target).toHaveAttribute('aria-pressed', 'true')
+  const steps = page.getByRole('list', { name: '投稿の手順' })
+  await expect(steps.locator('[aria-current="step"]').getByRole('heading', { name: '本を選ぶ' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '栞を残す' })).toHaveCount(0)
+  await expect(page.getByRole('textbox', { name: /本文/ })).toHaveCount(0)
+  const searchBox = await page.getByRole('button', { name: '検索', exact: true }).boundingBox()
+  const scanBox = await page.getByRole('button', { name: 'バーコード', exact: true }).boundingBox()
+  expect(scanBox!.x).toBeGreaterThan(searchBox!.x)
+  expect(scanBox!.y).toBe(searchBox!.y)
+
+  const lastBook = page.getByRole('button', { name: '投稿する本：本棚の本 15', exact: true })
+  await lastBook.scrollIntoViewIfNeeded()
+  const heights = await page.getByRole('region', { name: '本棚', exact: true }).getByRole('button', { name: /^投稿する本：/ })
+    .evaluateAll((books) => books.map((book) => book.getBoundingClientRect().height))
+  expect(new Set(heights).size).toBe(1)
+  await page.getByRole('button', { name: `投稿する本：${book.title}`, exact: true }).click()
+  await expect.poll(() => mock.counts().libraryPages).toBeGreaterThanOrEqual(2)
+  await expect(page).toHaveURL(`/create?userBookId=${shelfId}`)
+  await expect(steps.locator('[aria-current="step"]').getByRole('heading', { name: '投稿する' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: book.title })).toBeVisible()
+  await expect(page.getByLabel('公開範囲')).toHaveValue('public')
+
+  await expect(page.getByText('前に残した栞')).toHaveCount(0)
+  const history = page.locator('details')
+  const historyToggle = history.locator('summary')
+  await expect(historyToggle.locator('svg')).toBeVisible()
+  await historyToggle.click()
+  await expect(page.getByText('前に残した栞')).toBeVisible()
+  await expect(history.locator('time').first()).toHaveAttribute('datetime', initial.createdAt)
+  await expect(page.getByText('過去のネタバレ本文')).toBeVisible()
+  await expect(history.getByRole('button', { name: /本文を(表示|閉じる)/ })).toHaveCount(0)
+  await historyToggle.click()
+  await expect(page.getByText('過去のネタバレ本文')).toHaveCount(0)
+
   const field = page.getByRole('textbox', { name: /本文/ })
-  await field.fill('プレビューを閉じても選択は保持されます。')
-  const dock = page.getByRole('group', { name: '投稿操作' })
-  const navBox = await page.getByRole('navigation', { name: 'メインメニュー' }).boundingBox()
-  const dockBox = await dock.boundingBox()
-  expect(dockBox!.y + dockBox!.height).toBeLessThanOrEqual(navBox!.y)
-  await page.screenshot({ path: `test-results/composer-${width}.png` })
-  await page.evaluate(() => {
-    Object.assign(window.visualViewport!, { height: innerHeight - 300 })
-    window.visualViewport!.dispatchEvent(new Event('resize'))
-  })
-  await expect.poll(async () => { const box = await dock.boundingBox(); return box!.y + box!.height }).toBeLessThanOrEqual(500)
-  await page.getByLabel('ページ番号（任意）').focus()
-  await expect.poll(async () => {
-    const input = await page.getByLabel('ページ番号（任意）').boundingBox()
-    const controls = await dock.boundingBox()
-    return input!.y + input!.height <= controls!.y
-  }).toBe(true)
-  await page.screenshot({ path: `test-results/composer-keyboard-${width}.png` })
-  await page.evaluate(() => {
-    Object.assign(window.visualViewport!, { height: innerHeight })
-    window.visualViewport!.dispatchEvent(new Event('resize'))
-  })
-  await page.getByRole('button', { name: '本棚を閉じる' }).click()
-  await page.getByRole('button', { name: '栞を投稿', exact: true }).click()
+  const originalHeight = (await field.boundingBox())!.height
+  for (const input of [field, page.getByLabel('ページ番号（任意）'), page.getByLabel('公開範囲')]) {
+    await input.focus()
+    await expect(input).toHaveCSS('outline-offset', '-2px')
+    await expect(input).toHaveCSS('outline-width', '2px')
+  }
+  await field.fill('複数行の栞を書きます。\n'.repeat(10))
+  expect((await field.boundingBox())!.height).toBeGreaterThan(originalHeight)
+  await expect(field).toHaveCSS('resize', 'none')
+  await field.fill('短い栞')
+  expect((await field.boundingBox())!.height).toBe(originalHeight)
+
+  const submit = page.getByRole('button', { name: '栞を投稿', exact: true })
+  const spoiler = await page.getByLabel('ネタバレを含む').boundingBox()
+  expect((await submit.boundingBox())!.y).toBeGreaterThan(spoiler!.y + spoiler!.height)
+  expect(await submit.evaluate((button) => {
+    for (let node: Element | null = button; node; node = node.parentElement) {
+      if (['fixed', 'sticky'].includes(getComputedStyle(node).position)) return false
+    }
+    return true
+  })).toBe(true)
+  await submit.click()
   await expect(page).toHaveURL(`/bookmarks/${bookmarkId}`)
   expect(mock.counts()).toMatchObject({ saves: 1, adds: 0 })
+  expect(mock.bodies[0]).toMatchObject({ content: '短い栞', visibility: 'public' })
+})
+
+test('selecting a search result opens the composer without starting a guest session', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 })
+  const mock = await setup(page)
+  await page.route(`${origin}/api/v1/books/search?**`, (route) => {
+    expect(new URL(route.request().url()).searchParams.get('q')).toBe('栞')
+    return route.fulfill({ json: { items: [{ ...book, localBookId: bookId, provider: null, providerId: null }] } })
+  })
+  await page.goto('/create')
+  await page.getByRole('button', { name: '検索', exact: true }).click()
+  const query = page.getByLabel('書名・著者名・ISBN')
+  await query.focus()
+  await expect(query).toHaveCSS('outline-offset', '-2px')
+  await expect(query).toHaveCSS('outline-width', '2px')
+  await query.fill('栞')
+  await page.getByRole('button', { name: '検索する', exact: true }).click()
+  await page.getByRole('button', { name: `投稿する本：${book.title}`, exact: true }).click()
+  await expect(page).toHaveURL(`/create?bookId=${bookId}`)
+  await expect(page.getByRole('heading', { name: '投稿する' })).toBeFocused()
+  expect(mock.counts().signup).toBe(0)
+  await page.getByRole('button', { name: '本を選ぶ', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '本を選ぶ' })).toBeFocused()
+})
+
+test('a single scanned ISBN is imported and opens the composer', async ({ page }) => {
+  const isbn = '9784101010014'
+  await setup(page)
+  await page.addInitScript((isbn) => {
+    class Detector {
+      static async getSupportedFormats() { return ['ean_13'] }
+      async detect() { return [{ rawValue: isbn }] }
+    }
+    Object.defineProperty(window, 'BarcodeDetector', { configurable: true, value: Detector })
+    Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: {
+      getUserMedia: async () => ({ getTracks: () => [{ stop() { document.documentElement.dataset.cameraStopped = 'true' } }] }),
+    } })
+    Object.defineProperty(HTMLMediaElement.prototype, 'srcObject', { configurable: true, writable: true, value: null })
+    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', { configurable: true, get: () => HTMLMediaElement.HAVE_CURRENT_DATA })
+    HTMLMediaElement.prototype.play = async () => {}
+  }, isbn)
+  await page.route(`${origin}/api/v1/books/search?**`, (route) => {
+    expect(new URL(route.request().url()).searchParams.get('q')).toBe(isbn)
+    return route.fulfill({ json: { items: [{ ...book, isbn13: isbn, localBookId: null, provider: 'openbd', providerId: isbn }] } })
+  })
+  await page.route(`${origin}/api/v1/books/import`, (route) => {
+    expect(route.request().postDataJSON()).toEqual({ provider: 'openbd', providerId: isbn })
+    return route.fulfill({ status: 201, json: { ...book, isbn13: isbn, source: 'openbd' } })
+  })
+  await page.goto('/create')
+  await page.getByRole('button', { name: 'バーコード', exact: true }).click()
+  await expect(page).toHaveURL(`/create?bookId=${bookId}`)
+  await expect(page.getByRole('heading', { name: '投稿する' })).toBeVisible()
+  await expect(page.locator('html')).toHaveAttribute('data-camera-stopped', 'true')
 })
 
 test('merged public feed drops cached private/deleted bookmarks and shows updated public content', async ({ page }) => {
