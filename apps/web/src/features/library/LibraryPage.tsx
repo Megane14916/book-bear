@@ -9,6 +9,7 @@ import { BookCard } from '../../components/books/BookCard'
 import { EmptyState, ErrorState, LoadingState } from '../../components/states/ScreenStates'
 import { useAuth } from '../../lib/auth/AuthProvider'
 import { queryKeys } from '../../lib/query/keys'
+import { getLibraryPage } from './api'
 
 type UserBook = components['schemas']['UserBook']
 type ReadingStatus = UserBook['status']
@@ -25,13 +26,7 @@ export default function LibraryPage() {
     queryKey: queryKeys.myBooks(userId ?? 'unavailable'),
     enabled: userId !== null,
     initialPageParam: undefined as string | undefined,
-    queryFn: async ({ pageParam, signal }) => {
-      const page = await requestData(() => api.GET('/api/v1/me/books', {
-        params: { query: { limit: 15, ...(pageParam ? { cursor: pageParam } : {}) } }, signal,
-      }))
-      if (!page) throw new Error('本棚の応答がありません。')
-      return page
-    },
+    queryFn: ({ pageParam, signal }) => getLibraryPage(pageParam, signal),
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
   })
 

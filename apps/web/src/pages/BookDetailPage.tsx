@@ -28,6 +28,7 @@ export default function BookDetailPage() {
     </dl>
     <Link className="ui-action inline-flex border border-forest px-4 text-forest" to={`/library?bookId=${book.id}`}>本棚への追加へ進む</Link>
     <p className="text-xs text-[#526356]">書籍情報の登録と、自分の本棚への追加は別の操作です。</p>
+    <p><Link className="ui-action inline-flex bg-forest px-4 text-white" to={`/create?bookId=${book.id}`}>この本に栞を残す</Link></p>
     {userId && isUuid(userId) && <p><Link className="ui-action inline-flex text-forest underline"
       to={`/users/${userId}/books/${book.id}/bookmarks`}>このユーザーの栞の流れを見る</Link></p>}
     <p><Link className="ui-action inline-flex text-forest underline" to="/search">書籍検索へ戻る</Link></p>

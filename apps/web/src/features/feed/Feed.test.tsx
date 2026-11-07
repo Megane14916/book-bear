@@ -1,4 +1,4 @@
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router'
@@ -19,7 +19,21 @@ const response = <T,>(data: T) => ({ data, response: Response.json(data) })
 function show(client = createQueryClient()) {
   return render(<QueryClientProvider client={client}><MemoryRouter><Feed /></MemoryRouter></QueryClientProvider>)
 }
-afterEach(() => { cleanup(); vi.restoreAllMocks(); localStorage.clear(); auth.status = 'guest'; auth.userId = null; auth.canReadPrivate = false })
+// Use fresh browser-like storage for each test without depending on Node's
+// optional global localStorage.
+beforeEach(() => {
+  const values = new Map<string, string>()
+  const storage: Storage = {
+    get length() { return values.size },
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => { values.set(key, String(value)) },
+    removeItem: (key) => { values.delete(key) },
+    clear: () => values.clear(),
+    key: (index) => [...values.keys()][index] ?? null,
+  }
+  vi.stubGlobal('localStorage', storage)
+})
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); auth.status = 'guest'; auth.userId = null; auth.canReadPrivate = false })
 
 it('keeps pages on an additional-fetch failure, retries the cursor, and persists guest mode without refetching', async () => {
   const get = vi.spyOn(api, 'GET').mockResolvedValueOnce(response({ items: [post('1'), post('spoiler', true)], nextCursor: 'next' }))

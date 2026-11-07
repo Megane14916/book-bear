@@ -7,6 +7,8 @@ import HomePage from './pages/HomePage'
 import PlaceholderPage from './pages/PlaceholderPage'
 import NotFoundPage from './pages/NotFoundPage'
 import LibraryPage from './features/library/LibraryPage'
+import BookmarkCreatePage from './features/bookmarks/BookmarkCreatePage'
+import BookmarkDetailPage from './features/bookmarks/BookmarkDetailPage'
 
 export default function App() {
   return (
@@ -34,8 +36,10 @@ export default function App() {
           <Route path="/books/:bookId" element={<BookDetailPage />} />
           <Route
             path="/create"
-            element={<PlaceholderPage title="栞を残す" description="読んだページや感想を記録する投稿画面を、これから作ります。" />}
+            element={<BookmarkCreatePage />}
           />
+          <Route path="/bookmarks/:bookmarkId" element={<BookmarkDetailPage />} />
+          <Route path="/bookmarks/:bookmarkId/edit" element={<BookmarkDetailPage edit />} />
           <Route
             path="/library"
             element={<LibraryPage />}
