@@ -21,8 +21,8 @@ import RelationshipsPage from './features/social/RelationshipsPage'
 export default function App() {
   const { pathname } = useLocation()
   const isTimelinePage = pathname === '/' || !!matchPath('/bookmarks/:bookmarkId', pathname)
-  const isViewportPage = isTimelinePage || pathname === '/search'
-  const compactTop = pathname === '/library' || matchPath('/me', pathname) || matchPath('/users/:userId', pathname)
+  const isViewportPage = isTimelinePage || pathname === '/search' || pathname === '/library'
+  const compactTop = matchPath('/me', pathname) || matchPath('/users/:userId', pathname)
   return (
     <div className={`min-h-screen text-ink ${isTimelinePage ? 'bg-white' : 'bg-paper'}`}>
       <header className="h-(--app-header-height) border-b border-[#e7e9e4] bg-white">

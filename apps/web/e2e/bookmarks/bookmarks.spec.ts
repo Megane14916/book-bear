@@ -201,7 +201,9 @@ test('the compact bookshelf shows reading progress after posting and reloading',
   const status = card.getByRole('combobox', { name: '読書状態' })
   const sort = page.getByRole('combobox', { name: '並べ替え' })
   await expect(sort).toHaveValue('read_recent')
-  await expect(page.getByRole('radio', { name: 'すべて', exact: true })).toBeChecked()
+  await expect(sort.locator('..').locator('svg')).toBeVisible()
+  const filters = page.getByRole('tablist', { name: '絞り込み' })
+  await expect(filters.getByRole('tab', { name: 'すべて', exact: true })).toHaveAttribute('aria-selected', 'true')
   await expect(status).toHaveValue('want_to_read')
   await expect(card.getByText('未設定')).toBeVisible()
   await expect(card.getByRole('button', { name: '本棚から削除' }).locator('svg')).toBeVisible()
@@ -214,10 +216,13 @@ test('the compact bookshelf shows reading progress after posting and reloading',
     const query = new URL(request.url()).searchParams
     return query.get('sort') === 'read_oldest' && query.get('status') === 'reading' && !query.has('cursor')
   })
-  await page.getByRole('radio', { name: '読書中', exact: true }).press('Space')
+  const reading = filters.getByRole('tab', { name: '読書中', exact: true })
+  await reading.click()
   await filterApplied
+  await expect(reading).toHaveAttribute('aria-selected', 'true')
   await expect(page.getByRole('region', { name: '条件に一致する本がありません' })).toBeVisible()
-  await page.getByRole('radio', { name: '読みたい', exact: true }).press('Space')
+  await reading.press('ArrowLeft')
+  await expect(filters.getByRole('tab', { name: '読みたい', exact: true })).toBeFocused()
   await card.getByRole('link', { name: '栞を残す', exact: true }).click()
   await page.getByRole('textbox', { name: /本文/ }).fill('本棚から残した栞')
   await page.getByLabel('ページ番号（任意）').fill('42')
@@ -233,6 +238,28 @@ test('the compact bookshelf shows reading progress after posting and reloading',
   await page.setViewportSize({ width: 1024, height: 800 })
   expect((await card.boundingBox())!.width).toBeLessThan(360)
   await page.screenshot({ path: 'test-results/library-1024.png' })
+})
+
+test('bookshelf tabs hide while reading further and reappear when scrolling back', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 })
+  await setup(page, { signedIn: true, manyBooks: true })
+  await page.goto('/library')
+  const scroller = page.getByRole('region', { name: '本棚の一覧' })
+  const tabs = scroller.getByRole('tablist', { name: '絞り込み' })
+  const selected = tabs.getByRole('tab', { selected: true })
+  await expect(selected).toHaveText('すべて')
+  expect(await selected.locator('span').evaluate((element) => getComputedStyle(element, '::after').backgroundColor)).toBe('rgb(52, 104, 75)')
+  await expect(scroller.getByRole('listitem')).toHaveCount(15)
+
+  const top = (await scroller.boundingBox())!.y
+  await scroller.evaluate((element) => { element.scrollTop = 260 })
+  await expect.poll(async () => {
+    const box = (await tabs.boundingBox())!
+    return box.y + box.height
+  }).toBeLessThanOrEqual(top)
+  await scroller.evaluate((element) => { element.scrollTop -= 50 })
+  await expect.poll(async () => (await tabs.boundingBox())!.y).toBeGreaterThanOrEqual(top)
+  expect(await scroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
 })
 
 test('guest browsing creates no account; first private save initializes auth, adds the book and saves once at 360px', async ({ page }) => {

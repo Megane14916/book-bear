@@ -6,6 +6,7 @@ import { api } from '../../lib/api/client'
 import { HttpError } from '../../lib/api/errors'
 import { requestData } from '../../lib/api/result'
 import { BookCover } from '../../components/books/BookCover'
+import { ScrollableTabs } from '../../components/ScrollableTabs'
 import { EmptyState, ErrorState, LoadingState } from '../../components/states/ScreenStates'
 import { useAuth } from '../../lib/auth/AuthProvider'
 import { queryKeys } from '../../lib/query/keys'
@@ -13,13 +14,14 @@ import { getLibraryPage, type LibrarySelection } from './api'
 
 type UserBook = components['schemas']['UserBook']
 type ReadingStatus = UserBook['status']
+type Filter = 'all' | ReadingStatus
 type Sort = NonNullable<LibrarySelection['sort']>
 const statuses: { value: ReadingStatus; label: string }[] = [
   { value: 'want_to_read', label: '読みたい' },
   { value: 'reading', label: '読書中' },
   { value: 'completed', label: '読了' },
 ]
-const filters = [{ value: undefined, label: 'すべて' }, ...statuses]
+const filters: { value: Filter; label: string }[] = [{ value: 'all', label: 'すべて' }, ...statuses]
 const sorts: { value: Sort; label: string }[] = [
   { value: 'read_recent', label: '最近読んだ' },
   { value: 'read_oldest', label: '最近読んでない' },
@@ -28,7 +30,7 @@ const sorts: { value: Sort; label: string }[] = [
 ]
 
 export default function LibraryPage() {
-  return <section aria-labelledby="library-title" className="space-y-4">
+  return <section aria-labelledby="library-title" className="h-full">
     <h1 id="library-title" className="sr-only">本棚</h1>
     <LibraryContents />
   </section>
@@ -38,7 +40,8 @@ function LibraryContents() {
   const auth = useAuth()
   const { state } = useLocation()
   const userId = auth.status === 'ready' ? auth.userId : null
-  const [status, setStatus] = useState<ReadingStatus>()
+  const [filter, setFilter] = useState<Filter>('all')
+  const status = filter === 'all' ? undefined : filter
   const [sort, setSort] = useState<Sort>(state?.sort === 'added_recent' ? 'added_recent' : 'read_recent')
   const selection = sort === 'added_recent' && !status ? undefined : { sort, status }
   const books = useInfiniteQuery({
@@ -49,33 +52,26 @@ function LibraryContents() {
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
   })
 
-  if (auth.status === 'loading' || auth.status === 'preparing' || auth.status === 'signing-out') {
-    return <LoadingState label="ログイン状態を確認しています…" />
-  }
-  if (auth.status === 'guest') return <EmptyState title="本棚を見るにはログインが必要です"
-    description="本の登録時に匿名アカウントを準備します。画面を開いただけではアカウントを作成しません。"
-    action={<Link className="ui-action inline-flex border border-forest px-5 text-sm font-bold text-forest" to="/search">本を探す</Link>} />
-  if (auth.status === 'unconfigured' || auth.status === 'error') return <ErrorState title="本棚を開けません"
-    description={auth.error?.message ?? '認証設定を確認してください。'} onRetry={() => void auth.retrySession().catch(() => {})} />
+  if (!userId) return <div className="h-full overflow-y-auto px-5 py-4 sm:px-6">
+    {auth.status === 'guest' ? <EmptyState title="本棚を見るにはログインが必要です"
+      description="本の登録時に匿名アカウントを準備します。画面を開いただけではアカウントを作成しません。"
+      action={<Link className="ui-action inline-flex border border-forest px-5 text-sm font-bold text-forest" to="/search">本を探す</Link>} /> :
+      auth.status === 'unconfigured' || auth.status === 'error' ? <ErrorState title="本棚を開けません"
+        description={auth.error?.message ?? '認証設定を確認してください。'} onRetry={() => void auth.retrySession().catch(() => {})} /> :
+        <LoadingState label="ログイン状態を確認しています…" />}
+  </div>
 
   const items = books.data?.pages.flatMap((page) => page.items) ?? []
-  return <>
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5">
-      <fieldset className="min-w-0 flex-1 basis-60">
-        <legend className="sr-only">絞り込み</legend>
-        <div className="grid grid-cols-4 gap-1 rounded-xl border border-[#e2e7e2] bg-white p-1">
-          {filters.map((filter) => <label key={filter.label}
-            className="grid min-h-11 cursor-pointer place-items-center rounded-lg px-1 text-center text-xs font-semibold text-[#526356] hover:bg-paper has-checked:bg-mist has-checked:text-forest has-[:focus-visible]:outline-2 has-[:focus-visible]:-outline-offset-2 has-[:focus-visible]:outline-forest">
-            <input type="radio" name="library-status" className="sr-only" checked={status === filter.value}
-              onChange={() => setStatus(filter.value)} />
-            {filter.label}
-          </label>)}
-        </div>
-      </fieldset>
-      <label className="ml-auto flex items-center gap-2 text-xs font-semibold text-[#526356]">
-        並べ替え
+  return <ScrollableTabs tabs={filters} value={filter} onChange={setFilter} label="絞り込み" scrollLabel="本棚の一覧"
+    panelClassName="space-y-3 px-5 pt-3 pb-6 sm:px-6">
+    <div className="flex justify-end">
+      <label className="relative inline-flex items-center text-forest">
+        <span className="sr-only">並べ替え</span>
+        <svg aria-hidden="true" className="pointer-events-none absolute left-3 size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M8 6v12m-4-4 4 4 4-4m4 4V6m-4 4 4-4 4 4" />
+        </svg>
         <select value={sort} onChange={(event) => setSort(event.target.value as Sort)}
-          className="min-h-11 rounded-lg border border-[#e2e7e2] bg-white px-3 text-sm font-semibold text-forest focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-forest">
+          className="min-h-11 rounded-lg border border-[#e2e7e2] bg-white pr-3 pl-9 text-sm font-semibold focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-forest">
           {sorts.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
         </select>
       </label>
@@ -86,7 +82,7 @@ function LibraryContents() {
         <EmptyState title="本棚は空です" description="気になる本を探して、本棚に追加してみましょう。"
         action={<Link className="ui-action inline-flex bg-forest px-5 text-sm font-bold text-white" to="/search">本を探す</Link>} /> :
       <ul className="grid gap-3 sm:grid-cols-2">
-        {items.map((item) => <li key={item.id} className="min-w-0"><LibraryBook item={item} userId={userId!} /></li>)}
+        {items.map((item) => <li key={item.id} className="min-w-0"><LibraryBook item={item} userId={userId} /></li>)}
       </ul>}
     {books.isRefetchError && <ErrorState description="本棚の一覧を更新できませんでした。" onRetry={() => void books.refetch()} isRetrying={books.isFetching} />}
     {books.hasNextPage && !books.isRefetchError && <button type="button" className="ui-action w-full border border-forest text-sm font-bold text-forest"
@@ -94,7 +90,7 @@ function LibraryContents() {
       {books.isFetchingNextPage ? '読み込み中…' : books.isFetchNextPageError ? '再試行' : '続きを読み込む'}
     </button>}
     {books.isFetchNextPageError && <p role="alert" className="text-sm text-red-700">続きの読み込みに失敗しました。もう一度お試しください。</p>}
-  </>
+  </ScrollableTabs>
 }
 
 function LibraryBook({ item, userId }: { item: UserBook; userId: string }) {
