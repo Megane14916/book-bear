@@ -3,9 +3,10 @@ import type { z } from '@hono/zod-openapi'
 import type { Database } from '../../db/client'
 import { bookmarkLikes, bookmarkReplies, bookmarks, books, follows, profiles, userBooks } from '../../db/schema'
 import type { Identity } from '../../middleware/auth'
-import { decodeCursor, encodeCursor, newerThan, olderThan, preciseTimestamp } from '../../shared/cursor'
+import { cursorBoundarySchema, decodeCursor, encodeCursor, newerThan, olderThan, preciseTimestamp } from '../../shared/cursor'
 import { ApiError, notFound } from '../../shared/errors'
-import { bookSummaryFields, requireProfile } from '../books/service'
+import { positivePage } from '../../shared/schemas'
+import { bookSummaryFields, getBook, requireProfile } from '../books/service'
 import type { CreateBookmarkRequest, PatchBookmarkRequest } from './schemas'
 
 const bookmarkFields = {
@@ -59,24 +60,48 @@ export async function listAuthorBookmarks(db: Database, authorId: string, query:
   return listPublicBookmarks(db, { limit: query.limit, boundary, authorId }, viewer)
 }
 
+const pageBoundarySchema = cursorBoundarySchema.extend({ pageNumber: positivePage.max(2147483647).nullable() })
+const missingPage = 2147483648 // One more than the largest PostgreSQL integer page number.
+const pagePosition = sql`coalesce(${bookmarks.pageNumber}, ${missingPage}::bigint)`
+
+function afterPage(boundary?: z.infer<typeof pageBoundarySchema>) {
+  if (!boundary) return
+  const position = boundary.pageNumber ?? missingPage
+  return or(sql`${pagePosition} > ${position}`, and(sql`${pagePosition} = ${position}`, olderThan(bookmarks.createdAt, bookmarks.id, boundary)))
+}
+
+export async function listBookBookmarks(db: Database, bookId: string, query: { limit: number; cursor?: string; sort: 'page' | 'recent' }, viewer?: Identity) {
+  const pageOrder = query.sort === 'page' ? { boundary: decodeCursor(query.cursor, pageBoundarySchema) } : undefined
+  const boundary = pageOrder ? undefined : decodeCursor(query.cursor)
+  await getBook(db, bookId)
+  return listPublicBookmarks(db, { limit: query.limit, bookId, boundary, pageOrder }, viewer)
+}
+
 export async function listPublicBookmarks(db: Database, query: {
   limit: number; boundary?: ReturnType<typeof decodeCursor>; followingUserId?: string; authorId?: string; q?: string
+  bookId?: string; pageOrder?: { boundary?: z.infer<typeof pageBoundarySchema> }
 }, viewer?: Identity) {
   const followed = query.followingUserId ? exists(db.select({ id: userBooks.id }).from(userBooks)
     .innerJoin(follows, eq(follows.followingId, userBooks.userId))
     .where(and(eq(userBooks.id, bookmarks.userBookId), eq(follows.followerId, query.followingUserId)))) : undefined
   const matching = query.q === undefined ? undefined : ilike(bookmarks.content, `%${query.q.replace(/[\\%_]/g, '\\$&')}%`)
   const author = query.authorId ? authoredBy(db, query.authorId) : undefined
+  const bookId = query.bookId
+  const book = bookId ? inArray(bookmarks.userBookId, db.select({ id: userBooks.id }).from(userBooks).where(eq(userBooks.bookId, bookId))) : undefined
   const publicOnly = and(eq(bookmarks.visibility, 'public'), isNull(bookmarks.deletedAt), followed, matching, author)
+  const order = [...(query.pageOrder ? [asc(pagePosition)] : []), desc(bookmarks.createdAt), desc(bookmarks.id)]
+  const boundary = query.pageOrder ? afterPage(query.pageOrder.boundary) : olderThan(bookmarks.createdAt, bookmarks.id, query.boundary)
   const page = db.$with('feed_page').as(db.select({ id: bookmarks.id }).from(bookmarks)
-    .where(and(publicOnly, olderThan(bookmarks.createdAt, bookmarks.id, query.boundary)))
-    .orderBy(desc(bookmarks.createdAt), desc(bookmarks.id)).limit(query.limit + 1))
+    .where(and(publicOnly, book, boundary)).orderBy(...order).limit(query.limit + 1))
   const rows = await db.with(page).select(fields).from(page).innerJoin(bookmarks, eq(bookmarks.id, page.id))
     .innerJoin(userBooks, eq(userBooks.id, bookmarks.userBookId)).innerJoin(profiles, eq(profiles.id, userBooks.userId))
-    .innerJoin(books, eq(books.id, userBooks.bookId)).where(publicOnly)
-    .orderBy(desc(bookmarks.createdAt), desc(bookmarks.id))
+    .innerJoin(books, eq(books.id, userBooks.bookId)).where(and(publicOnly, bookId ? eq(userBooks.bookId, bookId) : undefined))
+    .orderBy(...order)
   const cards = rows.slice(0, query.limit), last = cards.at(-1)
-  return { items: await withCounts(db, cards, viewer), nextCursor: rows.length > query.limit && last ? encodeCursor({ createdAt: last.createdAt, id: last.id }) : null }
+  const nextCursor = rows.length > query.limit && last ? encodeCursor({ createdAt: last.createdAt, id: last.id,
+    ...(query.pageOrder ? { pageNumber: last.pageNumber } : {}),
+  }) : null
+  return { items: await withCounts(db, cards, viewer), nextCursor }
 }
 export async function lockBookmark(db: Database, id: string, viewer?: Identity) {
   const [row] = await db.select({ visibility: bookmarks.visibility }).from(bookmarks)

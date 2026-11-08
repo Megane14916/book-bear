@@ -190,6 +190,58 @@ it('公開プロフィールの栞は読者・公開範囲・未削除の条件�
   expect((await request(`/users/${randomUUID()}/bookmarks`)).status).toBe(404)
 })
 
+it('書籍ごとの公開栞をページ順・新着順でページ分割し、閲覧者のいいねを返す', async () => {
+  const entry = await shelf(), unrelated = await shelf(other)
+  const added = await request('/me/books', other.token, 'POST', { bookId: entry.book.id })
+  expect(added.status).toBe(201)
+  const secondReader = await added.json() as Shelf
+  const createdAt = '2026-06-06T00:00:00.000001Z', later = '2026-06-06T00:00:00.000002Z'
+  const earlierPage = await seed(entry, createdAt, { pageNumber: 3 })
+  const ids = [randomUUID(), randomUUID()].sort().reverse()
+  const firstAtTie = await seed(secondReader, later, { pageNumber: 3, id: ids[0] })
+  const secondAtTie = await seed(entry, later, { pageNumber: 3, id: ids[1] })
+  const maxPage = await seed(entry, '2026-06-07T00:00:00.000000Z', { pageNumber: 2147483647 })
+  const olderUnnumbered = await seed(secondReader, '2026-06-08T00:00:00.000000Z')
+  const newest = await seed(entry, '2026-06-09T00:00:00.000000Z', { isSpoiler: true })
+  await seed(entry, later, { pageNumber: 1, visibility: 'private' })
+  await seed(secondReader, later, { pageNumber: 1, deleted: true })
+  await seed(unrelated, later, { pageNumber: 1 })
+  expect((await request(`/bookmarks/${firstAtTie.id}/like`, owner.token, 'PUT')).status).toBe(204)
+
+  const path = `/books/${entry.book.id}/bookmarks`
+  for (const [sort, token, expected] of [
+    ['page', owner.token, [firstAtTie, secondAtTie, earlierPage, maxPage, newest, olderUnnumbered]],
+    ['recent', null, [newest, olderUnnumbered, maxPage, firstAtTie, secondAtTie, earlierPage]],
+  ] as const) {
+    const items: string[] = []
+    let cursor: string | null = null
+    do {
+      const response = await request(`${path}?sort=${sort}&limit=1${cursor ? `&cursor=${cursor}` : ''}`, token)
+      expect(response.status).toBe(200)
+      expect(response.headers.get('Cache-Control')).toBe('no-store')
+      const result = FeedPage.parse(await response.json())
+      for (const card of result.items) {
+        expect(card.book.id).toBe(entry.book.id)
+        expect(card.visibility).toBe('public')
+        if (card.id === firstAtTie.id) expect(card).toMatchObject({ likeCount: 1, likedByMe: !!token, author: { id: other.id } })
+        items.push(card.id)
+      }
+      expect(items.length).toBeLessThanOrEqual(expected.length)
+      cursor = result.nextCursor
+    } while (cursor && items.length < expected.length)
+    expect(cursor).toBeNull()
+    expect(items).toEqual(expected.map(({ id }) => id))
+  }
+
+  const defaultPage = FeedPage.parse(await (await request(`${path}?limit=1`)).json())
+  expect(defaultPage.items[0].id).toBe(firstAtTie.id)
+  expect(await (await request(`${path}?sort=recent&cursor=${defaultPage.nextCursor}`)).json()).toMatchObject({ error: { code: 'INVALID_CURSOR' } })
+  expect((await request(`${path}?sort=unknown`)).status).toBe(400)
+  expect((await request(path, 'invalid')).status).toBe(401)
+  expect((await request(`/books/${randomUUID()}/bookmarks`)).status).toBe(404)
+  expect(await (await request(`/books/${(await shelf()).book.id}/bookmarks`)).json()).toEqual({ items: [], nextCursor: null })
+})
+
 describe('認証→Zod→followingガード→allのカーソル検証', () => {
   it('不正・期限切れ・署名不正JWTは不正クエリより先に401、認証基盤障害は503', async () => {
     const database = vi.fn(async () => { throw new Error('DB must not be called') })
