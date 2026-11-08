@@ -33,8 +33,11 @@ export function AddToLibraryButton({ bookId, onAdded }: { bookId: string; onAdde
   })
 
   return <div>
-    <button type="button" className="ui-action inline-flex bg-forest px-4 text-sm font-bold text-white hover:bg-forest-dark"
+    <button type="button" className="ui-action flex w-full gap-2 border border-[#d6e2d9] bg-white px-2 text-sm font-bold text-forest hover:bg-mist"
       disabled={mutation.isPending} onClick={() => mutation.mutate(undefined, { onSuccess: onAdded })}>
+      <svg aria-hidden="true" className="size-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 4h8v16H3zM7 8h1m7 4h6m-3-3v6M3 17h8" />
+      </svg>
       {mutation.isPending ? '本棚に追加中…' : '本棚に追加'}
     </button>
     {mutation.isError && <p role="alert" className="mt-2 text-sm text-red-700">{mutation.error.message}</p>}

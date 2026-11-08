@@ -2955,6 +2955,131 @@
         }
       }
     },
+    "/api/v1/books/{bookId}/bookmarks": {
+      "get": {
+        "tags": [
+          "Bookmarks"
+        ],
+        "security": [
+          {},
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-implementation-status": "implemented",
+        "x-auth": "OptionalAuth",
+        "operationId": "getBooksBookidBookmarks",
+        "summary": "書籍の公開栞一覧",
+        "description": "指定した書籍の公開・未削除の栞を返す。pageはページ番号の昇順（未設定は末尾）、同じページ内はrecentと同じく投稿日時・IDの降順。JWTは任意で、提示時は検証する。",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "bookId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "同じ書籍・並べ替えで取得した次ページカーソル。pageにはページ番号（未設定はnull）も含む。不正形式や異なる並べ替えのカーソルは400 INVALID_CURSOR。"
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 30,
+              "default": 15
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "page",
+                "recent"
+              ],
+              "default": "page"
+            },
+            "required": false,
+            "name": "sort",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHORIZED: JWTなし・無効・期限切れ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND: 対象書籍が存在しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_ERROR: 内部情報を含めないエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "INTERNAL_ERROR: 認証設定不備・JWKS取得失敗",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/users/{userId}/bookmarks": {
       "get": {
         "tags": [

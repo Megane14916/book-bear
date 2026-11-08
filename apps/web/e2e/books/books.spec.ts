@@ -53,6 +53,8 @@ async function setup(page: Page, options: { failAuth?: boolean; failInit?: boole
       books.set(manualId, book)
       return route.fulfill({ status: 201, json: book })
     }
+    if (/^\/api\/v1\/books\/[^/]+\/bookmarks$/.test(url.pathname)) return route.fulfill({ json: { items: [], nextCursor: null } })
+    if (url.pathname === '/api/v1/me/preferences') return route.fulfill({ json: { feedContentMode: 'tap' } })
     if (url.pathname.startsWith('/api/v1/books/')) {
       details++; events.push('detail')
       const book = books.get(url.pathname.split('/').at(-1)!)
@@ -106,6 +108,67 @@ test('external import authenticates, sends provider identity, and handles 201/20
   expect(mock.imports).toHaveLength(2)
   expect(mock.counts().signup).toBe(1)
   expect(mock.counts().libraries).toBe(0)
+})
+
+test('book details collapse metadata and show the public feed in page or recent order on mobile', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 })
+  const mock = await setup(page)
+  const post = (pageNumber: number, isSpoiler = false) => ({
+    id: `00000000-0000-4000-8000-${String(pageNumber).padStart(12, '0')}`,
+    book: local, author: { id: userId, displayName: '読者', avatarUrl: null },
+    pageNumber, content: `${pageNumber}ページの感想`, visibility: 'public', isSpoiler, likeCount: 2, replyCount: 1, likedByMe: false,
+    createdAt: '2026-11-08T00:00:00Z', updatedAt: '2026-11-08T00:00:00Z',
+  })
+  const first = post(12), second = post(30, true), last = post(40)
+  const requests: [string | null, string | null][] = []
+  await page.route((url) => url.origin === origin && url.pathname === `/api/v1/books/${localId}/bookmarks`, (route) => {
+    const params = new URL(route.request().url()).searchParams
+    const sort = params.get('sort'), cursor = params.get('cursor')
+    requests.push([sort, cursor])
+    const items = sort === 'recent' ? [last, second, first] : cursor ? [last] : [first, second]
+    return route.fulfill({ json: { items, nextCursor: sort === 'page' && !cursor ? 'next-page' : null } })
+  })
+  await page.goto(`/books/${localId}`)
+  const isbn = page.getByText(local.isbn13, { exact: true })
+  const metadata = page.getByText('書誌情報', { exact: true })
+  await expect(isbn).toBeHidden()
+  await metadata.click()
+  await expect(isbn).toBeVisible()
+  await metadata.click()
+  await expect(isbn).toBeHidden()
+
+  const add = page.getByRole('button', { name: '本棚に追加', exact: true })
+  const compose = page.getByRole('link', { name: '栞を残す', exact: true })
+  await expect(compose).toHaveAttribute('href', `/create?bookId=${localId}`)
+  const addBox = (await add.boundingBox())!, composeBox = (await compose.boundingBox())!
+  expect(addBox.y).toBe(composeBox.y)
+  expect(addBox.x + addBox.width).toBeLessThan(composeBox.x)
+
+  const area = page.getByRole('region', { name: '書籍詳細と栞の一覧' })
+  const byPage = area.getByRole('tab', { name: 'ページ順' }), recent = area.getByRole('tab', { name: '新着順' })
+  const cards = area.getByRole('article', { name: '栞', exact: true })
+  await expect(byPage).toHaveAttribute('aria-selected', 'true')
+  expect(await byPage.locator('span').evaluate((element) => getComputedStyle(element, '::after').backgroundColor)).toBe('rgb(52, 104, 75)')
+  await expect(cards.first()).toContainText('12ページ')
+  await expect(area.getByText(first.content)).toHaveCount(0)
+  await page.getByRole('button', { name: '本文：タップして表示' }).click()
+  await expect(area.getByText(first.content)).toBeVisible()
+  await expect(area.getByText(second.content)).toHaveCount(0)
+  await expect(cards.nth(1).getByRole('button', { name: 'ネタバレ本文を表示' })).toBeVisible()
+  await expect(cards.first().getByRole('link', { name: 'Xで共有' })).toBeVisible()
+
+  await area.evaluate((element) => { element.scrollTop = element.scrollHeight })
+  await expect(cards).toHaveCount(3)
+  expect(requests).toEqual([['page', null], ['page', 'next-page']])
+  await area.evaluate((element) => { element.scrollTop = 0 })
+  await recent.click()
+  await expect(recent).toHaveAttribute('aria-selected', 'true')
+  await expect(cards.first()).toContainText('40ページ')
+  await expect(cards.first().getByRole('link', { name: `${local.title}の栞を開く` })).toHaveAttribute('href', `/bookmarks/${last.id}`)
+  expect(requests.at(-1)).toEqual(['recent', null])
+  expect(mock.counts().signup).toBe(0)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await page.screenshot({ path: 'test-results/book-detail-360.png' })
 })
 
 test('saves from book details and shows the saved book while the shelf list loads', async ({ page }) => {
@@ -180,6 +243,8 @@ test('manual registration validates before auth, retains inputs and retries the 
   await page.getByLabel('著者（任意）').fill(' 著者 ')
   await page.getByRole('button', { name: 'もう一度試す', exact: true }).click()
   await expect(page).toHaveURL(`/books/${manualId}`)
+  await expect(page.getByText('ISBNなし', { exact: true })).toBeHidden()
+  await page.getByText('書誌情報', { exact: true }).click()
   await expect(page.getByText('ISBNなし', { exact: true })).toBeVisible()
   expect(mock.manuals[1]).toEqual({ title: '修正した本', author: '著者', totalPages: null })
   expect(mock.counts().signup).toBe(1)

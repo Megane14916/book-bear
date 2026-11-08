@@ -15,6 +15,8 @@ export const queryKeys = {
   publicBooks: (userId: string, limit = 15) => ['public-books', userId, { limit }] as const,
   feed: (scope: 'all' | 'following', viewerId: string | null, limit = 15) =>
     ['feed', scope, viewerId, { limit }] as const,
+  bookBookmarks: (bookId: string, sort: 'page' | 'recent', viewerId: string | null) =>
+    ['book-bookmarks', bookId, sort, viewerId] as const,
   bookmarkFlow: (userId: string, bookId: string, viewerId: string | null, limit = 15) =>
     ['bookmark-flow', userId, bookId, viewerId, { limit }] as const,
   searchPosts: (q: string, viewerId: string | null, limit = 15) =>

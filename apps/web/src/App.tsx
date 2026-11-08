@@ -22,7 +22,8 @@ import RelationshipsPage from './features/social/RelationshipsPage'
 export default function App() {
   const { pathname } = useLocation()
   const isHome = pathname === '/'
-  const isTimelinePage = isHome || !!matchPath('/bookmarks/:bookmarkId', pathname)
+  const isBookDetail = !!matchPath('/books/:bookId', pathname) && !matchPath('/books/manual', pathname)
+  const isTimelinePage = isHome || isBookDetail || !!matchPath('/bookmarks/:bookmarkId', pathname)
   const isProfilePage = pathname === '/me' || !!matchPath('/users/:userId', pathname)
   const isViewportPage = isTimelinePage || pathname === '/search' || pathname === '/library' || isProfilePage
   useLayoutEffect(() => {

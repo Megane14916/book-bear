@@ -336,6 +336,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/books/{bookId}/bookmarks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 書籍の公開栞一覧
+         * @description 指定した書籍の公開・未削除の栞を返す。pageはページ番号の昇順（未設定は末尾）、同じページ内はrecentと同じく投稿日時・IDの降順。JWTは任意で、提示時は検証する。
+         */
+        get: operations["getBooksBookidBookmarks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/users/{userId}/bookmarks": {
         parameters: {
             query?: never;
@@ -2257,6 +2277,77 @@ export interface operations {
                 };
             };
             /** @description NOT_FOUND: 対象なし。他人の栞・本棚、第三者の非公開栞、削除済み栞も404 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description INTERNAL_ERROR: 内部情報を含めないエラー */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description INTERNAL_ERROR: 認証設定不備・JWKS取得失敗 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getBooksBookidBookmarks: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+                sort?: "page" | "recent";
+            };
+            header?: never;
+            path: {
+                bookId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedPage"];
+                };
+            };
+            /** @description VALIDATION_ERROR / INVALID_CURSOR: 入力・カーソル不正 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description UNAUTHORIZED: JWTなし・無効・期限切れ */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description NOT_FOUND: 対象書籍が存在しない */
             404: {
                 headers: {
                     [name: string]: unknown;

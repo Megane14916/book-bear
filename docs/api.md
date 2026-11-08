@@ -6,9 +6,9 @@
 
 ### 現在の契約と実装状況（Issue #7）
 
-`apps/api/src/modules/*/schemas.ts` と各モジュールの `routes.ts` を正本として、主要34操作の `contracts/openapi.json` とWebの `src/lib/api/generated.ts` を生成する。`GET /openapi.json` も同一仕様を返す。手書きの初期ドラフトは履歴資料とし、以降の変更はZod定義・生成物・本書に反映する。
+`apps/api/src/modules/*/schemas.ts` と各モジュールの `routes.ts` を正本として、主要36操作の `contracts/openapi.json` とWebの `src/lib/api/generated.ts` を生成する。`GET /openapi.json` も同一仕様を返す。手書きの初期ドラフトは履歴資料とし、以降の変更はZod定義・生成物・本書に反映する。
 
-- 操作単位の `x-implementation-status: implemented` は実装済み（health・DB接続確認、プロフィール／設定6操作、書籍・本棚9操作、栞CRUD・本人一覧5操作、栞の流れ1操作、all／followingフィード1操作、フォロー・いいね・返信10操作、投稿／ユーザー検索2操作）。全36操作が実装済み。
+- 操作単位の `x-implementation-status: implemented` は実装済み（health・DB接続確認、プロフィール／設定6操作、書籍・本棚9操作、栞CRUD・本人一覧5操作、公開プロフィール・書籍の公開栞一覧2操作、栞の流れ1操作、all／followingフィード1操作、フォロー・いいね・返信10操作、投稿／ユーザー検索2操作）。全38操作が実装済み。
 - `x-auth` は `Public / OptionalAuth / AnyAuth / Owner / Registered`。`OptionalAuth` はJWTなしでも閲覧可、送信時は必ず検証して無効なら401。`Registered` は匿名ユーザーに403。公開化・followingフィードなどの条件付き制限は各操作の説明と403レスポンスに記載する。
 - `followedByMe`・`likedByMe` を返す公開GETと、本人の非公開情報を返し得るGETは任意認証。初期ドラフトの公開プロフィール・返信一覧・投稿検索の認証記載を補完した。
 - 入力はUUID、UTC日時、列挙値、本文長、整数範囲をZodで検証。JSONの数値・booleanは文字列から変換しない。クエリのlimitは数値化し、1〜30（既定15、書籍・ユーザー検索は20）とする。
@@ -68,6 +68,7 @@ Custom providerの識別子は `custom:google`、要求scopeは `openid email` �
 - 他人の栞の変更、第三者の非公開栞、削除済みは404。詳細GETのJWTは任意だが、提示時は必ず検証する。各操作でno-store。
 - 本人一覧は公開・非公開を新しい順で取得。Issue #10と同じ署名・期限なしのBase64URLカーソルとDB日時精度を維持し、毎回SQLで認可する。いいね・未削除返信は返却ID集合で一括集計する。
 - 公開プロフィールの `GET /users/{userId}/bookmarks` は対象読者の公開・未削除の栞を投稿日時・IDの降順で取得する。JWTは任意で、提示時は検証する。既存のカーソルとフィードと同じカードを返す。
+- 書籍詳細の `GET /books/{bookId}/bookmarks` は対象書籍の公開・未削除の栞を `FeedPage` で返す。JWTは任意で、提示時は検証する。`sort=page`（既定）はページ番号の昇順で未設定を末尾に置き、同じページ内は投稿日時・IDの降順とする。`sort=recent` は全体を投稿日時・IDの降順にする。`limit` は既定15・最大30。同じ書籍と並べ替えで `nextCursor` を使い、別の並べ替えのカーソルは400。存在しない書籍は404。
 - 論理削除後もFK参照・関連行は残り、本棚削除の409 HAS_BOOKMARKSは維持する。新規インデックス・マイグレーション・レート制限は追加していない。
 
 ### 栞の流れ（Issue #12）
@@ -237,6 +238,7 @@ export type CursorPage<T> = {
 | PATCH | `/bookmarks/{bookmarkId}` | Owner（公開化はRegistered） | 本文、位置、公開、ネタバレの更新 |
 | DELETE | `/bookmarks/{bookmarkId}` | Owner | 論理削除 |
 | GET | `/me/bookmarks?cursor=` | Owner | 自分の公開／非公開の栞を新しい順に取得 |
+| GET | `/books/{bookId}/bookmarks?sort=page&cursor=` | OptionalAuth | 書籍の公開栞をページ順または新着順で取得 |
 | **GET** | **`/users/{userId}/books/{bookId}/bookmarks`** | Public／自分ならOwner | **「栞の流れ」：投稿日時の古い順** |
 
 作成・編集入力（`PATCH` は一部フィールドでよい）：

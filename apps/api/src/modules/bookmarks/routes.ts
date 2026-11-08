@@ -1,6 +1,6 @@
-import { createRoute, type RouteConfig } from '@hono/zod-openapi'
+import { createRoute, z, type RouteConfig } from '@hono/zod-openapi'
 import { authErrors, body, commonErrors, json } from '../../shared/http'
-import { BookmarkFlowParams, BookmarkIdParams, cursor, ErrorSchema, PaginationQuery, UserIdParams } from '../../shared/schemas'
+import { BookIdParams, BookmarkFlowParams, BookmarkIdParams, cursor, ErrorSchema, PaginationQuery, UserIdParams } from '../../shared/schemas'
 import { BookmarkCard, BookmarkFlowPage, CreateBookmarkRequest, FeedPage, PatchBookmarkRequest } from './schemas'
 
 const owner = { tags: ['Bookmarks'], security: [{ bearerAuth: [] }], 'x-implementation-status': 'implemented' as const, 'x-auth': 'Owner' }
@@ -10,6 +10,14 @@ const publishError = { 403: json(ErrorSchema, 'REGISTRATION_REQUIRED: 匿名ユ�
 const query = PaginationQuery.extend({ cursor: cursor.openapi({ description: '日時・IDのBase64URLカーソル。署名・有効期限なし。不正形式は400 INVALID_CURSOR。' }).optional() })
 
 export const bookmarkRoutes = {
+  bookList: createRoute({ ...owner, 'x-auth': 'OptionalAuth', security: optionalBearer, method: 'get',
+    path: '/api/v1/books/{bookId}/bookmarks', operationId: 'getBooksBookidBookmarks', summary: '書籍の公開栞一覧',
+    description: '指定した書籍の公開・未削除の栞を返す。pageはページ番号の昇順（未設定は末尾）、同じページ内はrecentと同じく投稿日時・IDの降順。JWTは任意で、提示時は検証する。',
+    request: { params: BookIdParams, query: PaginationQuery.extend({
+      sort: z.enum(['page', 'recent']).default('page'),
+      cursor: cursor.openapi({ description: '同じ書籍・並べ替えで取得した次ページカーソル。pageにはページ番号（未設定はnull）も含む。不正形式や異なる並べ替えのカーソルは400 INVALID_CURSOR。' }).optional(),
+    }) },
+    responses: { ...errors, 404: json(ErrorSchema, 'NOT_FOUND: 対象書籍が存在しない'), 200: json(FeedPage) } }),
   publicList: createRoute({ ...owner, 'x-auth': 'OptionalAuth', security: optionalBearer, method: 'get',
     path: '/api/v1/users/{userId}/bookmarks', operationId: 'getUsersUseridBookmarks', summary: '読者の公開栞一覧',
     description: '指定した読者の公開・未削除の栞を投稿日時・IDの降順で返す。JWTは任意で、提示時は検証する。',
