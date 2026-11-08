@@ -17,10 +17,10 @@ const fields = { ...bookmarkFields, author: authorFields, book: bookSummaryField
 const cardQuery = (db: Database) => db.select(fields).from(bookmarks)
   .innerJoin(userBooks, eq(userBooks.id, bookmarks.userBookId))
   .innerJoin(profiles, eq(profiles.id, userBooks.userId)).innerJoin(books, eq(books.id, userBooks.bookId))
-const owned = (db: Database, viewer: Identity) => exists(db.select({ id: userBooks.id }).from(userBooks)
-  .where(and(eq(userBooks.id, bookmarks.userBookId), eq(userBooks.userId, viewer.id))))
+const authoredBy = (db: Database, userId: string) => exists(db.select({ id: userBooks.id }).from(userBooks)
+  .where(and(eq(userBooks.id, bookmarks.userBookId), eq(userBooks.userId, userId))))
 export const canReadBookmark = (db: Database, viewer?: Identity) => and(isNull(bookmarks.deletedAt),
-  viewer ? or(eq(bookmarks.visibility, 'public'), owned(db, viewer)) : eq(bookmarks.visibility, 'public'))
+  viewer ? or(eq(bookmarks.visibility, 'public'), authoredBy(db, viewer.id)) : eq(bookmarks.visibility, 'public'))
 
 async function withCounts<T extends { id: string }>(db: Database, cards: T[], viewer?: Identity) {
   if (!cards.length) return []
@@ -44,7 +44,7 @@ export async function listBookmarks(db: Database, viewer: Identity, query: { lim
   await requireProfile(db, viewer.id)
   // Limit the candidate IDs before joining metadata; count only returned cards.
   const page = db.$with('bookmark_page').as(db.select({ id: bookmarks.id }).from(bookmarks)
-    .where(and(owned(db, viewer), isNull(bookmarks.deletedAt), olderThan(bookmarks.createdAt, bookmarks.id, boundary)))
+    .where(and(authoredBy(db, viewer.id), isNull(bookmarks.deletedAt), olderThan(bookmarks.createdAt, bookmarks.id, boundary)))
     .orderBy(desc(bookmarks.createdAt), desc(bookmarks.id)).limit(query.limit + 1))
   const rows = await db.with(page).select(fields).from(page).innerJoin(bookmarks, eq(bookmarks.id, page.id))
     .innerJoin(userBooks, eq(userBooks.id, bookmarks.userBookId)).innerJoin(profiles, eq(profiles.id, userBooks.userId))
@@ -53,12 +53,21 @@ export async function listBookmarks(db: Database, viewer: Identity, query: { lim
   const cards = rows.slice(0, query.limit), last = cards.at(-1)
   return { items: await withCounts(db, cards, viewer), nextCursor: rows.length > query.limit && last ? encodeCursor({ createdAt: last.createdAt, id: last.id }) : null }
 }
-export async function listPublicBookmarks(db: Database, query: { limit: number; boundary?: ReturnType<typeof decodeCursor>; followingUserId?: string; q?: string }, viewer?: Identity) {
+export async function listAuthorBookmarks(db: Database, authorId: string, query: { limit: number; cursor?: string }, viewer?: Identity) {
+  const boundary = decodeCursor(query.cursor)
+  await requireProfile(db, authorId)
+  return listPublicBookmarks(db, { limit: query.limit, boundary, authorId }, viewer)
+}
+
+export async function listPublicBookmarks(db: Database, query: {
+  limit: number; boundary?: ReturnType<typeof decodeCursor>; followingUserId?: string; authorId?: string; q?: string
+}, viewer?: Identity) {
   const followed = query.followingUserId ? exists(db.select({ id: userBooks.id }).from(userBooks)
     .innerJoin(follows, eq(follows.followingId, userBooks.userId))
     .where(and(eq(userBooks.id, bookmarks.userBookId), eq(follows.followerId, query.followingUserId)))) : undefined
   const matching = query.q === undefined ? undefined : ilike(bookmarks.content, `%${query.q.replace(/[\\%_]/g, '\\$&')}%`)
-  const publicOnly = and(eq(bookmarks.visibility, 'public'), isNull(bookmarks.deletedAt), followed, matching)
+  const author = query.authorId ? authoredBy(db, query.authorId) : undefined
+  const publicOnly = and(eq(bookmarks.visibility, 'public'), isNull(bookmarks.deletedAt), followed, matching, author)
   const page = db.$with('feed_page').as(db.select({ id: bookmarks.id }).from(bookmarks)
     .where(and(publicOnly, olderThan(bookmarks.createdAt, bookmarks.id, query.boundary)))
     .orderBy(desc(bookmarks.createdAt), desc(bookmarks.id)).limit(query.limit + 1))
@@ -118,15 +127,15 @@ export async function createBookmark(db: Database, viewer: Identity, input: z.in
 export async function patchBookmark(db: Database, viewer: Identity, id: string, patch: z.infer<typeof PatchBookmarkRequest>) {
   return db.transaction(async (tx) => {
     const [current] = await tx.select({ visibility: bookmarks.visibility }).from(bookmarks)
-      .where(and(eq(bookmarks.id, id), isNull(bookmarks.deletedAt), owned(tx, viewer))).for('update')
+      .where(and(eq(bookmarks.id, id), isNull(bookmarks.deletedAt), authoredBy(tx, viewer.id))).for('update')
     if (!current) throw notFound()
     requirePublishPermission(viewer, patch.visibility ?? current.visibility)
-    await tx.update(bookmarks).set(patch).where(and(eq(bookmarks.id, id), isNull(bookmarks.deletedAt), owned(tx, viewer)))
+    await tx.update(bookmarks).set(patch).where(and(eq(bookmarks.id, id), isNull(bookmarks.deletedAt), authoredBy(tx, viewer.id)))
     return getBookmark(tx, id, viewer)
   })
 }
 export async function deleteBookmark(db: Database, viewer: Identity, id: string) {
   const rows = await db.update(bookmarks).set({ deletedAt: sql`now()`, updatedAt: sql`now()` })
-    .where(and(eq(bookmarks.id, id), isNull(bookmarks.deletedAt), owned(db, viewer))).returning({ id: bookmarks.id })
+    .where(and(eq(bookmarks.id, id), isNull(bookmarks.deletedAt), authoredBy(db, viewer.id))).returning({ id: bookmarks.id })
   if (!rows.length) throw notFound()
 }

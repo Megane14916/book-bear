@@ -17,7 +17,7 @@ for (const width of [360, 1024]) test(`home timeline tabs, reveal and card navig
     const url = new URL(route.request().url())
     if (url.pathname === '/api/v1/feed') {
       scopes.push(url.searchParams.get('scope')!)
-      return route.fulfill({ json: { items: url.searchParams.has('cursor') ? [post(4)] : [post(1), post(2), post(3)],
+      return route.fulfill({ json: { items: url.searchParams.has('cursor') ? [post(5)] : [post(1), post(2), post(3), post(4)],
         nextCursor: url.searchParams.has('cursor') ? null : 'next' } })
     }
     if (url.pathname === `/api/v1/bookmarks/${post(1).id}`) return route.fulfill({ json: post(1) })
@@ -41,7 +41,7 @@ for (const width of [360, 1024]) test(`home timeline tabs, reveal and card navig
   const underline = (tab: typeof latest) => tab.locator('span').evaluate((element) => getComputedStyle(element, '::after').backgroundColor)
   expect(await underline(latest)).toBe('rgb(52, 104, 75)')
   expect(await underline(following)).toBe('rgba(0, 0, 0, 0)')
-  await expect(cards).toHaveCount(3)
+  await expect(cards).toHaveCount(4)
   await expect(firstBody).toHaveCount(0)
   await first.getByRole('button', { name: '本文を表示', exact: true }).click()
   await expect(firstBody).toBeVisible()
@@ -75,8 +75,16 @@ for (const width of [360, 1024]) test(`home timeline tabs, reveal and card navig
   await expect(spoiler).toHaveCount(0)
   await expect(page).toHaveURL(/\/$/)
 
-  await page.getByRole('button', { name: 'もっと見る', exact: true }).click()
-  await expect(cards).toHaveCount(4)
+  await expect(timeline.getByRole('button', { name: 'もっと見る', exact: true })).toHaveCount(0)
+  expect(scopes).toHaveLength(1)
+  const banner = page.getByRole('banner')
+  const header = (await banner.boundingBox())!
+  await page.mouse.move(header.x + header.width / 2, header.y + header.height / 2)
+  await page.mouse.wheel(0, 500)
+  expect(await timeline.evaluate((element) => element.scrollTop)).toBe(0)
+  expect(await page.evaluate(() => window.scrollY)).toBe(0)
+  await timeline.evaluate((element) => { element.scrollTop = element.scrollHeight })
+  await expect(cards).toHaveCount(5)
   const lastLike = timeline.getByRole('button', { name: 'いいね（3）', exact: true }).last()
   await timeline.evaluate((element) => { element.scrollTop = element.scrollHeight })
   await expect.poll(async () => {
@@ -105,5 +113,14 @@ for (const width of [360, 1024]) test(`home timeline tabs, reveal and card navig
   const body = (await firstBody.boundingBox())!
   await page.mouse.click(body.x + body.width / 2, body.y + body.height / 2)
   await expect(page).toHaveURL(`/bookmarks/${post(1).id}`)
-  await expect(page.getByRole('heading', { name: '栞の詳細' })).toBeVisible()
+  await expect(page.getByRole('link', { name: '栞の流れ', exact: true })).toBeVisible()
+
+  await page.setViewportSize({ width, height: 420 })
+  await page.goto('/books/manual')
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
+  await nav.getByRole('link', { name: 'ホーム', exact: true }).click()
+  await expect(timeline).toBeVisible()
+  expect(await page.evaluate(() => window.scrollY)).toBe(0)
+  expect((await banner.boundingBox())!.y).toBe(0)
 })

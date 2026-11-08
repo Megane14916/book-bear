@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router'
 import { api } from '../../lib/api/client'
@@ -36,6 +36,14 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); auth.status = 'guest'; auth.userId = null; auth.canReadPrivate = false })
 
 it('keeps pages on an additional-fetch failure, retries the cursor, and persists guest mode without refetching', async () => {
+  let reachEnd: (() => void) | undefined
+  vi.stubGlobal('IntersectionObserver', class {
+    constructor(callback: (entries: { isIntersecting: boolean }[]) => void) {
+      reachEnd = () => callback([{ isIntersecting: true }])
+    }
+    observe() {}
+    disconnect() {}
+  })
   const get = vi.spyOn(api, 'GET').mockResolvedValueOnce(response({ items: [post('1'), post('spoiler', true)], nextCursor: 'next' }))
     .mockRejectedValueOnce(new Error('failed')).mockResolvedValueOnce(response({ items: [post('2')], nextCursor: null }))
   const view = show()
@@ -45,7 +53,9 @@ it('keeps pages on an additional-fetch failure, retries the cursor, and persists
   expect(screen.getByText('本文1')).toBeTruthy()
   expect(screen.queryByText('本文spoiler')).toBeNull()
   expect(get).toHaveBeenCalledTimes(1)
-  fireEvent.click(screen.getByRole('button', { name: 'もっと見る' }))
+  expect(screen.queryByRole('button', { name: 'もっと見る' })).toBeNull()
+  await waitFor(() => expect(reachEnd).toBeTypeOf('function'))
+  act(() => reachEnd!())
   await screen.findByText('続きを取得できませんでした。')
   expect(screen.getByText('本文1')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'もう一度試す' }))

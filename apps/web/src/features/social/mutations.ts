@@ -26,7 +26,7 @@ export function useSocialMutation<T>(key: string[], write: (input: T, signal: Ab
 
 export function refreshBookmarkSocial(client: QueryClient, bookmarkId: string) {
   return client.invalidateQueries({ predicate: ({ queryKey: [group, kind, id] }) =>
-    ['feed', 'bookmark-flow', 'search-posts', 'my-bookmarks'].includes(String(group)) ||
+    ['feed', 'bookmark-flow', 'search-posts', 'my-bookmarks', 'public-bookmarks'].includes(String(group)) ||
     (group === 'bookmarks' && kind === 'detail' && id === bookmarkId) || (group === 'replies' && kind === bookmarkId),
   })
 }

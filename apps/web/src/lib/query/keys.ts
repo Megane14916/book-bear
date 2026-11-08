@@ -11,6 +11,7 @@ export const queryKeys = {
     ['my-books', viewerId, { limit }, ...(selection ? [selection] : [])] as const,
   me: (viewerId: string | null) => ['me', viewerId] as const,
   publicProfile: (userId: string, viewerId: string | null) => ['public-profile', userId, viewerId] as const,
+  publicBookmarks: (userId: string, viewerId: string | null) => ['public-bookmarks', userId, viewerId] as const,
   publicBooks: (userId: string, limit = 15) => ['public-books', userId, { limit }] as const,
   feed: (scope: 'all' | 'following', viewerId: string | null, limit = 15) =>
     ['feed', scope, viewerId, { limit }] as const,

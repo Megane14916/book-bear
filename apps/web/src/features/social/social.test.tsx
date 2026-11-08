@@ -101,6 +101,7 @@ it('links an updated follower count to the public relationship list and forwards
       return response({ items: input.params.query.scope === 'following' && followed ? [bookmark] : [], nextCursor: null })
     }
     if (path === '/api/v1/users/{userId}/books') return response({ items: [], nextCursor: null })
+    if (path === '/api/v1/users/{userId}/bookmarks') return response({ items: [], nextCursor: null })
     if (path === '/api/v1/users/{userId}/followers') {
       const input = options as { params: { query: { cursor?: string } } }
       return response(input.params.query.cursor ? { items: [{ ...other, id: 'next', displayName: '次の読者' }], nextCursor: null } :

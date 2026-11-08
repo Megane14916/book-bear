@@ -39,6 +39,12 @@
     -webkit-font-smoothing: antialiased;
   }
 
+  html:has([data-home]),
+  body:has([data-home]) {
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
   body {
     min-width: 320px;
   }

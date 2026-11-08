@@ -1,4 +1,5 @@
-import { useId, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useId, useState, type FormEvent, type ReactNode } from 'react'
+import { useAutoGrowTextarea } from '../../components/useAutoGrowTextarea'
 import type { Bookmark, BookmarkInput } from './api'
 import { bookmarkError, bookmarkInput, registrationMessage, validateBookmark } from './validation'
 
@@ -16,19 +17,8 @@ export function BookmarkForm({ initial, pending, error, canPublish, canSave = tr
   const visibility = visibilityChoice ?? defaultVisibility
   const [spoiler, setSpoiler] = useState(initial?.isSpoiler ?? false)
   const [validation, setValidation] = useState<string | null>(null)
-  const textarea = useRef<HTMLTextAreaElement>(null)
+  const textarea = useAutoGrowTextarea(content, autoGrow)
   const countId = useId()
-  useLayoutEffect(() => {
-    const input = textarea.current
-    if (!autoGrow || !input) return
-    const resize = () => {
-      input.style.height = 'auto'
-      input.style.height = `${input.scrollHeight + input.offsetHeight - input.clientHeight}px`
-    }
-    resize()
-    window.addEventListener('resize', resize)
-    return () => window.removeEventListener('resize', resize)
-  }, [autoGrow, content])
   function submit(event: FormEvent) {
     event.preventDefault()
     if (pending || !canSave) return

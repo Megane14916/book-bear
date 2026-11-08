@@ -18,10 +18,10 @@ const operations = Object.values(document.paths).flatMap((path) => Object.values
 const routes = [...Object.values(profileRoutes), ...Object.values(bookRoutes), ...Object.values(libraryRoutes), ...Object.values(bookmarkRoutes), ...Object.values(feedRoutes), ...Object.values(socialRoutes), ...Object.values(replyRoutes), ...Object.values(searchRoutes)]
 
 describe('OpenAPI契約と稼働APIの整合性', () => {
-  it('主要34操作・healthが一意のoperationIdを持ち、全操作が実装済み', () => {
-    expect(routes).toHaveLength(34)
-    expect(operations).toHaveLength(36)
-    expect(new Set(operations.map((operation) => operation.operationId)).size).toBe(36)
+  it('主要35操作・healthが一意のoperationIdを持ち、全操作が実装済み', () => {
+    expect(routes).toHaveLength(35)
+    expect(operations).toHaveLength(37)
+    expect(new Set(operations.map((operation) => operation.operationId)).size).toBe(37)
     expect(document.paths['/api/v1/health']?.get?.['x-implementation-status']).toBe('implemented')
     expect(document.paths['/api/v1/health/db']?.get?.['x-implementation-status']).toBe('implemented')
     for (const route of routes) {
@@ -36,7 +36,7 @@ describe('OpenAPI契約と稼働APIの整合性', () => {
     const draft = await readFile(new URL('../../../../contracts/openapi-draft.yaml', import.meta.url), 'utf8')
     const ids = [...draft.matchAll(/operationId: (\S+)/g)].map((match) => match[1])
     expect(ids).toHaveLength(34)
-    expect(routes.map((route) => route.operationId).sort()).toEqual(ids.sort())
+    expect(routes.map((route) => route.operationId).sort()).toEqual([...ids, 'getUsersUseridBookmarks'].sort())
   })
 
   it('followingと自分の返信DELETEの実際の認可を契約に明記する', () => {
@@ -58,7 +58,7 @@ describe('OpenAPI契約と稼働APIの整合性', () => {
     expect(document.components?.securitySchemes?.bearerAuth).toMatchObject({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' })
     expect(paths['/api/v1/me']?.get?.security).toEqual([{ bearerAuth: [] }])
     expect(paths['/api/v1/books/search']?.get?.security).toEqual([])
-    for (const path of ['/api/v1/feed', '/api/v1/bookmarks/{bookmarkId}', '/api/v1/users/{userId}', '/api/v1/users/{userId}/books/{bookId}/bookmarks', '/api/v1/bookmarks/{bookmarkId}/replies', '/api/v1/search/posts']) {
+    for (const path of ['/api/v1/feed', '/api/v1/bookmarks/{bookmarkId}', '/api/v1/users/{userId}', '/api/v1/users/{userId}/bookmarks', '/api/v1/users/{userId}/books/{bookId}/bookmarks', '/api/v1/bookmarks/{bookmarkId}/replies', '/api/v1/search/posts']) {
       expect(paths[path]?.get?.security).toEqual([{}, { bearerAuth: [] }])
       expect(paths[path]?.get?.responses[401]).toBeDefined()
     }

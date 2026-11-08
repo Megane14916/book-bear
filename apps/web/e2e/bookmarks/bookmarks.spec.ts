@@ -26,6 +26,7 @@ function session(id: string, anonymous: boolean) {
 async function setup(page: Page, options: { signedIn?: boolean; anonymous?: boolean; otherUser?: boolean; private?: boolean; failSave?: boolean; failInit?: boolean; denyPublic?: boolean; paginated?: boolean; manyBooks?: boolean; history?: boolean } = {}) {
   const events: string[] = [], bodies: Record<string, unknown>[] = []
   let signup = 0, saves = 0, adds = 0, deletes = 0, libraryPages = 0, init = 0
+  let feedContentMode = 'all'
   let current: typeof initial | null = { ...initial, visibility: options.private ? 'private' : 'public' }
   let libraryBook = shelf
   let identity: string | null = options.signedIn ? (options.otherUser ? otherId : userId) : null
@@ -52,7 +53,10 @@ async function setup(page: Page, options: { signedIn?: boolean; anonymous?: bool
         { ...initial, id: '00000000-0000-4000-8000-000000000006', content: '過去のネタバレ本文', isSpoiler: true },
       ] : [], nextCursor: null,
     } })
-    if (url.pathname === '/api/v1/me/preferences') return route.fulfill({ json: { feedContentMode: 'all' } })
+    if (url.pathname === '/api/v1/me/preferences') {
+      if (method === 'PATCH') feedContentMode = request.postDataJSON().feedContentMode
+      return route.fulfill({ json: { feedContentMode } })
+    }
     if (url.pathname === `/api/v1/bookmarks/${bookmarkId}/replies` && method === 'GET') {
       return current?.visibility === 'public' ? route.fulfill({ json: { items: [], nextCursor: null } }) : missing()
     }
@@ -102,7 +106,7 @@ async function setup(page: Page, options: { signedIn?: boolean; anonymous?: bool
   return { events, bodies, counts: () => ({ signup, saves, adds, deletes, libraryPages }) }
 }
 
-test('my page, bookmark flow and reply controls work at 360px', async ({ page }) => {
+test('profile tabs, bookmark flow and reply controls work at 360px', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 800 })
   await setup(page, { signedIn: true })
   const profilePath = `/api/v1/users/${userId}`
@@ -111,33 +115,68 @@ test('my page, bookmark flow and reply controls work at 360px', async ({ page })
     ...initial.author, handle: 'reader', bio: '読書記録です。', followersCount: 0, followingCount: 0, publicBookmarkCount: 1, followedByMe: false,
   } }))
   await page.route(`${origin}${profilePath}/books?**`, (route) => route.fulfill({ json: { items: [book], nextCursor: null } }))
+  await page.route(`${origin}/api/v1/me/bookmarks?**`, (route) => {
+    expect(Boolean(route.request().headers().authorization)).toBe(true)
+    const cursor = new URL(route.request().url()).searchParams.get('cursor')
+    return route.fulfill({ json: cursor ? {
+      items: [{ ...initial, id: '00000000-0000-4000-8000-000000000007', content: '自分だけの読書メモ', visibility: 'private' }], nextCursor: null,
+    } : { items: [initial], nextCursor: 'next' } })
+  })
   await page.route(`${origin}/api/v1${flowPath}?**`, (route) => route.fulfill({ json: {
-    author: initial.author, book, items: [{ ...initial, likeCount: 2, likedByMe: true, replyCount: 3 }], nextCursor: null,
+    author: initial.author, book, items: [
+      { ...initial, likeCount: 2, likedByMe: true, replyCount: 3 },
+      { ...initial, id: '00000000-0000-4000-8000-000000000006', content: '流れのネタバレ本文', isSpoiler: true },
+    ], nextCursor: null,
   } }))
   await page.route(`${origin}/api/v1/bookmarks/${bookmarkId}/replies?**`, (route) => route.fulfill({ json: { items: [], nextCursor: null } }))
 
   await page.goto('/library')
   await page.getByRole('link', { name: 'マイページ' }).click()
   await expect(page).toHaveURL('/me')
-  await expect(page.getByRole('heading', { name: '読者' })).toBeVisible()
-  await expect(page.getByRole('main')).toHaveCSS('padding-top', '16px')
+  const name = page.getByRole('heading', { name: '読者' })
+  await expect(name).toBeVisible()
+  await expect(name.locator('..').getByText('公開栞 1件', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: '戻る' })).toHaveCount(0)
   await expect(page.getByRole('navigation', { name: 'プロフィールの操作' })).toHaveCSS('border-top-width', '0px')
   await expect(page.getByRole('link', { name: '編集' })).toHaveAttribute('href', '/me/edit')
+  await expect(page.getByRole('link', { name: '編集' }).locator('svg')).toBeVisible()
+  await expect(page.getByRole('link', { name: '設定' }).locator('svg')).toBeVisible()
+  const profileTabs = page.getByRole('tablist', { name: 'マイページの表示' })
+  const posts = profileTabs.getByRole('tab', { name: '投稿', exact: true })
+  const books = profileTabs.getByRole('tab', { name: '栞がある本', exact: true })
+  await expect(posts).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByText(initial.content, { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'もっと見る', exact: true }).click()
+  await expect(page.getByText('自分だけの読書メモ', { exact: true })).toBeVisible()
+  await expect(page.getByText('非公開', { exact: true })).toBeVisible()
+  await page.screenshot({ path: 'test-results/my-profile-360.png' })
   await page.getByRole('link', { name: '設定' }).click()
   await expect(page.getByRole('heading', { name: '設定' })).toBeVisible()
   await page.getByRole('button', { name: '戻る' }).click()
   await expect(page).toHaveURL('/me')
 
+  await books.click()
+  await expect(books).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByText('自分だけの読書メモ', { exact: true })).toHaveCount(0)
   await page.getByRole('link', { name: book.title }).click()
   await expect(page).toHaveURL(flowPath)
-  const card = page.getByRole('article', { name: '栞' })
+  const bookInfo = page.getByRole('article', { name: `書籍：${book.title}`, exact: true })
+  await expect(bookInfo).toHaveCSS('border-top-width', '1px')
+  await expect(bookInfo.locator('..')).toHaveCSS('border-top-width', '0px')
+  await expect(page.getByRole('link', { name: '読者', exact: true }).locator('svg')).toBeVisible()
+  await page.screenshot({ path: 'test-results/bookmark-flow-360.png' })
+  const card = page.getByRole('article', { name: '栞', exact: true }).first()
   const body = card.getByText(initial.content)
   await expect(body).toBeVisible()
-  const close = card.getByRole('button', { name: '本文を閉じる' })
-  expect((await close.boundingBox())!.y).toBeGreaterThan((await body.boundingBox())!.y)
-  await close.click()
+  const spoilerBody = page.getByText('流れのネタバレ本文', { exact: true })
+  await expect(spoilerBody).toHaveCount(0)
+  await page.getByRole('button', { name: '本文：すべて表示', exact: true }).click()
   await expect(body).toHaveCount(0)
+  await card.getByRole('button', { name: '本文を表示', exact: true }).click()
+  await expect(body).toBeVisible()
+  await expect(card.getByRole('button', { name: '本文を閉じる' })).toHaveCount(0)
+  await page.getByRole('button', { name: 'ネタバレ本文を表示', exact: true }).click()
+  await expect(spoilerBody).toBeVisible()
   const like = card.getByRole('button', { name: 'いいねを解除（2）' })
   await expect(like).toHaveText('2')
   await expect(like.locator('svg')).toHaveAttribute('fill', 'currentColor')
@@ -149,11 +188,40 @@ test('my page, bookmark flow and reply controls work at 360px', async ({ page })
   await expect(page.getByRole('region', { name: '返信', exact: true })).toBeFocused()
   await page.getByRole('button', { name: '戻る' }).click()
   await expect(page).toHaveURL(flowPath)
+  await card.scrollIntoViewIfNeeded()
+  const bounds = (await card.boundingBox())!
+  await page.mouse.click(bounds.x + 8, bounds.y + 8)
+  await expect(page).toHaveURL(`/bookmarks/${bookmarkId}`)
+  await page.getByRole('button', { name: '戻る' }).click()
+  await expect(page).toHaveURL(flowPath)
   await page.getByRole('button', { name: '戻る' }).click()
   await expect(page).toHaveURL('/me')
+
+  const other = { ...initial.author, id: otherId, displayName: '別の読者' }
+  await page.route(`${origin}/api/v1/users/${otherId}`, (route) => route.fulfill({ json: {
+    ...other, handle: null, bio: null, followersCount: 0, followingCount: 0, publicBookmarkCount: 1, followedByMe: false,
+  } }))
+  await page.route(`${origin}/api/v1/users/${otherId}/bookmarks?**`, (route) => route.fulfill({ json: {
+    items: [{ ...initial, author: other, content: '別の読者の公開栞' }], nextCursor: null,
+  } }))
+  await page.route(`${origin}/api/v1/users/${otherId}/books?**`, (route) => route.fulfill({ json: { items: [book], nextCursor: null } }))
+  await page.goto(`/users/${otherId}`)
+  const publicName = page.getByRole('heading', { name: other.displayName })
+  await expect(publicName.locator('..').getByText('公開栞 1件', { exact: true })).toBeVisible()
+  await expect(page.getByRole('tab', { name: '投稿', exact: true })).toHaveAttribute('aria-selected', 'true')
+  const publicBody = page.getByText('別の読者の公開栞', { exact: true })
+  await expect(publicBody).toHaveCount(0)
+  await page.getByRole('button', { name: '本文を表示', exact: true }).click()
+  await expect(publicBody).toBeVisible()
+  await expect(page.getByRole('button', { name: 'フォローする', exact: true })).toBeVisible()
+  await expect(page.getByRole('navigation', { name: 'プロフィールの操作' })).toHaveCount(0)
+  await page.screenshot({ path: 'test-results/public-profile-360.png' })
+  await page.getByRole('tab', { name: '栞がある本', exact: true }).click()
+  await expect(page.getByRole('link', { name: book.title, exact: true }))
+    .toHaveAttribute('href', `/users/${otherId}/books/${bookId}/bookmarks`)
 })
 
-test('bookmark detail opens at the current post with adjacent pages and an inline reply composer', async ({ page }) => {
+test('bookmark detail opens at the current post and expands later bookmarks above replies', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 800 })
   await setup(page, { signedIn: true })
   const previous = { ...initial, id: '00000000-0000-4000-8000-000000000011', content: 'ひとつ前の栞',
@@ -172,24 +240,45 @@ test('bookmark detail opens at the current post with adjacent pages and an inlin
   await page.goto(`/bookmarks/${bookmarkId}`)
   const thread = page.getByRole('region', { name: '前後の栞と返信' })
   const cards = thread.getByRole('article', { name: '栞', exact: true })
-  await expect(cards).toHaveCount(3)
-  expect(cursors).toEqual([null, 'current', 'following'])
+  await expect(cards).toHaveCount(2)
+  expect(cursors).toEqual([null, 'current'])
   await expect(cards.nth(0)).toContainText(previous.content)
   await expect(cards.nth(1)).toContainText(initial.content)
-  await expect(cards.nth(2)).toContainText(following.content)
+  await expect(thread.getByText(following.content, { exact: true })).toHaveCount(0)
   const viewport = (await thread.boundingBox())!
   const current = cards.nth(1)
   const replies = thread.getByRole('region', { name: '返信', exact: true })
   expect(Math.abs((await current.boundingBox())!.y - viewport.y)).toBeLessThanOrEqual(1)
-  expect((await replies.boundingBox())!.y).toBeLessThan((await cards.nth(2).boundingBox())!.y)
-  await expect(replies.getByRole('textbox', { name: '返信本文（1,000文字以内）' })).toBeInViewport()
+  await expect(page.getByRole('link', { name: '栞の流れ', exact: true })).toHaveAttribute('href', `/users/${userId}/books/${bookId}/bookmarks`)
+  await expect(page.getByRole('heading', { name: '栞の詳細', exact: true })).toHaveClass('sr-only')
+  const replyInput = replies.getByRole('textbox', { name: '返信本文（1,000文字以内）' })
+  await expect(replyInput).toBeInViewport()
+  await expect(replies.locator('form')).toHaveCSS('border-top-width', '0px')
+  const initialHeight = (await replyInput.boundingBox())!.height
+  await replyInput.fill('横幅に合わせて折り返す返信です。'.repeat(12))
+  expect((await replyInput.boundingBox())!.height).toBeGreaterThan(initialHeight)
+  await replyInput.fill('')
+  expect((await replyInput.boundingBox())!.height).toBe(initialHeight)
   await expect(current.getByRole('link', { name: 'Xで共有' })).toBeVisible()
   await expect(cards.nth(0).getByRole('link', { name: 'Xで共有' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'URLをコピー' })).toHaveCount(0)
   await page.screenshot({ path: 'test-results/bookmark-thread-360.png' })
+  const more = thread.getByRole('button', { name: 'もっと見る', exact: true })
+  await expect(more).toHaveAttribute('aria-expanded', 'false')
+  const dots = more.locator('..').locator('circle')
+  await expect(dots).toHaveCount(4)
+  const lineColor = await current.locator('..').locator(':scope > span').evaluate((element) => getComputedStyle(element).backgroundColor)
+  await expect(dots.first()).toHaveCSS('fill', lineColor)
+  await more.click()
+  await expect(cards).toHaveCount(3)
+  await expect(more).toHaveCount(0)
+  await expect(thread.getByRole('button', { name: '後の栞を閉じる' })).toHaveCount(0)
+  expect(cursors).toEqual([null, 'current', 'following'])
+  await expect(cards.nth(2)).toContainText(following.content)
+  expect((await replies.boundingBox())!.y).toBeGreaterThan((await cards.nth(2).boundingBox())!.y)
   await thread.evaluate((element) => { element.scrollTop = 0 })
   await expect(cards.nth(0)).toBeInViewport()
-  await thread.evaluate((element) => { element.scrollTop = element.scrollHeight })
+  await cards.nth(2).scrollIntoViewIfNeeded()
   await expect(cards.nth(2)).toBeInViewport()
 })
 
@@ -289,7 +378,7 @@ test('guest browsing creates no account; first private save initializes auth, ad
   await expect(page.getByRole('link', { name: '編集', exact: true })).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   await page.reload()
-  await expect(page.getByRole('heading', { name: '栞の詳細' })).toBeVisible()
+  await expect(page.getByRole('link', { name: '栞の流れ', exact: true })).toBeVisible()
   expect(mock.counts().signup).toBe(1)
 })
 

@@ -26,16 +26,16 @@ export function BookmarkCard(props: Props) {
   const date = new Date(bookmark.createdAt)
   const dateText = Number.isNaN(date.getTime()) ? '日時不明' : dateFormat.format(date)
   const timeline = props.appearance === 'timeline' && props.variant !== 'flow'
+  const detailOverlay = (timeline || props.variant === 'flow') && detailHref
   const time = <time dateTime={Number.isNaN(date.getTime()) ? undefined : bookmark.createdAt}>{dateText}</time>
-  const timestamp = detailHref && !timeline ? <Link to={detailHref} className="ui-action inline-flex underline">{time}</Link> : time
-  const detailOverlay = timeline && detailHref
+  const timestamp = detailHref && !detailOverlay ? <Link to={detailHref} className="ui-action inline-flex underline">{time}</Link> : time
   const book = props.variant !== 'flow' && <BookCard book={props.bookmark.book} titleHref={props.bookHref}
     compact={timeline} pageNumber={timeline ? bookmark.pageNumber : undefined} />
   return (
     <article aria-label="栞" className={timeline
       ? 'relative min-w-0 py-4 [overflow-wrap:anywhere]'
-      : 'min-w-0 rounded-2xl border border-[#e2e7e2] bg-white p-4 [overflow-wrap:anywhere] sm:p-5'}>
-      {detailOverlay && <Link to={detailOverlay} aria-label={`${props.bookmark.book.title}の栞を開く`}
+      : 'relative min-w-0 rounded-2xl border border-[#e2e7e2] bg-white p-4 [overflow-wrap:anywhere] sm:p-5'}>
+      {detailOverlay && <Link to={detailOverlay} aria-label={props.variant === 'flow' ? `${dateText}の栞を開く` : `${props.bookmark.book.title}の栞を開く`}
         className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-forest" />}
       <div className={`relative ${detailOverlay ? 'pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto' : ''} ${inThread ? 'min-h-8 pl-11' : ''}`}>
         {props.variant !== 'flow' && (
@@ -62,7 +62,7 @@ export function BookmarkCard(props: Props) {
           {bookmark.pageNumber !== null && <span>{bookmark.pageNumber}ページ</span>}
         </div>}
         <BookmarkBody bookmarkId={bookmark.id} viewerId={viewerId} mode={mode} isSpoiler={bookmark.isSpoiler} content={bookmark.content}
-          closeBelow={props.variant === 'flow'} compact={timeline && !inThread} revealOverlay={timeline} />
+          compact={timeline && !inThread} revealOverlay={timeline || props.variant === 'flow'} />
         {timeline && book}
         {(!inThread || bookmark.visibility === 'public') && <div className={`flex flex-wrap items-start gap-x-3 text-sm text-[#526356] tabular-nums ${timeline ? 'mt-1' : 'mt-2 border-t border-[#e2e7e2] pt-1'}`}>
           {props.likeAction ?? <span className="inline-flex min-h-11 items-center gap-1.5 px-2">

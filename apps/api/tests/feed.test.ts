@@ -165,6 +165,31 @@ describe('全体フィードの公開範囲と降順ページング（署名済�
   })
 })
 
+it('公開プロフィールの栞は読者・公開範囲・未削除の条件をページ分割前に適用する', async () => {
+  const reader = await actor(false)
+  const firstBook = await shelf(reader), secondBook = await shelf(reader), otherBook = await shelf(other)
+  const latest = await seed(firstBook, '2026-06-01T00:00:00.000002Z')
+  const earlier = await seed(secondBook, '2026-06-01T00:00:00.000001Z')
+  await seed(firstBook, '2026-06-02T00:00:00.000000Z', { visibility: 'private' })
+  await seed(secondBook, '2026-06-03T00:00:00.000000Z', { deleted: true })
+  await seed(otherBook, '2026-06-04T00:00:00.000000Z')
+  const path = `/users/${reader.id}/bookmarks`
+  for (const token of [null, reader.token, other.token]) {
+    const response = await request(`${path}?limit=1`, token)
+    expect(response.status).toBe(200)
+    expect(response.headers.get('Cache-Control')).toBe('no-store')
+    const first = FeedPage.parse(await response.json())
+    expect(first.items.map((item) => item.id)).toEqual([latest.id])
+    expect(first.nextCursor).toBeTypeOf('string')
+    const second = FeedPage.parse(await (await request(`${path}?limit=1&cursor=${first.nextCursor}`, token)).json())
+    expect(second.items.map((item) => item.id)).toEqual([earlier.id])
+    expect(second.nextCursor).toBeNull()
+  }
+  expect((await request(path, 'invalid')).status).toBe(401)
+  expect((await request(`${path}?cursor=invalid!`)).status).toBe(400)
+  expect((await request(`/users/${randomUUID()}/bookmarks`)).status).toBe(404)
+})
+
 describe('認証→Zod→followingガード→allのカーソル検証', () => {
   it('不正・期限切れ・署名不正JWTは不正クエリより先に401、認証基盤障害は503', async () => {
     const database = vi.fn(async () => { throw new Error('DB must not be called') })

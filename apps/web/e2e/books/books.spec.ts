@@ -210,7 +210,7 @@ test('empty results, malformed candidates, 404, invalid IDs and 502 are actionab
   const mock = await setup(page)
   await page.goto('/search?q=0件')
   await expect(page.getByText('本が見つかりませんでした', { exact: true })).toBeVisible()
-  await expect(page.getByRole('link', { name: '手動登録へ', exact: true })).toHaveAttribute('href', '/books/manual')
+  await expect(page.getByRole('link', { name: 'ISBNのない本を手動登録', exact: true })).toHaveAttribute('href', '/books/manual')
   await search(page, '不正候補')
   await expect(page.getByText('取り込みに必要な識別情報がありません。検索し直してください。', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: '書籍情報を取り込む' })).toHaveCount(0)
