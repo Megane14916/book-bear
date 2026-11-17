@@ -1,56 +1,75 @@
-# book-bear
+# Book Bear
 
-## 開発環境
+本の好きなページや章に、感想を「栞」として残して共有できる読書 SNS です。本棚で読書の進捗を管理し、「栞の流れ」で同じ本への感想を投稿順に振り返れます。
 
-Node.js 22.12以上とpnpm 10.28.2を使用します。
+- [プロジェクト概要](docs/overview.md)
+- [アーキテクチャ設計書](docs/architecture.md)
 
-依存関係をインストールし直す前に、起動中のWeb/API開発サーバーを `Ctrl+C` で停止してください。特にWindowsでは使用中のネイティブモジュールがインストールを妨げることがあります。pnpmストアはリポジトリ内の `.pnpm-store` を使用します。
+## 使用技術
 
-```sh
-pnpm install
-pnpm dev:api # http://localhost:8787
-pnpm dev:web # http://localhost:5173
-pnpm typecheck
-pnpm test
-pnpm build
+| 領域 | 技術 |
+| --- | --- |
+| フロントエンド | React、TypeScript、Vite、React Router |
+| UI・データ取得 | Tailwind CSS、TanStack Query、openapi-fetch |
+| バックエンド | Hono、Zod OpenAPI |
+| データベース | Supabase PostgreSQL、Drizzle ORM、Cloudflare Hyperdrive |
+| 認証 | Supabase Auth（匿名認証・Google 連携） |
+| 書籍情報 | openBD、Google Books API |
+| テスト・CI | Vitest、Playwright、GitHub Actions |
+| デプロイ | Cloudflare Pages、Cloudflare Workers |
+
+## システム構成
+
+Web（`apps/web`）と API（`apps/api`）を pnpm のモノレポで管理します。ブラウザは Supabase Auth で認証し、アプリのデータは Hono API を通じて読み書きします。
+
+```text
+[ブラウザ] ──認証──⇄ [Supabase Auth] ⇄ [Google]
+   ⇅ 画面配信
+[React / Cloudflare Pages]
+
+[ブラウザ] ──HTTP / OpenAPI──⇄ [Hono API / Cloudflare Workers]
+                                  ├─ Hyperdrive 経由 ──⇄ [Supabase PostgreSQL]
+                                  └─ 書籍情報の取得 ──⇄ [openBD / Google Books API]
 ```
 
-DBを使う場合は [Supabase・Hyperdrive初期設定](docs/database-setup.md) を参照してください。外部サービスの作成前でも `pnpm --filter api db:local` と `pnpm --filter api db:migrate` でローカル確認できます。
+## 開発環境構築
 
-配信済み開発用Worker・実Hyperdrive・Supabaseの接続と書籍／本棚の基本操作は、[クラウド結合テスト手順](docs/cloud-integration-test.md) の `pnpm --filter api test:cloud check`／`run` で明示確認できます。実行前にDashboardで開発環境の対応を確認し、正式な専用ユーザーのJWTを用意します。通常テスト・PR CIから実サービスへは接続しません。
+Node.js 22.12 以上と pnpm 10.28.2 を使用します。リポジトリ直下で依存関係をインストールし、設定ファイルがない場合はサンプルをコピーします（PowerShell）。
 
-開発用SupabaseへローカルAPIから接続する場合は、`apps/api/.env.local.example` を `.env.local`、`.dev.vars.example` を `.dev.vars` にコピーして設定し、`pnpm dev:api` を実行します。既存ファイルは上書きしないでください。公開CAは `apps/api/certs/prod-ca-2021.crt` を共有し、接続文字列には `sslrootcert=certs/prod-ca-2021.crt` を指定します。Cloudflareへのログインは不要です。
+```powershell
+pnpm install --frozen-lockfile
+Copy-Item apps/web/.env.example apps/web/.env.local
+Copy-Item apps/api/.dev.vars.example apps/api/.dev.vars
+```
 
-実際のHyperdrive IDは `apps/api/.env.deploy.local` の `HYPERDRIVE_ID` で管理し、`wrangler.jsonc` には書き込みません。リモートでの接続確認は `pnpm --filter api dev:remote`、デプロイは `pnpm --filter api deploy:worker` を使用します。設定例は `apps/api/.env.deploy.example` にあります。
+macOS / Linux では `Copy-Item` を `cp` に置き換えます。
 
-認証・プロフィールAPIの利用には [Supabase匿名認証の設定](docs/auth-setup.md) を参照してください。Supabaseの匿名サインインとES256/RS256署名キーを確認し、APIに `SUPABASE_URL` を設定します。リモートコマンドは `.env.deploy.local`、ローカルWranglerは `.dev.vars` を使います。
+環境変数を設定し、[DB・Hyperdrive 初期設定](docs/database-setup.md)に沿って DB を準備します。Web と API は別々のターミナルで起動します。
 
-Google Custom OIDCと認証・データアクセスの責務は [認証機能 Design Doc](docs/auth-design.md) に記載しています。[Google OIDC設定・手動確認](docs/google-oidc-setup.md) に沿って、`pnpm --filter api auth:google link`／`login` でご自身のブラウザから確認できます。CLIは実際の認可scopeを検査し、UID・既存プロフィール・設定の保持を確認します。2026-11-02に利用者による実Googleログイン・匿名連携・再ログイン・追加メタデータ等の確認が完了しました。[検証結果](docs/google-oidc-setup.md#11-実サービスの検証記録) を参照してください。
+```powershell
+pnpm dev:web # http://localhost:5173
+pnpm dev:api # http://localhost:8787
+```
 
-フロントは後続タスクでSupabase SDKを認証専用に導入し、Data APIは使用せず、アプリデータはHono API経由で扱います。今回のバックエンド対応ではフロントのSDK・UIを追加していません。
+## 環境変数
 
-WebのAPI接続先は `apps/web/.env.example` を参考に `apps/web/.env.local` の `VITE_API_BASE_URL` で変更できます。APIのCORS許可元は既定で `http://localhost:5173` です。環境ごとにWorkersの `CORS_ORIGIN` を設定してください。
+| 設定ファイル | 主な項目 |
+| --- | --- |
+| [Web の設定例](apps/web/.env.example) | `VITE_API_BASE_URL`（ローカルでは `http://localhost:8787`）、`VITE_SUPABASE_URL`、`VITE_SUPABASE_PUBLISHABLE_KEY` |
+| [API の設定例](apps/api/.dev.vars.example) | `SUPABASE_URL`、`CORS_ORIGIN`（ローカルでは `http://localhost:5173`）、`GOOGLE_BOOKS_API_KEY`（任意） |
 
-書籍・本棚APIの設計とGoogle Books APIキーの設定は [書籍・本棚API設計書](docs/books-library-design.md) を参照してください。ISBNなしの重複は許容し、手動登録のレート制限は今後の課題です。外部検索が失敗してもDB候補があれば200で返します。
+Web と API には同じ Supabase プロジェクトの URL を設定します。認証の設定は [Supabase 匿名認証](docs/auth-setup.md)と [Google OIDC](docs/google-oidc-setup.md)を参照してください。
 
-栞CRUD・本人一覧の認可とトランザクションは [栞CRUD API設計書](docs/bookmarks-design.md) を参照してください。作成は所有者確認から応答取得まで同一トランザクションで行い、匿名の公開操作と第三者による非公開栞の取得を拒否します。
+## テスト
 
-投稿順で読む栞の流れは [栞の流れAPI設計書](docs/bookmark-flow-design.md) を参照してください。本人には公開・非公開、第三者には公開のみを返し、author・bookはヘッダーに1回だけ含めます。
+```powershell
+pnpm typecheck
+pnpm test
+pnpm check:openapi
+```
 
-公開栞を新しい順に読むフィードは [全体フィードAPI設計書](docs/feed-design.md) を参照してください。GET /feedはallと、正式ユーザー本人のフォロー先だけを返すfollowingに対応しています。
+## デプロイ
 
-フォロー・いいね・返信の認可と登録確認の移行は [SNS API設計書](docs/social-design.md) を参照してください。DBの登録確認列マイグレーション適用後、ログイン・匿名昇格後にも新しい正式JWTでPUT /meを呼ぶことが必要です。既存ユーザーも実行するまでフォロー対象として未確認となります。自分の返信DELETEは元栞の非公開化・削除後も可能です。
+Web は `pnpm --filter web build` で生成した `apps/web/dist` を Cloudflare Pages に配信します。ビルド時に Web の環境変数を設定し、`VITE_API_BASE_URL` に公開 API の URL を指定します。
 
-投稿・ユーザー検索は [検索API設計書](docs/search-design.md) を参照してください。投稿は本人の非公開も除く公開・未削除の本文を検索し、既存の高精度カーソルと一括集計を使います。ユーザーは正式JWTのPUT /meで登録確認済みのプロフィールのみを検索し、handle付きのSearchUserPageを返します。ユーザー検索は既定20・最大30件で、続きの取得はありません。
-
-## OpenAPI契約
-
-`pnpm generate:openapi` はAPIのHono/Zod定義から `contracts/openapi.json` を生成し、続けてWeb用の型を生成します。生成物はコミットし、変更後は `pnpm check:openapi` で差分がないことを確認します。APIは同じ仕様を `/openapi.json` でも公開します。
-
-生成契約にはプロフィール、書籍・本棚、栞、フィード、フォロー・いいね・返信、検索の34操作と2種類のhealthが含まれます。各操作の **`x-implementation-status`** を確認してください。
-
-- 全36操作が `implemented`：health、DB接続確認、プロフィール／設定6操作、書籍・本棚9操作、栞CRUD・本人一覧5操作、栞の流れ1操作、all／followingフィード1操作、フォロー・いいね・返信10操作、投稿／ユーザー検索2操作。DB・認証の設定が必要です。
-
-スキーマは `apps/api/src/modules/*/schemas.ts`、共通項目は `src/shared/schemas.ts`、操作は `src/modules/{users,books,library,bookmarks,feed,social,replies,search}/routes.ts` にあります。一覧は日時・IDのBase64URLカーソルを使い、日時のマイクロ秒精度を維持します。署名・期限は設けず、認可はSQL条件で毎回確認します。ユーザー検索のみカーソル入力がなく、nextCursorは常にnullです。`contracts/openapi-draft.yaml` は初期設計の履歴として残し、生成には利用しません。詳しくは [API設計書](docs/api.md) を参照してください。
-
-`pnpm test` でVitestによるスキーマ境界値・契約・実APIの認可と正常系／異常系の検証を実行します。GitHub Actionsでも型チェック・テスト・契約整合性・ビルドを確認します。現在lintスクリプトは未導入です。
+API は [デプロイ用の設定例](apps/api/.env.deploy.example)をもとに `apps/api/.env.deploy.local` を作成し、`CORS_ORIGIN` に公開 Web のオリジンを設定してから `pnpm --filter api deploy:worker` で Cloudflare Workers にデプロイします。
